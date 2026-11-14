@@ -72,6 +72,10 @@ fun DashboardCardItem(
         DashboardCardType.BUDGET_PULSE -> BudgetPulseCard(
             summary = uiState.budgetPulse,
             onClick = { onNavigate(OrbitNavKey.Budgets) },
+            dayOfMonth = uiState.dayOfMonth,
+            totalDaysInMonth = uiState.totalDaysInMonth,
+            isCurrentMonth = uiState.cashflow.isCurrentMonth,
+            onCategoryClick = { catId -> onNavigate(OrbitNavKey.Transactions(categoryId = catId)) },
             modifier = modifier
         )
         DashboardCardType.TOP_SPENDING -> TopSpendingCard(
@@ -102,6 +106,7 @@ fun DashboardCardItem(
                         )
                     )
                 },
+                onSelectTransaction = { txnId -> onNavigate(OrbitNavKey.Transactions(transactionId = txnId)) },
                 onHideTransaction = { onAction(DashboardAction.HideBiggestTransaction(it)) },
                 onResetHidden = { onAction(DashboardAction.ResetHiddenBiggestTransactions) },
                 modifier = modifier
@@ -115,10 +120,13 @@ fun DashboardCardItem(
         DashboardCardType.UNCATEGORIZED -> UncategorizedCard(
             state = uiState.uncategorized,
             onClick = { onNavigate(OrbitNavKey.Transactions(uncategorizedOnly = true)) },
+            onOpenReview = { onAction(DashboardAction.OpenCategorizeReview) },
+            onSelectTransaction = { txnId -> onNavigate(OrbitNavKey.Transactions(transactionId = txnId)) },
             modifier = modifier
         )
         DashboardCardType.CATEGORIZE_RECENT -> CategorizeRecentCard(
             onOpenReview = { onAction(DashboardAction.OpenCategorizeReview) },
+            uncategorizedCount = uiState.uncategorized.count,
             modifier = modifier
         )
         DashboardCardType.MONTH_COMPARISON -> MonthComparisonCard(

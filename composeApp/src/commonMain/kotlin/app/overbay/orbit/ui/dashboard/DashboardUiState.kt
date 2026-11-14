@@ -147,6 +147,7 @@ data class SubscriptionItem(
     val name: String,
     val merchant: String?,
     val amountCents: Cents,
+    val isExpense: Boolean = true,
     val frequencyLabel: String,
     val categoryName: String? = null,
     val categoryColor: String? = null,
@@ -155,7 +156,9 @@ data class SubscriptionItem(
 )
 
 data class SubscriptionsState(
-    val items: List<SubscriptionItem> = emptyList()
+    val items: List<SubscriptionItem> = emptyList(),
+    val totalActiveCount: Int = 0,
+    val estimatedMonthlyTotalCents: Cents = 0L
 )
 
 data class UncategorizedTransactionsState(
@@ -275,6 +278,8 @@ data class DashboardGoalItem(
     val remainingAmountCents: Cents,
     val isCompleted: Boolean,
     val targetDate: String? = null,
+    val targetDateDisplay: String? = null,
+    val monthlyPaceCents: Cents? = null,
     val icon: String = "🎯"
 ) {
     val labelWithEmoji: String

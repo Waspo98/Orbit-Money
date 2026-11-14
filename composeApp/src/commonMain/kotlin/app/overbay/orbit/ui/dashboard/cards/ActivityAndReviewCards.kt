@@ -2,7 +2,6 @@ package app.overbay.orbit.ui.dashboard.cards
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,71 +13,59 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import app.overbay.orbit.data.model.Category
-import app.overbay.orbit.data.model.CategoryEmojiMapper
 import app.overbay.orbit.theme.OrbitTheme
-import app.overbay.orbit.theme.toComposeColor
-import app.overbay.orbit.ui.components.OrbitAccordionVisibility
+import app.overbay.orbit.ui.components.OrbitActionChip
+import app.overbay.orbit.ui.components.OrbitBadge
 import app.overbay.orbit.ui.components.OrbitCompactListRow
-import app.overbay.orbit.ui.components.OrbitExpandableChevron
-import app.overbay.orbit.ui.components.OrbitMiniStatRow
+import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.OrbitSectionCard
-import app.overbay.orbit.ui.dashboard.DashboardRecentTransactionItem
 import app.overbay.orbit.ui.dashboard.UncategorizedTransactionsState
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 /**
- * Uncategorized transactions card listing up to 5 transactions requiring a category.
+ * Uncategorized transactions card listing up to 5 transactions requiring a category,
+ * with a live count badge, formatted dates, per-row inspection, and direct Quick Review launch.
  */
 @Composable
 fun UncategorizedCard(
     state: UncategorizedTransactionsState,
     onClick: () -> Unit,
+    onOpenReview: () -> Unit = onClick,
+    onSelectTransaction: (Long) -> Unit = { onClick() },
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
     val colors = OrbitTheme.colors
+    val hasPending = state.count > 0
 
     OrbitSectionCard(
         title = "Uncategorized Transactions",
-        actionText = "Categorize",
+        headerBadge = {
+            OrbitBadge(
+                text = if (hasPending) "${state.count}" else "All set",
+                containerColor = (if (hasPending) colors.warning else colors.income).copy(alpha = 0.14f),
+                contentColor = if (hasPending) colors.warning else colors.income
+            )
+        },
+        actionText = "Browse",
         onActionClick = onClick,
+        onCardClick = onClick,
         modifier = modifier
-            .clip(MaterialTheme.shapes.large)
-            .clickable {
-                haptics.tick()
-                onClick()
-            }
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            OrbitMiniStatRow(
-                label = "Needs category",
-                value = "${state.count} items",
-                valueColor = if (state.count > 0) colors.warning else colors.income
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
             if (state.transactions.isEmpty()) {
                 Text(
                     text = "All transactions are neatly categorized! 🎉",
@@ -92,8 +79,26 @@ fun UncategorizedCard(
                         subtitle = "${txn.dateDisplay} · ${txn.accountName}",
                         amount = txn.formattedAmount,
                         amountColor = if (txn.isExpense) colors.expense else colors.income,
-                        showTopDivider = index > 0
+                        showTopDivider = index > 0,
+                        onClick = {
+                            haptics.tick()
+                            onSelectTransaction(txn.id)
+                        }
                     )
+                }
+
+                if (hasPending) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        OrbitActionChip(
+                            label = "Quick Review (${state.count})",
+                            icon = OrbitIcons.Categories,
+                            onClick = onOpenReview
+                        )
+                    }
                 }
             }
         }
@@ -101,26 +106,31 @@ fun UncategorizedCard(
 }
 
 /**
- * Quick category check launch card opening the swipeable review modal.
- * Matches main's `CategorizeRecentCard` with stacked 3-card graphic and copy.
+ * Quick category check launch card opening the swipeable review modal,
+ * reflecting the live uncategorized review queue count.
  */
 @Composable
 fun CategorizeRecentCard(
     onOpenReview: () -> Unit,
+    uncategorizedCount: Int = 0,
     modifier: Modifier = Modifier
 ) {
-    val haptics = LocalOrbitHaptics.current
+    val colors = OrbitTheme.colors
+    val hasItems = uncategorizedCount > 0
 
     OrbitSectionCard(
         title = "Categorize Recent Transactions",
-        actionText = "Open",
+        headerBadge = {
+            OrbitBadge(
+                text = if (hasItems) "$uncategorizedCount waiting" else "Caught up",
+                containerColor = (if (hasItems) colors.warning else colors.income).copy(alpha = 0.14f),
+                contentColor = if (hasItems) colors.warning else colors.income
+            )
+        },
+        actionText = if (hasItems) "Review" else "Open",
         onActionClick = onOpenReview,
+        onCardClick = onOpenReview,
         modifier = modifier
-            .clip(MaterialTheme.shapes.large)
-            .clickable {
-                haptics.tick()
-                onOpenReview()
-            }
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -131,14 +141,19 @@ fun CategorizeRecentCard(
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Quick category check",
+                    text = if (hasItems) "Quick category check" else "All caught up",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Quickly categorize recent transactions that need your review.",
+                    text = if (hasItems) {
+                        val noun = if (uncategorizedCount == 1) "transaction needs" else "transactions need"
+                        "$uncategorizedCount $noun a quick category review."
+                    } else {
+                        "Everything is categorized—tap to review recent activity anyway."
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     lineHeight = 19.sp
@@ -161,7 +176,6 @@ private fun ReviewLaunchGraphic(
         modifier = modifier.size(width = 84.dp, height = 78.dp),
         contentAlignment = Alignment.Center
     ) {
-        // Left ghost card (-17dp X, -22deg, danger soft background)
         Surface(
             shape = cardShape,
             color = colors.danger.copy(alpha = 0.14f),
@@ -175,7 +189,6 @@ private fun ReviewLaunchGraphic(
                 }
         ) {}
 
-        // Right ghost card (+18dp X, +20deg, accent soft background)
         Surface(
             shape = cardShape,
             color = primary.copy(alpha = 0.14f),
@@ -189,7 +202,6 @@ private fun ReviewLaunchGraphic(
                 }
         ) {}
 
-        // Main center card (-8deg, two bottom pill bars)
         Surface(
             shape = cardShape,
             color = MaterialTheme.colorScheme.surface,
@@ -221,112 +233,6 @@ private fun ReviewLaunchGraphic(
                         .clip(CircleShape)
                         .background(primary.copy(alpha = 0.45f))
                 )
-            }
-        }
-    }
-}
-
-/**
- * Editorial Recent Transactions card showing up to 10 latest transactions
- * with inline expandable quick actions (categorize, transfer, ignore, mha, recurring, reset, delete).
- */
-@Composable
-fun RecentTransactionsCard(
-    transactions: List<DashboardRecentTransactionItem>,
-    mhaEnabled: Boolean = false,
-    categories: List<Category> = emptyList(),
-    onSelectTransaction: (Long) -> Unit,
-    onViewAll: () -> Unit,
-    onQuickCategorize: (Long, Long) -> Unit = { _, _ -> },
-    onToggleTransfer: (Long, Boolean) -> Unit = { _, _ -> },
-    onToggleIgnore: (Long, Boolean) -> Unit = { _, _ -> },
-    onToggleMha: (Long, Boolean) -> Unit = { _, _ -> },
-    onMarkRecurring: (Long) -> Unit = {},
-    onResetEdits: (Long) -> Unit = {},
-    onDelete: (Long) -> Unit = {},
-    modifier: Modifier = Modifier
-) {
-    val haptics = LocalOrbitHaptics.current
-    val colors = OrbitTheme.colors
-    var expandedTransactionId by remember { mutableStateOf<Long?>(null) }
-
-    OrbitSectionCard(
-        title = "Recent Transactions",
-        actionText = "See All",
-        onActionClick = onViewAll,
-        modifier = modifier
-            .clip(MaterialTheme.shapes.large)
-            .clickable {
-                haptics.tick()
-                onViewAll()
-            }
-    ) {
-        if (transactions.isEmpty()) {
-            Text(
-                text = "No recent transactions recorded.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        } else {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                transactions.take(10).forEachIndexed { index, txn ->
-                    val isExpanded = expandedTransactionId == txn.id
-                    val catColor = txn.categoryColor.toComposeColor(MaterialTheme.colorScheme.primary)
-                    val catPrefix = CategoryEmojiMapper.resolveEmoji(txn.categoryIcon)?.let { "$it " } ?: ""
-                    val catLabel = txn.categoryName?.let { "$catPrefix$it" } ?: "❓ Uncategorized"
-
-                    OrbitCompactListRow(
-                        title = txn.merchant,
-                        subtitle = "${txn.dateDisplay} · $catLabel",
-                        amount = txn.formattedAmount,
-                        amountDetail = txn.accountName,
-                        amountColor = if (txn.isExpense) colors.expense else colors.income,
-                        showTopDivider = index > 0,
-                        leadingContent = {
-                            Box(
-                                modifier = Modifier
-                                    .padding(end = 10.dp)
-                                    .size(10.dp)
-                                    .clip(CircleShape)
-                                    .background(catColor)
-                            )
-                        },
-                        trailingAction = {
-                            IconButton(
-                                onClick = {
-                                    haptics.tick()
-                                    expandedTransactionId = if (isExpanded) null else txn.id
-                                },
-                                modifier = Modifier.size(28.dp)
-                            ) {
-                                OrbitExpandableChevron(
-                                    expanded = isExpanded,
-                                    contentDescription = "Quick actions"
-                                )
-                            }
-                        },
-                        onClick = {
-                            haptics.tick()
-                            onSelectTransaction(txn.id)
-                        }
-                    )
-
-                    OrbitAccordionVisibility(visible = isExpanded) {
-                        RecentTransactionQuickActionsRow(
-                            transaction = txn,
-                            mhaEnabled = mhaEnabled,
-                            categories = categories,
-                            onQuickCategorize = { catId -> onQuickCategorize(txn.id, catId) },
-                            onToggleTransfer = { isTr -> onToggleTransfer(txn.id, isTr) },
-                            onToggleIgnore = { isIgn -> onToggleIgnore(txn.id, isIgn) },
-                            onToggleMha = { isMha -> onToggleMha(txn.id, isMha) },
-                            onMarkRecurring = { onMarkRecurring(txn.id) },
-                            onResetEdits = { onResetEdits(txn.id) },
-                            onInspectDetails = { onSelectTransaction(txn.id) },
-                            onDelete = { onDelete(txn.id) }
-                        )
-                    }
-                }
             }
         }
     }

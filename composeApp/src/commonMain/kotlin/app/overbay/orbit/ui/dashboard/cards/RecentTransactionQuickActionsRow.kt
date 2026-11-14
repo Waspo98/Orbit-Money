@@ -10,15 +10,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
-import app.overbay.orbit.ui.components.OrbitIcons
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -29,8 +27,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.Category
-import app.overbay.orbit.theme.OrbitColorTokens
 import app.overbay.orbit.ui.components.OrbitAccordionVisibility
+import app.overbay.orbit.ui.components.OrbitActionChip
+import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.OrbitScaleBadgeVisibility
 import app.overbay.orbit.ui.dashboard.DashboardRecentTransactionItem
 import app.overbay.orbit.util.LocalOrbitHaptics
@@ -61,7 +60,6 @@ fun RecentTransactionQuickActionsRow(
             .fillMaxWidth()
             .padding(vertical = 4.dp)
     ) {
-        // Quick Category Suggestions (first 4 categories if available)
         OrbitAccordionVisibility(visible = categories.isNotEmpty()) {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Row(
@@ -85,11 +83,12 @@ fun RecentTransactionQuickActionsRow(
                                 haptics.tick()
                                 onQuickCategorize(cat.id)
                             },
-                            label = { Text(cat.name, fontSize = 11.sp) },
+                            label = { Text(cat.name, fontSize = 11.5.sp) },
                             leadingIcon = if (isCurrent) {
-                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(12.dp)) }
+                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(13.dp)) }
                             } else null,
-                            modifier = Modifier.height(28.dp)
+                            shape = CircleShape,
+                            modifier = Modifier.height(32.dp)
                         )
                     }
                 }
@@ -98,7 +97,6 @@ fun RecentTransactionQuickActionsRow(
             }
         }
 
-        // Action Buttons Row
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -106,7 +104,6 @@ fun RecentTransactionQuickActionsRow(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Toggle Transfer
             FilterChip(
                 selected = transaction.isTransfer,
                 onClick = {
@@ -116,11 +113,11 @@ fun RecentTransactionQuickActionsRow(
                 leadingIcon = {
                     Icon(OrbitIcons.Transactions, contentDescription = null, modifier = Modifier.size(14.dp))
                 },
-                label = { Text("Transfer", fontSize = 11.sp) },
-                modifier = Modifier.height(28.dp)
+                label = { Text("Transfer", fontSize = 11.5.sp) },
+                shape = CircleShape,
+                modifier = Modifier.height(32.dp)
             )
 
-            // Toggle Ignore
             FilterChip(
                 selected = transaction.isIgnored,
                 onClick = {
@@ -130,11 +127,11 @@ fun RecentTransactionQuickActionsRow(
                 leadingIcon = {
                     Icon(Icons.Default.Clear, contentDescription = null, modifier = Modifier.size(14.dp))
                 },
-                label = { Text("Ignore", fontSize = 11.sp) },
-                modifier = Modifier.height(28.dp)
+                label = { Text("Ignore", fontSize = 11.5.sp) },
+                shape = CircleShape,
+                modifier = Modifier.height(32.dp)
             )
 
-            // Toggle MHA (if enabled)
             OrbitScaleBadgeVisibility(visible = mhaEnabled) {
                 FilterChip(
                     selected = transaction.isMhaEligible,
@@ -142,69 +139,47 @@ fun RecentTransactionQuickActionsRow(
                         haptics.tick()
                         onToggleMha(!transaction.isMhaEligible)
                     },
-                    label = { Text("MHA Eligible", fontSize = 11.sp) },
-                    modifier = Modifier.height(28.dp)
+                    label = { Text("MHA Eligible", fontSize = 11.5.sp) },
+                    shape = CircleShape,
+                    modifier = Modifier.height(32.dp)
                 )
             }
 
-            // Mark Recurring
-            AssistChip(
+            OrbitActionChip(
+                label = "Mark Recurring",
+                icon = OrbitIcons.Upcoming,
                 onClick = {
                     haptics.confirm()
                     onMarkRecurring()
                 },
-                leadingIcon = {
-                    Icon(OrbitIcons.Upcoming, contentDescription = null, modifier = Modifier.size(14.dp))
-                },
-                label = { Text("Mark Recurring", fontSize = 11.sp) },
-                modifier = Modifier.height(28.dp)
+                modifier = Modifier.height(32.dp)
             )
 
-            // Reset Edits (if edited)
             OrbitScaleBadgeVisibility(visible = transaction.hasEdits) {
-                AssistChip(
-                    onClick = {
-                        haptics.tick()
-                        onResetEdits()
-                    },
-                    leadingIcon = {
-                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp))
-                    },
-                    label = { Text("Reset Edits", fontSize = 11.sp) },
-                    modifier = Modifier.height(28.dp)
+                OrbitActionChip(
+                    label = "Reset Edits",
+                    icon = Icons.Default.Refresh,
+                    onClick = onResetEdits,
+                    modifier = Modifier.height(32.dp)
                 )
             }
 
-            // Inspect Details
-            AssistChip(
-                onClick = {
-                    haptics.tick()
-                    onInspectDetails()
-                },
-                leadingIcon = {
-                    Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(14.dp))
-                },
-                label = { Text("Details", fontSize = 11.sp) },
-                modifier = Modifier.height(28.dp)
+            OrbitActionChip(
+                label = "Details",
+                icon = Icons.Default.Info,
+                onClick = onInspectDetails,
+                modifier = Modifier.height(32.dp)
             )
 
-            // Delete
-            AssistChip(
+            OrbitActionChip(
+                label = "Delete",
+                icon = Icons.Default.Delete,
+                isDestructive = true,
                 onClick = {
                     haptics.confirm()
                     onDelete()
                 },
-                leadingIcon = {
-                    Icon(
-                        Icons.Default.Delete,
-                        contentDescription = null,
-                        modifier = Modifier.size(14.dp),
-                        tint = OrbitColorTokens.Red
-                    )
-                },
-                label = { Text("Delete", fontSize = 11.sp, color = OrbitColorTokens.Red) },
-                colors = AssistChipDefaults.assistChipColors(labelColor = OrbitColorTokens.Red),
-                modifier = Modifier.height(28.dp)
+                modifier = Modifier.height(32.dp)
             )
         }
     }

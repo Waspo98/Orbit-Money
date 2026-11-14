@@ -11,15 +11,21 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.font.FontWeight
@@ -30,15 +36,17 @@ import app.overbay.orbit.util.LocalOrbitHaptics
 
 /**
  * Standard section card for Orbit Money with 16dp rounded corners, subtle border,
- * clean title header, optional action link, and header divider.
+ * clean title header, optional badge/action link, and header divider.
  */
 @Composable
 fun OrbitSectionCard(
     modifier: Modifier = Modifier,
     title: String? = null,
     subtitle: String? = null,
+    headerBadge: (@Composable () -> Unit)? = null,
     actionText: String? = null,
     onActionClick: (() -> Unit)? = null,
+    onCardClick: (() -> Unit)? = null,
     action: (@Composable () -> Unit)? = null,
     showHeaderDivider: Boolean = true,
     shape: Shape = RoundedCornerShape(16.dp),
@@ -48,9 +56,21 @@ fun OrbitSectionCard(
     content: @Composable ColumnScope.() -> Unit
 ) {
     val haptics = LocalOrbitHaptics.current
+    val interactiveModifier = if (onCardClick != null) {
+        modifier
+            .fillMaxWidth()
+            .orbitTactilePress(pressedScale = 0.985f)
+            .clip(shape)
+            .clickable {
+                haptics.tick()
+                onCardClick()
+            }
+    } else {
+        modifier.fillMaxWidth()
+    }
 
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = interactiveModifier,
         shape = shape,
         colors = CardDefaults.cardColors(containerColor = containerColor),
         border = border
@@ -60,22 +80,33 @@ fun OrbitSectionCard(
                 .fillMaxWidth()
                 .padding(contentPadding)
         ) {
-            val hasHeader = title != null || action != null || actionText != null
+            val hasHeader = title != null || action != null || actionText != null || headerBadge != null
             if (hasHeader) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(modifier = Modifier.weight(1f, fill = false)) {
-                        if (title != null) {
-                            Text(
-                                text = title,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
+                    Column(modifier = Modifier.weight(1f)) {
+                        if (title != null || headerBadge != null) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                if (title != null) {
+                                    Text(
+                                        text = title,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.weight(1f, fill = false)
+                                    )
+                                }
+                                if (headerBadge != null) {
+                                    headerBadge()
+                                }
+                            }
                         }
                         if (subtitle != null) {
                             Spacer(modifier = Modifier.height(2.dp))
@@ -88,20 +119,33 @@ fun OrbitSectionCard(
                     }
 
                     if (actionText != null && onActionClick != null) {
-                        Text(
-                            text = actionText,
-                            style = MaterialTheme.typography.labelMedium,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = MaterialTheme.colorScheme.primary,
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .padding(start = 8.dp)
+                                .clip(RoundedCornerShape(8.dp))
                                 .orbitTactilePress()
                                 .clickable {
                                     haptics.tick()
                                     onActionClick()
                                 }
-                        )
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = actionText,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.width(1.dp))
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
                     } else if (action != null) {
                         action()
                     }

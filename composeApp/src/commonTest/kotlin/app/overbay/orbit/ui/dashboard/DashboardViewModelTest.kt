@@ -541,4 +541,75 @@ class DashboardViewModelTest {
 
         collectJob.cancel()
     }
+
+    @Test
+    fun testSubscriptionsAndGoalPace_filteringSortingAndMonthlyEstimates() = runTest(testDispatcher) {
+        val today = LocalDateUtils.todayLocalDate()
+        val futureGoalDate = LocalDateUtils.formatIsoDate(LocalDateUtils.addDays(today, 180))
+
+        // Active monthly subscription ($15/mo), active yearly bill ($120/yr = $10/mo), and active income (excluded)
+        repository.saveUpcoming(
+            UpcomingItem(
+                id = 1L,
+                name = "Streaming",
+                amountCents = 1500L,
+                kind = UpcomingKind.SUBSCRIPTION,
+                direction = "expense",
+                frequencyType = RecurrenceFrequency.MONTHLY,
+                nextDate = "2026-12-10",
+                status = UpcomingStatus.ACTIVE
+            )
+        )
+        repository.saveUpcoming(
+            UpcomingItem(
+                id = 2L,
+                name = "Domain Renewal",
+                amountCents = 12000L,
+                kind = UpcomingKind.BILL,
+                direction = "expense",
+                frequencyType = RecurrenceFrequency.YEARLY,
+                nextDate = "2026-12-01",
+                status = UpcomingStatus.ACTIVE
+            )
+        )
+        repository.saveUpcoming(
+            UpcomingItem(
+                id = 3L,
+                name = "Paycheck",
+                amountCents = 300000L,
+                kind = UpcomingKind.INCOME,
+                direction = "income",
+                frequencyType = RecurrenceFrequency.BIWEEKLY,
+                nextDate = "2026-11-20",
+                status = UpcomingStatus.ACTIVE
+            )
+        )
+        repository.saveGoal(
+            Goal(
+                id = 10L,
+                name = "House Downpayment",
+                targetAmountCents = 12000_00L,
+                currentAmountCents = 6000_00L,
+                targetDate = futureGoalDate
+            )
+        )
+
+        val collectJob = launch(testDispatcher) {
+            viewModel.uiState.collect {}
+        }
+        testScheduler.advanceUntilIdle()
+
+        val subs = viewModel.uiState.value.subscriptions
+        assertEquals(2, subs.totalActiveCount)
+        assertEquals(2500L, subs.estimatedMonthlyTotalCents)
+        assertEquals(listOf("Domain Renewal", "Streaming"), subs.items.map { it.name })
+        assertEquals("Dec 1", subs.items[0].nextDateDisplay)
+
+        val focusedGoal = viewModel.uiState.value.goalFocus.focusedGoal
+        assertTrue(focusedGoal != null)
+        assertTrue(focusedGoal.monthlyPaceCents != null && focusedGoal.monthlyPaceCents!! > 0L)
+        assertTrue(focusedGoal.targetDateDisplay != null)
+
+        collectJob.cancel()
+    }
 }

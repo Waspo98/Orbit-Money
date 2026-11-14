@@ -13,7 +13,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.CategoryEmojiMapper
@@ -30,19 +35,20 @@ import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.theme.toComposeColor
 import app.overbay.orbit.ui.components.OrbitAccordionVisibility
 import app.overbay.orbit.ui.components.OrbitAnimatedEntryColumn
+import app.overbay.orbit.ui.components.OrbitBarSegment
 import app.overbay.orbit.ui.components.OrbitCompactListRow
-import app.overbay.orbit.ui.components.OrbitMiniStatRow
 import app.overbay.orbit.ui.components.OrbitPillProgressBar
 import app.overbay.orbit.ui.components.OrbitSectionCard
+import app.overbay.orbit.ui.components.OrbitStackedSegmentBar
+import app.overbay.orbit.ui.components.RollingTickerCents
 import app.overbay.orbit.ui.components.rememberAnimatedExternalEntries
 import app.overbay.orbit.ui.dashboard.BiggestTransactionsState
-import app.overbay.orbit.ui.dashboard.MonthComparisonState
 import app.overbay.orbit.ui.dashboard.TopSpendingState
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 /**
- * Top Spending card showing total monthly spend and the top 7 spending categories
- * with category-colored progress bars and percentages.
+ * Top Spending card showing animated total monthly spend, a proportional spectrum bar,
+ * and the top 7 spending categories with category-colored bars and percentages.
  */
 @Composable
 fun TopSpendingCard(
@@ -57,30 +63,54 @@ fun TopSpendingCard(
         title = "Top Spending This Month",
         actionText = "Browse",
         onActionClick = onClick,
+        onCardClick = onClick,
         modifier = modifier
-            .clip(MaterialTheme.shapes.large)
-            .clickable {
-                haptics.tick()
-                onClick()
-            }
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            OrbitMiniStatRow(
-                label = "Total Spend",
-                value = MoneyUtils.formatCents(state.totalSpentCents),
-                valueColor = MaterialTheme.colorScheme.onSurface
-            )
-
-            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Total Spend",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                RollingTickerCents(
+                    cents = state.totalSpentCents,
+                    style = TabularNumStyle.copy(
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold
+                    ),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
 
             if (state.categories.isEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "No spending recorded this month.",
+                    text = "No spending recorded this month yet.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             } else {
-                state.categories.forEachIndexed { index, cat ->
+                Spacer(modifier = Modifier.height(8.dp))
+                OrbitStackedSegmentBar(
+                    segments = state.categories.map { cat ->
+                        OrbitBarSegment(
+                            key = cat.categoryId,
+                            fraction = (cat.percentOfTotal / 100.0).toFloat(),
+                            color = cat.categoryColor.toComposeColor(MaterialTheme.colorScheme.primary)
+                        )
+                    },
+                    height = 7.dp
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                state.categories.forEach { cat ->
                     val color = cat.categoryColor.toComposeColor(MaterialTheme.colorScheme.primary)
                     Column(
                         modifier = Modifier
@@ -97,7 +127,10 @@ fun TopSpendingCard(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                                 Box(
                                     modifier = Modifier
                                         .size(8.dp)
@@ -110,9 +143,12 @@ fun TopSpendingCard(
                                     text = "$iconPrefix${cat.categoryName}",
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onSurface
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
+                            Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = "${MoneyUtils.formatCents(cat.spentCents)} (${cat.percentOfTotal.toInt()}%)",
                                 style = TabularNumStyle.copy(
@@ -136,12 +172,14 @@ fun TopSpendingCard(
 }
 
 /**
- * Biggest monthly transactions card with quick "Hide from dashboard" support.
+ * Biggest monthly transactions card with category avatars, per-row inspection,
+ * and quick "Hide from dashboard" support.
  */
 @Composable
 fun BiggestTransactionsCard(
     state: BiggestTransactionsState,
     onClick: () -> Unit,
+    onSelectTransaction: (Long) -> Unit = {},
     onHideTransaction: (Long) -> Unit,
     onResetHidden: () -> Unit,
     modifier: Modifier = Modifier
@@ -153,12 +191,8 @@ fun BiggestTransactionsCard(
         title = "Biggest Monthly Transactions",
         actionText = "View All",
         onActionClick = onClick,
+        onCardClick = onClick,
         modifier = modifier
-            .clip(MaterialTheme.shapes.large)
-            .clickable {
-                haptics.tick()
-                onClick()
-            }
     ) {
         val (txnEntries, onTxnRemoveFinished) = rememberAnimatedExternalEntries(
             items = state.transactions,
@@ -179,26 +213,53 @@ fun BiggestTransactionsCard(
                 bringIntoViewOnAdd = false
             ) { entry, displayIndex, _ ->
                 val txn = entry.value
-                val catPrefix = CategoryEmojiMapper.resolveEmoji(txn.categoryIcon)?.let { "$it " } ?: ""
-                val catLabel = txn.categoryName?.let { "$catPrefix$it" } ?: "❓ Uncategorized"
+                val catColor = txn.categoryColor.toComposeColor(MaterialTheme.colorScheme.primary)
+                val catEmoji = CategoryEmojiMapper.resolveEmoji(txn.categoryIcon)
+                    ?: if (txn.categoryName.isNullOrBlank()) "❓" else "💸"
+                val catLabel = txn.categoryName ?: "Uncategorized"
+                val detailSubtitle = buildString {
+                    append(txn.dateDisplay)
+                    append(" · ")
+                    append(catLabel)
+                }
+
                 OrbitCompactListRow(
                     title = txn.merchant,
-                    subtitle = "${txn.dateDisplay} · $catLabel",
+                    subtitle = detailSubtitle,
                     amount = txn.formattedAmount,
+                    amountDetail = txn.accountName.ifBlank { null },
                     amountColor = colors.expense,
                     showTopDivider = displayIndex > 0,
-                    trailingAction = {
-                        Text(
-                            text = "Hide",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    leadingContent = {
+                        Box(
                             modifier = Modifier
-                                .clickable {
-                                    haptics.tick()
-                                    onHideTransaction(txn.id)
-                                }
-                                .padding(start = 8.dp, top = 4.dp, bottom = 4.dp)
-                        )
+                                .size(32.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(catColor.copy(alpha = 0.14f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(text = catEmoji, fontSize = 14.sp)
+                        }
+                    },
+                    onClick = {
+                        haptics.tick()
+                        onSelectTransaction(txn.id)
+                    },
+                    trailingAction = {
+                        IconButton(
+                            onClick = {
+                                haptics.tick()
+                                onHideTransaction(txn.id)
+                            },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Hide from dashboard",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
                     }
                 )
             }
@@ -211,8 +272,9 @@ fun BiggestTransactionsCard(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        val noun = if (state.hiddenCount == 1) "transaction" else "transactions"
                         Text(
-                            text = "${state.hiddenCount} transaction(s) hidden",
+                            text = "${state.hiddenCount} hidden $noun",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -221,119 +283,15 @@ fun BiggestTransactionsCard(
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.clickable {
-                                haptics.tick()
-                                onResetHidden()
-                            }
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .clickable {
+                                    haptics.tick()
+                                    onResetHidden()
+                                }
+                                .padding(horizontal = 6.dp, vertical = 3.dp)
                         )
                     }
-                }
-            }
-        }
-    }
-}
-
-/**
- * 4-column Month vs Last Month comparison table card.
- */
-@Composable
-fun MonthComparisonCard(
-    state: MonthComparisonState,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val haptics = LocalOrbitHaptics.current
-    val colors = OrbitTheme.colors
-
-    OrbitSectionCard(
-        title = "Month vs. Last Month",
-        actionText = "Details",
-        onActionClick = onClick,
-        modifier = modifier
-            .clip(MaterialTheme.shapes.large)
-            .clickable {
-                haptics.tick()
-                onClick()
-            }
-    ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            // Header Row: Metric | Current | Previous | Change
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 6.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = "METRIC",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1.2f)
-                )
-                Text(
-                    text = state.currentMonthLabel.take(3).uppercase(),
-                    style = MaterialTheme.typography.labelSmall,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f)
-                )
-                Text(
-                    text = state.previousMonthLabel.take(3).uppercase(),
-                    style = MaterialTheme.typography.labelSmall,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f)
-                )
-                Text(
-                    text = "CHANGE",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
-
-            state.rows.forEach { row ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = row.metric,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.weight(1.2f)
-                    )
-                    Text(
-                        text = MoneyUtils.formatCents(row.currentCents),
-                        style = TabularNumStyle.copy(fontSize = 12.sp),
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Text(
-                        text = MoneyUtils.formatCents(row.previousCents),
-                        style = TabularNumStyle.copy(fontSize = 12.sp),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.weight(1f)
-                    )
-                    val deltaText = MoneyUtils.formatCents(row.deltaCents, signed = true)
-                    Text(
-                        text = deltaText,
-                        style = TabularNumStyle.copy(fontSize = 12.sp, fontWeight = FontWeight.Bold),
-                        color = if (row.isPositiveImprovement) colors.income else colors.danger,
-                        modifier = Modifier.weight(1f)
-                    )
                 }
             }
         }

@@ -23,6 +23,7 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlin.math.roundToLong
 
 object DashboardDataTransform {
 
@@ -183,33 +184,47 @@ object DashboardDataTransform {
             hiddenCount = hiddenBiggestIds.size
         )
 
-        // 5. Subscriptions / Recurring (from Upcoming)
-        val subscriptionsList = snapshot.upcomingItems
-            .asSequence()
-            .filter { it.status == UpcomingStatus.ACTIVE }
+        // 5. Subscriptions / Recurring (from active recurring expenses in Upcoming)
+        val activeRecurringExpenses = snapshot.upcomingItems
+            .filter { it.status == UpcomingStatus.ACTIVE && !it.direction.equals("income", ignoreCase = true) }
+            .sortedBy { it.nextDate }
+        val estimatedMonthlyTotal = activeRecurringExpenses.sumOf { item ->
+            (item.amountCents * UpcomingEngine.monthlyFactor(item.frequencyType, item.frequencyInterval)).roundToLong()
+        }
+        val subscriptionsList = activeRecurringExpenses
             .take(5)
             .map { item ->
                 val cat = item.categoryId?.let { categoryById[it] }
+                val nextFormatted = LocalDateUtils.parseIsoDate(item.nextDate)?.let {
+                    LocalDateUtils.formatShortDate(it)
+                } ?: item.nextDate
                 SubscriptionItem(
                     id = item.id,
                     name = item.name,
                     merchant = item.merchant,
                     amountCents = item.amountCents,
+                    isExpense = !item.direction.equals("income", ignoreCase = true),
                     frequencyLabel = item.frequency.name.lowercase().replaceFirstChar { it.uppercase() },
                     categoryName = cat?.name,
                     categoryColor = cat?.color,
                     categoryIcon = cat?.displayEmoji,
-                    nextDateDisplay = item.nextDate
+                    nextDateDisplay = nextFormatted
                 )
             }
-            .toList()
-        val subscriptionsState = SubscriptionsState(items = subscriptionsList)
+        val subscriptionsState = SubscriptionsState(
+            items = subscriptionsList,
+            totalActiveCount = activeRecurringExpenses.size,
+            estimatedMonthlyTotalCents = estimatedMonthlyTotal
+        )
 
         // 6. Uncategorized Transactions
         val uncategorizedState = UncategorizedTransactionsState(
             count = scan.uncategorizedCount,
             transactions = scan.topUncategorized.map { txn ->
                 val acct = accountById[txn.accountId]
+                val dateDisplay = LocalDateUtils.parseIsoDate(txn.effectiveDate)?.let {
+                    LocalDateUtils.formatRelativeOrDisplayDate(it)
+                } ?: txn.effectiveDate
                 DashboardRecentTransactionItem(
                     id = txn.id,
                     merchant = txn.effectiveMerchant,
@@ -217,7 +232,7 @@ object DashboardDataTransform {
                     isExpense = txn.isExpense,
                     formattedAmount = MoneyUtils.formatCents(txn.effectiveAmountCents, signed = true),
                     dateIso = txn.effectiveDate,
-                    dateDisplay = txn.effectiveDate,
+                    dateDisplay = dateDisplay,
                     categoryName = "Uncategorized",
                     categoryColor = null,
                     categoryIcon = null,
@@ -266,6 +281,14 @@ object DashboardDataTransform {
         val overallRatio = if (totalTarget > 0L) (totalSaved.toDouble() / totalTarget.toDouble()).coerceIn(0.0, 1.0) else 0.0
 
         val dashboardGoals = snapshot.goals.sortedBy { it.sortOrder }.map { g ->
+            val parsedTarget = LocalDateUtils.parseIsoDate(g.targetDate)
+            val targetDateDisplay = parsedTarget?.let { LocalDateUtils.formatDisplayDate(it) } ?: g.targetDate
+            val daysUntilTarget = parsedTarget?.let { LocalDateUtils.daysBetween(today, it) }
+            val monthlyPace = if (!g.isCompleted && g.remainingAmountCents > 0L && daysUntilTarget != null && daysUntilTarget > 0) {
+                val months = (daysUntilTarget / 30.4375).coerceAtLeast(1.0)
+                (g.remainingAmountCents.toDouble() / months).roundToLong()
+            } else null
+
             DashboardGoalItem(
                 id = g.id,
                 name = g.name,
@@ -275,6 +298,8 @@ object DashboardDataTransform {
                 remainingAmountCents = g.remainingAmountCents,
                 isCompleted = g.isCompleted,
                 targetDate = g.targetDate,
+                targetDateDisplay = targetDateDisplay,
+                monthlyPaceCents = monthlyPace,
                 icon = g.resolvedEmoji
             )
         }
