@@ -419,9 +419,16 @@ suspend fun OrbitApiClient.addHouseholdIncomeRecordRemote(memberId: Long, record
     res.body<HouseholdIncomeRecordWireDto>().toDomain()
 }
 
-suspend fun OrbitApiClient.getRetirementHistoryRemote(months: Int = 1200): Result<List<RetirementHistoryPoint>> = runCatching {
+suspend fun OrbitApiClient.getRetirementHistoryRemote(
+    months: Int = 1200,
+    customAccountIds: Set<Long>? = null
+): Result<List<RetirementHistoryPoint>> = runCatching {
     val res = client.get(url("/api/household/retirement-history")) {
-        parameter("months", months); auth(sessionCookie)
+        parameter("months", months)
+        if (customAccountIds != null) {
+            parameter("accountIds", customAccountIds.sorted().joinToString(","))
+        }
+        auth(sessionCookie)
     }
     extractSessionCookie(res); ensureSuccess(res)
     res.body<RetirementHistoryResponseDto>().history.map { it.toDomain() }

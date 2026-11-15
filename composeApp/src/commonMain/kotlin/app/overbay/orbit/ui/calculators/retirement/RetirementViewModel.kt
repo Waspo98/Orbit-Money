@@ -10,7 +10,6 @@ import app.overbay.orbit.data.model.HouseholdMember
 import app.overbay.orbit.data.model.RetirementHistoryPoint
 import app.overbay.orbit.data.model.RetirementScenarioPreset
 import app.overbay.orbit.data.model.RetirementTargetMode
-import app.overbay.orbit.data.model.StorageMode
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.ProjectionPoint
@@ -50,6 +49,8 @@ class RetirementViewModel(
     private var cachedBaseHistoryPoints: List<ProjectionPoint> = emptyList()
     private var lastObservedCustomIds: Set<Long>? = null
     private var hasObservedCustomIds: Boolean = false
+    private var lastFetchedHistoryCustomIds: Set<Long>? = null
+    private var historyRequestGeneration: Long = 0L
 
     init {
         vmScope.launch {
@@ -168,21 +169,25 @@ class RetirementViewModel(
                     )
                 }
                 recalculate()
+                if (customChanged && customIds != lastFetchedHistoryCustomIds) {
+                    launchHistoryRefresh(customIds)
+                }
             }
         }
 
+        val initialCustomIds = repository.preferences.value.retirementIncludedAccountIds?.toSet()
+        launchHistoryRefresh(initialCustomIds)
+    }
+
+    private fun launchHistoryRefresh(customAccountIds: Set<Long>?) {
+        lastFetchedHistoryCustomIds = customAccountIds
+        val generation = ++historyRequestGeneration
         vmScope.launch {
-            val initialCustomIds = repository.preferences.value.retirementIncludedAccountIds?.toSet()
-            val history = repository.getRetirementHistory(1200, initialCustomIds)
+            val history = repository.getRetirementHistory(1200, customAccountIds)
+            if (generation != historyRequestGeneration) return@launch
+            cachedHistoryAge = Double.NaN
             _uiState.update { current ->
-                val activeCustomIds = lastObservedCustomIds ?: initialCustomIds
-                cachedHistoryAge = current.currentAge
-                cachedHistoryCustomIds = activeCustomIds
-                cachedBaseHistoryPoints = RetirementAccountResolver.buildActualHistoryProjectionPoints(
-                    history = RetirementAccountResolver.filterHistoryByAccounts(history, activeCustomIds),
-                    currentAge = current.currentAge,
-                    currentBalanceCents = current.currentBalanceCents
-                )
+                val activeCustomIds = lastObservedCustomIds ?: customAccountIds
                 current.copy(
                     historyPoints = history,
                     filteredHistoryPoints = RetirementAccountResolver.filterHistoryPoints(
@@ -190,10 +195,10 @@ class RetirementViewModel(
                         horizon = current.selectedHorizon,
                         currentYear = currentYearString,
                         customIncludedIds = activeCustomIds
-                    ),
-                    actualHistoryPoints = cachedBaseHistoryPoints
+                    )
                 )
             }
+            recalculate()
         }
     }
 
@@ -333,29 +338,26 @@ class RetirementViewModel(
 
     fun setIncludedAccounts(accountIds: List<Long>?) {
         val normalized = accountIds?.distinct()?.sorted()
-        _uiState.update { it.copy(showIncludedAccountsSheet = false, currentBalanceOverridden = false) }
+        val customSet = normalized?.toSet()
+        val unchangedPrefs = repository.preferences.value.retirementIncludedAccountIds == normalized
+        _uiState.update { cur ->
+            val hasSources = cur.linkedAccounts.isNotEmpty() || cur.hasCustomAccountSelection
+            cur.copy(
+                showIncludedAccountsSheet = false,
+                currentBalanceOverridden = false,
+                currentBalanceCents = if (hasSources) cur.connectedBalanceCents else cur.currentBalanceCents
+            )
+        }
+        if (unchangedPrefs) {
+            recalculate()
+        }
         vmScope.launch {
             val currentPrefs = repository.preferences.value
             if (currentPrefs.retirementIncludedAccountIds != normalized) {
                 repository.updatePreferences(currentPrefs.copy(retirementIncludedAccountIds = normalized))
             }
-            if (repository.storageMode.value != StorageMode.SELF_HOSTED) {
-                val customSet = normalized?.toSet()
-                val refreshed = repository.getRetirementHistory(1200, customSet)
-                cachedHistoryAge = Double.NaN
-                _uiState.update { cur ->
-                    val filtered = RetirementAccountResolver.filterHistoryPoints(
-                        history = refreshed,
-                        horizon = cur.selectedHorizon,
-                        currentYear = currentYearString,
-                        customIncludedIds = customSet
-                    )
-                    cur.copy(
-                        historyPoints = refreshed,
-                        filteredHistoryPoints = filtered
-                    )
-                }
-                recalculate()
+            if (lastFetchedHistoryCustomIds != customSet) {
+                launchHistoryRefresh(customSet)
             }
         }
     }

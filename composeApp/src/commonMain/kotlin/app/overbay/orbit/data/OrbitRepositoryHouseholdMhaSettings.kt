@@ -204,13 +204,20 @@ suspend fun OrbitRepository.getRetirementHistory(
     customAccountIds: Set<Long>? = null
 ): List<RetirementHistoryPoint> {
     if (storageMode.value == StorageMode.SELF_HOSTED) {
-        val remote = createApiClient().getRetirementHistoryRemote(months).getOrNull()
+        val remote = createApiClient().getRetirementHistoryRemote(months, customAccountIds).getOrNull()
         if (remote != null) return remote
     }
 
     val linkedAccountIds = customAccountIds
         ?: snapshot.value.retirementAccountLinks.map { it.accountId }.toSet()
-            .ifEmpty { accounts.value.filter { it.type == AccountType.INVESTMENT }.map { it.id }.toSet() }
+            .ifEmpty { accounts.value.filter { !it.isArchived && it.type == AccountType.INVESTMENT }.map { it.id }.toSet() }
+            .ifEmpty {
+                val retGoal = goals.value.find { it.name.trim().equals("retirement", ignoreCase = true) }
+                retGoal?.allocations?.mapNotNull { it.accountId }?.toSet()
+                    ?: retGoal?.linkedAccountId?.let { setOf(it) }
+                    ?: emptySet()
+            }
+    if (linkedAccountIds.isEmpty()) return emptyList()
     val allBalRecords = snapshot.value.balanceRecords.filter { it.accountId in linkedAccountIds }
     val monthsSet = allBalRecords.map { it.recordDate.take(7) }.filter { it.length == 7 }.toSet()
         .ifEmpty { transactions.value.map { it.effectiveDate.take(7) }.filter { it.length == 7 }.toSet() }

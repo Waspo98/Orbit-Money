@@ -168,6 +168,7 @@ fun RetirementProjectionChart(
                 .chartHorizontalScrub(
                     key = minAge to maxAge,
                     clearOnRelease = true,
+                    trailingGutterDp = 46.dp,
                     onFractionChanged = { fraction ->
                         val wasActive = scrubFraction != null
                         val isNowActive = fraction != null
@@ -353,9 +354,10 @@ fun RetirementProjectionChart(
                 .padding(top = 4.dp, end = 46.dp),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            val mid1 = (currentAge + (retirementAge - currentAge) / 3.0).roundToInt()
-            val mid2 = (currentAge + 2.0 * (retirementAge - currentAge) / 3.0).roundToInt()
-            Text(text = "Today ${currentAge.roundToInt()}", style = TabularNumStyle.copy(fontSize = 11.sp), color = onSurfaceVariant)
+            val mid1 = (minAge + (retirementAge - minAge) / 3.0).roundToInt()
+            val mid2 = (minAge + 2.0 * (retirementAge - minAge) / 3.0).roundToInt()
+            val startLabel = if (minAge < currentAge - 0.5) "Age ${minAge.roundToInt()}" else "Today ${currentAge.roundToInt()}"
+            Text(text = startLabel, style = TabularNumStyle.copy(fontSize = 11.sp), color = onSurfaceVariant)
             if (mid2 - mid1 >= 4) {
                 Text(text = "$mid1", style = TabularNumStyle.copy(fontSize = 11.sp), color = onSurfaceVariant.copy(alpha = 0.78f))
                 Text(text = "$mid2", style = TabularNumStyle.copy(fontSize = 11.sp), color = onSurfaceVariant.copy(alpha = 0.78f))

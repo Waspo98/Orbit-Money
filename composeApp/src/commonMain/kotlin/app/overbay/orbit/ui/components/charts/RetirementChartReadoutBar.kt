@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.RetirementScenarioPreset
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.domain.RetirementCalculatorEngine
 import app.overbay.orbit.domain.ProjectionPoint
 import app.overbay.orbit.domain.RetirementScenarioModel
 import app.overbay.orbit.theme.OrbitSprings
@@ -229,7 +230,7 @@ internal fun RetirementChartReadoutBar(
                                     )
                                 }
                                 Text(
-                                    text = "${formatOneDecimalPercent(preset.nominalAnnualReturn)} nom",
+                                    text = "${RetirementCalculatorEngine.formatRatePercent(preset.nominalAnnualReturn)} nom",
                                     style = TabularNumStyle.copy(fontSize = 10.sp),
                                     color = if (isSelected) accent else onSurfaceVariant.copy(alpha = 0.78f),
                                     maxLines = 1
@@ -241,13 +242,6 @@ internal fun RetirementChartReadoutBar(
             }
         }
     }
-}
-
-internal fun formatOneDecimalPercent(rate: Double): String {
-    val tenths = (rate * 1000.0).roundToInt()
-    val whole = tenths / 10
-    val frac = kotlin.math.abs(tenths % 10)
-    return if (frac == 0) "$whole%" else "$whole.$frac%"
 }
 
 fun interpolateBalanceAtAge(points: List<ProjectionPoint>, age: Double): Cents {

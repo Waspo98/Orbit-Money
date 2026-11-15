@@ -169,5 +169,9 @@ class MhaAndCalculatorsTest {
         assertEquals("403(b)", RetirementCalculatorEngine.formatPlanKindLabel("403B"))
         assertEquals("Roth IRA", RetirementCalculatorEngine.formatPlanKindLabel("ROTH_IRA"))
         assertEquals("HSA", RetirementCalculatorEngine.formatPlanKindLabel("hsa"))
+        assertEquals("5%", RetirementCalculatorEngine.formatRatePercent(0.05))
+        assertEquals("2.5%", RetirementCalculatorEngine.formatRatePercent(0.025))
+        assertEquals("8.5%", RetirementCalculatorEngine.formatRatePercent(0.085))
+        assertEquals("2.25%", RetirementCalculatorEngine.formatRatePercent(0.0225))
     }
 }

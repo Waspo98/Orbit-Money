@@ -155,6 +155,7 @@ fun RetirementRunwayCard(
                 .chartHorizontalScrub(
                     key = retirementAge to runwayEndAge,
                     clearOnRelease = true,
+                    trailingGutterDp = 46.dp,
                     onFractionChanged = { fraction ->
                         if (fraction != null) {
                             val intAge = (retirementAge + fraction * ageSpan).roundToInt()

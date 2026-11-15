@@ -1,12 +1,7 @@
 import express from 'express';
 import { requireAuth, requireHouseholdId } from '../auth.js';
 import { db } from '../db/index.js';
-import {
-  addMonthsToLocalMonth,
-  formatLocalDate,
-  formatLocalMonth,
-  isValidOptionalDateOnly
-} from '../lib/localDate.js';
+import { formatLocalDate, isValidOptionalDateOnly } from '../lib/localDate.js';
 import {
   sendNotFound,
   sendOk,
@@ -15,6 +10,10 @@ import {
 } from '../lib/http.js';
 import { dollarsToCents, moneyFieldsToDollars } from '../lib/money.js';
 import { parseBoundedInteger, readIdParam } from '../lib/routeParams.js';
+import {
+  buildRetirementHistory,
+  parseAccountIdsQuery
+} from '../services/retirementHistoryService.js';
 
 const router = express.Router();
 
@@ -64,14 +63,6 @@ function validDate(value) {
 
 function today() {
   return formatLocalDate();
-}
-
-function monthKey(date) {
-  return String(date || '').slice(0, 7);
-}
-
-function addMonths(key, amount) {
-  return addMonthsToLocalMonth(key, amount);
 }
 
 function cleanString(value, max = 120) {
@@ -350,169 +341,6 @@ function buildPayload(householdId) {
   return { summary, members: decoratedMembers, records, retirement_accounts: linkedAccounts };
 }
 
-function buildRetirementHistory(householdId, months) {
-  const accounts = db
-    .prepare(
-      `SELECT a.id, a.name, a.type, a.institution, hra.account_kind,
-              a.current_balance / 100.0 AS current_balance,
-              a.estimated_value / 100.0 AS estimated_value
-         FROM household_retirement_accounts hra
-         JOIN accounts a ON a.id = hra.account_id
-        WHERE hra.household_id = ?
-          AND a.household_id = ?
-          AND a.is_archived = 0
-        ORDER BY hra.account_kind ASC, a.sort_order ASC, a.name ASC`
-    )
-    .all(householdId, householdId)
-    .map((row) => ({
-      ...row,
-      balance: accountBalance(row)
-    }));
-
-  if (accounts.length === 0) {
-    return { accounts: [], history: [] };
-  }
-
-  const accountIds = accounts.map((account) => account.id);
-  const placeholders = accountIds.map(() => '?').join(', ');
-  const todayMonth = formatLocalMonth();
-
-  const latestTransaction = db
-    .prepare(
-      `SELECT MAX(date) AS latest, MIN(date) AS earliest
-         FROM transactions
-        WHERE household_id = ?
-          AND account_id IN (${placeholders})`
-    )
-    .get(householdId, ...accountIds);
-
-  const latestRecord = db
-    .prepare(
-      `SELECT MAX(record_date) AS latest, MIN(record_date) AS earliest
-         FROM account_balance_records
-        WHERE household_id = ?
-          AND account_id IN (${placeholders})`
-    )
-    .get(householdId, ...accountIds);
-
-  const latestMonth = [monthKey(latestTransaction.latest), monthKey(latestRecord.latest), todayMonth]
-    .filter(Boolean)
-    .sort()
-    .at(-1) || todayMonth;
-  const earliestMonth = [monthKey(latestTransaction.earliest), monthKey(latestRecord.earliest)]
-    .filter(Boolean)
-    .sort()[0] || latestMonth;
-  const floorMonth = addMonths(latestMonth, -(months - 1));
-  const firstMonth = earliestMonth > floorMonth ? earliestMonth : floorMonth;
-
-  const monthlyDeltas = db
-    .prepare(
-      `SELECT account_id, substr(date, 1, 7) AS month, SUM(amount) / 100.0 AS amount
-         FROM transactions
-        WHERE household_id = ?
-          AND account_id IN (${placeholders})
-          AND date >= ?
-        GROUP BY account_id, substr(date, 1, 7)
-        ORDER BY month ASC`
-    )
-    .all(householdId, ...accountIds, `${firstMonth}-01`);
-
-  const balanceRecords = db
-    .prepare(
-      `SELECT account_id, record_date, balance / 100.0 AS balance
-         FROM account_balance_records
-        WHERE household_id = ?
-          AND account_id IN (${placeholders})
-          AND record_date <= ?
-        ORDER BY account_id ASC, record_date DESC`
-    )
-    .all(householdId, ...accountIds, `${latestMonth}-31`);
-
-  const balancesByAccount = new Map(accounts.map((account) => [account.id, Number(account.balance) || 0]));
-  const recordsByAccount = new Map();
-  for (const record of balanceRecords) {
-    const accountId = Number(record.account_id);
-    if (!recordsByAccount.has(accountId)) recordsByAccount.set(accountId, []);
-    recordsByAccount.get(accountId).push({
-      month: monthKey(record.record_date),
-      date: record.record_date,
-      balance: Number(record.balance) || 0
-    });
-  }
-
-  function snapshotBalanceForMonth(accountId, month) {
-    const records = recordsByAccount.get(accountId);
-    if (!records) return null;
-    const record = records.find((item) => item.month === month);
-    return record ? record.balance : null;
-  }
-
-  const deltasByMonth = new Map();
-  for (const row of monthlyDeltas) {
-    if (!deltasByMonth.has(row.month)) deltasByMonth.set(row.month, []);
-    deltasByMonth.get(row.month).push(row);
-  }
-
-  const rows = [];
-  const accountRows = [];
-  let cursor = latestMonth;
-  while (cursor >= firstMonth) {
-    const accountBalances = accounts.map((account) => {
-      const snapshot = snapshotBalanceForMonth(account.id, cursor);
-      const balance = snapshot ?? balancesByAccount.get(account.id) ?? 0;
-      if (snapshot !== null) balancesByAccount.set(account.id, balance);
-      return {
-        account_id: account.id,
-        balance
-      };
-    });
-    const total = accountBalances.reduce((sum, account) => sum + account.balance, 0);
-    accountRows.push({ month: cursor, accounts: accountBalances });
-    rows.push({ month: cursor, balance: total, accounts: accountBalances });
-
-    for (const delta of deltasByMonth.get(cursor) || []) {
-      balancesByAccount.set(
-        delta.account_id,
-        (balancesByAccount.get(delta.account_id) || 0) - (Number(delta.amount) || 0)
-      );
-    }
-
-    cursor = addMonths(cursor, -1);
-  }
-
-  const accountRowsAsc = accountRows.reverse();
-  const latestAccountRow = accountRowsAsc.at(-1) || null;
-  const latestYear = String(latestMonth).slice(0, 4);
-  const ytdStartRow =
-    accountRowsAsc.find((row) => row.month >= `${latestYear}-01`) ||
-    accountRowsAsc[0] ||
-    null;
-  const balanceForAccount = (row, accountId) => (
-    row?.accounts.find((account) => Number(account.account_id) === Number(accountId))?.balance ?? null
-  );
-
-  return {
-    accounts: accounts.map((account) => {
-      const currentBalance = balanceForAccount(latestAccountRow, account.id) ?? account.balance;
-      const ytdStartBalance = balanceForAccount(ytdStartRow, account.id);
-      const ytdChange = ytdStartBalance === null ? null : currentBalance - ytdStartBalance;
-      const ytdGrowthPercent = ytdStartBalance > 0 ? (ytdChange / ytdStartBalance) * 100 : null;
-      return {
-        id: account.id,
-        name: account.name,
-        type: account.type,
-        institution: account.institution,
-        account_kind: account.account_kind,
-        balance: account.balance,
-        ytd_change: ytdChange,
-        ytd_growth_percent: ytdGrowthPercent,
-        ytd_start_balance: ytdStartBalance
-      };
-    }),
-    history: rows.reverse()
-  };
-}
-
 function insertIncomeRecord(householdId, record) {
   db.prepare(
     `INSERT INTO household_income_records (
@@ -568,8 +396,13 @@ router.get('/retirement-history', requireAuth, (req, res) => {
     max: 1200
   });
   try {
-    sendOk(res, buildRetirementHistory(householdId, months));
+    const accountIds = parseAccountIdsQuery(req.query.accountIds);
+    sendOk(res, buildRetirementHistory(db, householdId, months, accountIds));
   } catch (err) {
+    if (err.status) {
+      sendRouteError(res, err, 'Could not load retirement history.');
+      return;
+    }
     console.error('Retirement history failed:', err);
     sendServerError(res, err);
   }

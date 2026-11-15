@@ -178,7 +178,8 @@ fun RetirementCalculatorContent(
                             activeTabItems(
                                 uiState = uiState,
                                 actions = actions,
-                                onDragStateChanged = { isDraggingControl = it }
+                                onDragStateChanged = { isDraggingControl = it },
+                                onOpenHousehold = { onNavigate(OrbitNavKey.Household) }
                             )
                             item(key = "spacer_right", contentType = "spacer") {
                                 Spacer(modifier = Modifier.height(16.dp))
@@ -215,7 +216,8 @@ fun RetirementCalculatorContent(
                     activeTabItems(
                         uiState = uiState,
                         actions = actions,
-                        onDragStateChanged = { isDraggingControl = it }
+                        onDragStateChanged = { isDraggingControl = it },
+                        onOpenHousehold = { onNavigate(OrbitNavKey.Household) }
                     )
 
                     item(key = "spacer_bottom", contentType = "spacer") {
@@ -277,7 +279,8 @@ fun RetirementCalculatorContent(
 private fun LazyListScope.activeTabItems(
     uiState: RetirementUiState,
     actions: RetirementActions,
-    onDragStateChanged: (Boolean) -> Unit
+    onDragStateChanged: (Boolean) -> Unit,
+    onOpenHousehold: () -> Unit
 ) {
     when (uiState.selectedTab) {
         RetirementWorkspaceTab.WHAT_IF -> {
@@ -285,7 +288,8 @@ private fun LazyListScope.activeTabItems(
                 WhatIfSandboxCard(
                     uiState = uiState,
                     actions = actions,
-                    onDragStateChanged = onDragStateChanged
+                    onDragStateChanged = onDragStateChanged,
+                    onOpenHousehold = onOpenHousehold
                 )
             }
         }

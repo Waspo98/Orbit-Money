@@ -17,6 +17,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
 import app.overbay.orbit.theme.OrbitSprings
 
@@ -29,6 +31,7 @@ import app.overbay.orbit.theme.OrbitSprings
 fun Modifier.chartHorizontalScrub(
     key: Any?,
     clearOnRelease: Boolean = true,
+    trailingGutterDp: Dp = 0.dp,
     onFractionChanged: (Float?) -> Unit,
     onTapFraction: ((Float) -> Unit)? = null
 ): Modifier {
@@ -36,12 +39,13 @@ fun Modifier.chartHorizontalScrub(
     val currentOnTap by rememberUpdatedState(onTapFraction)
 
     return this
-        .pointerInput(key, clearOnRelease) {
+        .pointerInput(key, clearOnRelease, trailingGutterDp) {
             detectTapGestures(
                 onPress = { offset ->
                     val tapHandler = currentOnTap
+                    val plotW = (size.width - trailingGutterDp.toPx()).coerceAtLeast(1f)
                     if (tapHandler == null && size.width > 0) {
-                        currentOnFraction((offset.x / size.width).coerceIn(0f, 1f))
+                        currentOnFraction((offset.x / plotW).coerceIn(0f, 1f))
                         tryAwaitRelease()
                         if (clearOnRelease) {
                             currentOnFraction(null)
@@ -50,17 +54,19 @@ fun Modifier.chartHorizontalScrub(
                 },
                 onTap = { offset ->
                     val tapHandler = currentOnTap
+                    val plotW = (size.width - trailingGutterDp.toPx()).coerceAtLeast(1f)
                     if (tapHandler != null && size.width > 0) {
-                        tapHandler((offset.x / size.width).coerceIn(0f, 1f))
+                        tapHandler((offset.x / plotW).coerceIn(0f, 1f))
                     }
                 }
             )
         }
-        .pointerInput(key, clearOnRelease) {
+        .pointerInput(key, clearOnRelease, trailingGutterDp) {
             detectHorizontalDragGestures(
                 onDragStart = { offset ->
+                    val plotW = (size.width - trailingGutterDp.toPx()).coerceAtLeast(1f)
                     if (size.width > 0) {
-                        currentOnFraction((offset.x / size.width).coerceIn(0f, 1f))
+                        currentOnFraction((offset.x / plotW).coerceIn(0f, 1f))
                     }
                 },
                 onDragEnd = {
@@ -71,8 +77,9 @@ fun Modifier.chartHorizontalScrub(
                 },
                 onHorizontalDrag = { change, _ ->
                     change.consume()
+                    val plotW = (size.width - trailingGutterDp.toPx()).coerceAtLeast(1f)
                     if (size.width > 0) {
-                        currentOnFraction((change.position.x / size.width).coerceIn(0f, 1f))
+                        currentOnFraction((change.position.x / plotW).coerceIn(0f, 1f))
                     }
                 }
             )

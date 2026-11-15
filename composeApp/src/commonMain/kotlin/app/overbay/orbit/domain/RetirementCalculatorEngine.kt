@@ -363,4 +363,15 @@ object RetirementCalculatorEngine {
             )
         }
     }
+
+    fun formatRatePercent(rate: Double): String {
+        val bps = (rate * 10_000.0).roundToLong().toInt()
+        val whole = bps / 100
+        val frac = abs(bps % 100)
+        return when {
+            frac == 0 -> "$whole%"
+            frac % 10 == 0 -> "$whole.${frac / 10}%"
+            else -> "$whole.${frac.toString().padStart(2, '0')}%"
+        }
+    }
 }

@@ -305,4 +305,41 @@ class RetirementViewModelTest {
         assertEquals(10_000_00L, filtered.first().balanceCents)
         assertEquals(listOf(11L), filtered.first().accounts.map { it.accountId })
     }
+
+    @Test
+    fun testSetIncludedAccounts_unchangedSelectionClearsBalanceOverrideAndRestoresConnected() = runTest(testDispatcher) {
+        repository.saveAccount(
+            Account(id = 10L, name = "Campus 403b", type = AccountType.INVESTMENT, currentBalanceCents = 40_000_00L)
+        )
+        repository.saveAccount(
+            Account(id = 12L, name = "HealthEquity HSA", type = AccountType.SAVINGS, currentBalanceCents = 10_000_00L)
+        )
+        repository.saveHouseholdMember(
+            HouseholdMember(
+                id = 1L,
+                name = "Jordan",
+                role = "adult",
+                retirementAccounts = listOf(
+                    HouseholdRetirementAccount(memberId = 1L, accountId = 10L, accountKind = "403b")
+                )
+            )
+        )
+        testScheduler.advanceUntilIdle()
+
+        viewModel.setIncludedAccounts(listOf(10L, 12L))
+        testScheduler.advanceUntilIdle()
+        assertEquals(50_000_00L, viewModel.uiState.value.connectedBalanceCents)
+        assertEquals(50_000_00L, viewModel.uiState.value.currentBalanceCents)
+
+        viewModel.setCurrentBalance(99_000_00L)
+        testScheduler.advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.currentBalanceOverridden)
+        assertEquals(99_000_00L, viewModel.uiState.value.currentBalanceCents)
+
+        // Re-applying the same selection resets override back to connected balance
+        viewModel.setIncludedAccounts(listOf(12L, 10L))
+        testScheduler.advanceUntilIdle()
+        assertFalse(viewModel.uiState.value.currentBalanceOverridden)
+        assertEquals(50_000_00L, viewModel.uiState.value.currentBalanceCents)
+    }
 }

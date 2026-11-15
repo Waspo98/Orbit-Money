@@ -322,6 +322,7 @@ private fun InteractiveHistoryChart(
                 .chartHorizontalScrub(
                     key = points,
                     clearOnRelease = true,
+                    trailingGutterDp = 46.dp,
                     onFractionChanged = { fraction ->
                         val nextIdx = if (fraction != null && points.isNotEmpty()) {
                             (fraction * (points.size - 1)).roundToInt().coerceIn(0, points.lastIndex)

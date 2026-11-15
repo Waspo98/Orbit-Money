@@ -127,9 +127,6 @@ data class RetirementUiState(
             ((monthlySavingsCents.toDouble() * 12.0) / grossIncomeAnnualCents.toDouble()) * 100.0
         } else 0.0
 
-    val targetFundingGapCents: Cents
-        get() = kotlin.math.max(0L, scenario.targetNestEggCents - scenario.projectedBalanceCents)
-
     val surplusOrGapCents: Cents
         get() = scenario.projectedBalanceCents - scenario.targetNestEggCents
 }

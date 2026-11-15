@@ -27,6 +27,7 @@ import app.overbay.orbit.data.model.RetirementScenarioPreset
 import app.overbay.orbit.data.model.RetirementTargetMode
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.domain.RetirementCalculatorEngine
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.ui.calculators.retirement.RetirementUiState
@@ -113,7 +114,7 @@ fun AssumptionsSheet(
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
-                                    text = "${formatBasisRate(preset.nominalAnnualReturn)} / ${formatBasisRate(preset.inflationRate)}",
+                                    text = "${RetirementCalculatorEngine.formatRatePercent(preset.nominalAnnualReturn)} / ${RetirementCalculatorEngine.formatRatePercent(preset.inflationRate)}",
                                     style = TabularNumStyle.copy(fontSize = 11.sp),
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1
@@ -301,33 +302,21 @@ fun AssumptionsSheet(
                 }
                 val minEnd = (uiState.retirementAge.toFloat() + 1f).coerceAtLeast(75f)
                 val maxEnd = max(110f, minEnd + 5f)
-                var lastTickedAge = uiState.runwayEndAge.roundToInt()
+                val currentEndAge = uiState.runwayEndAge.roundToInt()
                 OrbitSmoothSlider(
                     value = uiState.runwayEndAge.toFloat().coerceIn(minEnd, maxEnd),
                     valueRange = minEnd..maxEnd,
                     onValueChange = { raw ->
                         val rounded = raw.roundToInt()
-                        if (rounded != lastTickedAge) {
+                        if (rounded != currentEndAge) {
                             haptics.tick()
-                            lastTickedAge = rounded
+                            onSetRunwayEndAge(rounded.toDouble())
                         }
-                        onSetRunwayEndAge(rounded.toDouble())
                     }
                 )
             }
 
             Spacer(modifier = Modifier.height(2.dp))
         }
-    }
-}
-
-internal fun formatBasisRate(rate: Double): String {
-    val bps = (rate * 10_000.0).roundToInt()
-    val whole = bps / 100
-    val frac = kotlin.math.abs(bps % 100)
-    return when {
-        frac == 0 -> "$whole%"
-        frac % 10 == 0 -> "$whole.${frac / 10}%"
-        else -> "$whole.${frac.toString().padStart(2, '0')}%"
     }
 }

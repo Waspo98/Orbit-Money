@@ -73,6 +73,7 @@ class SelfHostedPreferencesSyncTest {
         private val wireJson: Json
     ) {
         val preferences: MutableMap<String, JsonElement> = mutableMapOf()
+        val retirementHistoryAccountIdParams: MutableList<String?> = mutableListOf()
 
         fun createClient(storage: PlatformStorage, dispatcher: CoroutineDispatcher): OrbitApiClient {
             val engine = FakeEngine(dispatcher)
@@ -112,6 +113,15 @@ class SelfHostedPreferencesSyncTest {
                     path == "/api/rules" -> """{"items":[]}"""
                     path == "/api/upcoming" -> """{"items":[],"occurrences":[],"suggestions":[]}"""
                     path == "/api/household" -> """{"members":[],"records":[],"retirementAccounts":[]}"""
+                    path == "/api/household/retirement-history" -> {
+                        val accountIdsParam = data.url.parameters["accountIds"]
+                        retirementHistoryAccountIdParams += accountIdsParam
+                        when (accountIdsParam) {
+                            "" -> """{"history":[]}"""
+                            "10,12" -> """{"history":[{"month":"2026-10","balance":50000.0,"accounts":[{"account_id":10,"balance":40000.0},{"account_id":12,"balance":10000.0}]}]}"""
+                            else -> """{"history":[{"month":"2026-10","balance":40000.0,"accounts":[{"account_id":10,"balance":40000.0}]}]}"""
+                        }
+                    }
                     path == "/api/mha/overview" -> """{"enabled":false}"""
                     path == "/api/household/shares" -> """{"shares":[],"currentUserRole":"owner","currentUserAccessLevel":"write"}"""
                     path == "/api/preferences" && data.method == HttpMethod.Get -> {
@@ -239,5 +249,35 @@ class SelfHostedPreferencesSyncTest {
         scopeB.cancel()
         storageA.clear()
         storageB.clear()
+    }
+
+    @Test
+    fun testGetRetirementHistoryRemote_sendsAccountIdsParamForCustomEmptyAndAuto() = runTest(testDispatcher) {
+        val backend = FakeOrbitBackend(wireJson)
+        val storage = PlatformStorage().apply { clear() }
+        LocalSnapshotEngine(storage).saveStartupPreferences(
+            OrbitPreferences(storageMode = StorageMode.SELF_HOSTED, selfHostedServerUrl = "https://orbit.example.com", onboardingCompleted = true)
+        )
+        val scope = CoroutineScope(SupervisorJob() + testDispatcher)
+        val repo = OrbitRepository(storage, customApiClient = backend.createClient(storage, testDispatcher), scope = scope)
+        repo.initialize()
+        testScheduler.advanceUntilIdle()
+
+        val customHistory = repo.getRetirementHistory(120, setOf(12L, 10L))
+        assertEquals(1, customHistory.size)
+        assertEquals(50_000_00L, customHistory.first().balanceCents)
+        assertEquals(listOf(10L, 12L), customHistory.first().accounts.map { it.accountId })
+
+        val emptyHistory = repo.getRetirementHistory(120, emptySet())
+        assertEquals(emptyList(), emptyHistory)
+
+        val autoHistory = repo.getRetirementHistory(120, null)
+        assertEquals(1, autoHistory.size)
+        assertEquals(40_000_00L, autoHistory.first().balanceCents)
+
+        assertEquals(listOf("10,12", "", null), backend.retirementHistoryAccountIdParams)
+
+        scope.cancel()
+        storage.clear()
     }
 }

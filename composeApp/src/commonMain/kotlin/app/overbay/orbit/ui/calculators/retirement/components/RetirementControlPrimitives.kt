@@ -30,6 +30,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -44,7 +45,6 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.domain.Cents
@@ -58,6 +58,22 @@ import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlin.math.max
 import kotlin.math.roundToLong
+
+/**
+ * Keeps a dynamic slider upper bound frozen while [isDragging] is true so the track scale never
+ * shifts underneath the user's finger mid-drag.
+ */
+@Composable
+internal fun rememberStableSliderUpperBound(
+    targetMax: Float,
+    isDragging: Boolean
+): Float {
+    var bound by remember { mutableFloatStateOf(targetMax) }
+    if (!isDragging) {
+        bound = targetMax
+    }
+    return bound
+}
 
 /**
  * Tickless capsule-track Material 3 slider with haptic feedback when quantized step changes
@@ -298,44 +314,6 @@ internal fun AgeStepperChip(
                     )
                 }
             }
-        }
-    }
-}
-
-@Composable
-internal fun BenchmarkSnapChip(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val haptics = LocalOrbitHaptics.current
-    val shape = RoundedCornerShape(10.dp)
-    Surface(
-        shape = shape,
-        color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f) else MaterialTheme.colorScheme.surfaceContainerLow,
-        border = BorderStroke(
-            width = 1.dp,
-            color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.6f) else OrbitTheme.colors.cardBorder
-        ),
-        modifier = modifier
-            .clip(shape)
-            .clickable {
-                haptics.tick()
-                onClick()
-            }
-    ) {
-        Box(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = label,
-                style = TabularNumStyle.copy(fontSize = 12.sp, fontWeight = FontWeight.SemiBold),
-                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
         }
     }
 }

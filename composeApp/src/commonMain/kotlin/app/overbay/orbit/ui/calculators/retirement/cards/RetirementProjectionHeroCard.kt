@@ -23,10 +23,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.RetirementScenarioPreset
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.domain.RetirementCalculatorEngine
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.ui.calculators.retirement.RetirementUiState
-import app.overbay.orbit.ui.calculators.retirement.dialogs.formatBasisRate
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.ui.components.OrbitStatTile
 import app.overbay.orbit.ui.components.RollingTickerCents
@@ -53,7 +53,7 @@ fun RetirementProjectionHeroCard(
 
     OrbitSectionCard(
         title = "Projected Nest Egg",
-        subtitle = "Age ${uiState.retirementAge.roundToInt()} · ${uiState.preset.label} (${formatBasisRate(uiState.preset.nominalAnnualReturn)})",
+        subtitle = "Age ${uiState.retirementAge.roundToInt()} · ${uiState.preset.label} (${RetirementCalculatorEngine.formatRatePercent(uiState.preset.nominalAnnualReturn)})",
         modifier = modifier
     ) {
         // 1. Headline Projection Verdict Row (Whole Dollars — zero .39 cents)
