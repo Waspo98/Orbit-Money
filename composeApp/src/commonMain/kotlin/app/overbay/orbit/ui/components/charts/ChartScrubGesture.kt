@@ -6,6 +6,8 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -101,6 +103,69 @@ fun rememberSmoothScrubPosition(targetPoint: Offset?): Offset? {
 }
 
 /**
+ * Draw-phase interpolated series state backed by a single reusable [FloatArray] buffer.
+ * Call [sampleInDrawPhase] only inside a `DrawScope` (`Canvas` / `drawBehind`) so spring
+ * transitions animate at 60–120fps without triggering per-frame Composition/Layout work.
+ */
+@Stable
+class AnimatedFloatSeriesState internal constructor(
+    initialTargets: FloatArray
+) {
+    internal var fromSeries: FloatArray = initialTargets.copyOf()
+    internal var toSeries: FloatArray = initialTargets.copyOf()
+    internal var scratchOutput: FloatArray = initialTargets.copyOf()
+    internal val anim = Animatable(1f)
+    private val progressState: State<Float> = anim.asState()
+
+    fun sampleInDrawPhase(count: Int): FloatArray {
+        if (count <= 0) return FloatArray(0)
+        if (scratchOutput.size != count) {
+            scratchOutput = FloatArray(count)
+        }
+        fillInterpolatedSeries(
+            from = fromSeries,
+            to = toSeries,
+            progress = progressState.value,
+            count = count,
+            out = scratchOutput
+        )
+        return scratchOutput
+    }
+}
+
+@Composable
+fun rememberAnimatedFloatSeriesState(
+    targets: List<Float>,
+    animate: Boolean = true
+): AnimatedFloatSeriesState {
+    val state = remember { AnimatedFloatSeriesState(targets.toFloatArray()) }
+
+    LaunchedEffect(targets, animate) {
+        val next = targets.toFloatArray()
+        if (!animate) {
+            state.anim.snapTo(1f)
+            state.fromSeries = next
+            state.toSeries = next
+        } else if (!next.contentEquals(state.toSeries)) {
+            val snapshot = FloatArray(next.size)
+            fillInterpolatedSeries(
+                from = state.fromSeries,
+                to = state.toSeries,
+                progress = state.anim.value,
+                count = next.size,
+                out = snapshot
+            )
+            state.fromSeries = snapshot
+            state.toSeries = next
+            state.anim.snapTo(0f)
+            state.anim.animateTo(1f, OrbitSprings.FloatSpatialDefault)
+        }
+    }
+
+    return state
+}
+
+/**
  * Smoothly interpolates an array of normalized `[0f..1f]` chart values across dataset/period
  * transitions using a single shared [Animatable] (zero per-point coroutine allocation).
  */
@@ -129,15 +194,17 @@ fun rememberAnimatedFloatSeries(targets: List<Float>): FloatArray {
     return sampleInterpolatedSeries(fromSeries, toSeries, progress, targets.size)
 }
 
-private fun sampleInterpolatedSeries(
+private fun fillInterpolatedSeries(
     from: FloatArray,
     to: FloatArray,
     progress: Float,
-    count: Int
-): FloatArray {
-    if (count == 0) return FloatArray(0)
-    if (to.isEmpty()) return FloatArray(count)
-    val out = FloatArray(count)
+    count: Int,
+    out: FloatArray
+) {
+    if (count == 0 || to.isEmpty()) {
+        for (i in 0 until count) out[i] = 0f
+        return
+    }
     for (i in 0 until count) {
         val targetVal = to[i.coerceAtMost(to.lastIndex)]
         val startVal = if (from.isEmpty()) {
@@ -154,5 +221,16 @@ private fun sampleInterpolatedSeries(
         }
         out[i] = lerp(startVal, targetVal, progress).coerceAtLeast(0f)
     }
+}
+
+private fun sampleInterpolatedSeries(
+    from: FloatArray,
+    to: FloatArray,
+    progress: Float,
+    count: Int
+): FloatArray {
+    if (count == 0) return FloatArray(0)
+    val out = FloatArray(count)
+    fillInterpolatedSeries(from, to, progress, count, out)
     return out
 }

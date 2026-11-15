@@ -1,7 +1,7 @@
 package app.overbay.orbit.ui.components.charts
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,7 +23,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -32,9 +34,12 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.HsaBridgeAnalysis
 import app.overbay.orbit.data.model.RetirementScenarioPreset
 import app.overbay.orbit.domain.Cents
@@ -43,24 +48,11 @@ import app.overbay.orbit.domain.ProjectionPoint
 import app.overbay.orbit.domain.RetirementScenarioModel
 import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
-
-@Composable
-private fun rememberScenarioPresetColors(): Map<RetirementScenarioPreset, Color> {
-    val conservative = OrbitTheme.colors.transfer
-    val balanced = MaterialTheme.colorScheme.primary
-    val aggressive = MaterialTheme.colorScheme.tertiary
-    return remember(conservative, balanced, aggressive) {
-        mapOf(
-            RetirementScenarioPreset.CONSERVATIVE to conservative,
-            RetirementScenarioPreset.BALANCED to balanced,
-            RetirementScenarioPreset.AGGRESSIVE to aggressive
-        )
-    }
-}
 
 @Composable
 fun RetirementProjectionChart(
@@ -72,19 +64,24 @@ fun RetirementProjectionChart(
     selectedPreset: RetirementScenarioPreset,
     actualHistoryPoints: List<ProjectionPoint>,
     hsaBridge: HsaBridgeAnalysis? = null,
-    onAgeScrubbed: ((Double?, Cents?) -> Unit)? = null,
+    onSelectPreset: (RetirementScenarioPreset) -> Unit = {},
+    onScrubActiveChanged: ((Boolean) -> Unit)? = null,
+    isDraggingControl: Boolean = false,
     modifier: Modifier = Modifier,
-    height: Dp = 250.dp
+    height: Dp = 196.dp
 ) {
     val haptics = LocalOrbitHaptics.current
     val density = LocalDensity.current
+    val textMeasurer = rememberTextMeasurer()
 
-    var scrubbedAge by remember { mutableStateOf<Double?>(null) }
+    var scrubFraction by remember { mutableStateOf<Float?>(null) }
     var lastHapticAge by remember { mutableStateOf<Int?>(null) }
 
     val firstActualAge = actualHistoryPoints.firstOrNull()?.age ?: currentAge
     val minAge = min(firstActualAge, currentAge)
     val maxAge = max(retirementAge, currentAge + 1.0)
+    val ageSpan = max(1.0, maxAge - minAge)
+    val scrubbedAge = scrubFraction?.let { minAge + it * ageSpan }
 
     val maxBalance = remember(scenarios, actualHistoryPoints, targetNestEggCents, currentBalanceCents) {
         val peakScenarios = scenarios.values.flatMap { it.accumulationPoints }.maxOfOrNull { it.balanceCents } ?: 0L
@@ -92,33 +89,22 @@ fun RetirementProjectionChart(
         val peak = maxOf(peakScenarios, peakActual, targetNestEggCents, currentBalanceCents, 100_000_00L)
         (peak.toDouble() * 1.12).toLong()
     }
-    val animatedMaxBalance by animateFloatAsState(
-        targetValue = maxBalance.toFloat(),
-        animationSpec = OrbitSprings.FloatSpatialDefault,
-        label = "retirementMaxBalanceScale"
-    )
-    val animatedScenarioBalances = RetirementScenarioPreset.entries.associateWith { preset ->
+    val maxBalanceAnim = remember { Animatable(maxBalance.toFloat()) }
+    LaunchedEffect(maxBalance, isDraggingControl) {
+        val target = maxBalance.toFloat().coerceAtLeast(1f)
+        if (isDraggingControl) {
+            maxBalanceAnim.snapTo(target)
+        } else {
+            maxBalanceAnim.animateTo(target, OrbitSprings.FloatSpatialDefault)
+        }
+    }
+    val maxBalState = maxBalanceAnim.asState()
+
+    val animatedSeriesMap = RetirementScenarioPreset.entries.associateWith { preset ->
         val targets = remember(scenarios[preset]) {
             scenarios[preset]?.accumulationPoints?.map { it.balanceCents.toFloat().coerceAtLeast(0f) } ?: emptyList()
         }
-        rememberAnimatedFloatSeries(targets = targets)
-    }
-
-    LaunchedEffect(scrubbedAge, selectedPreset) {
-        val age = scrubbedAge
-        if (age != null) {
-            val intAge = age.roundToInt()
-            if (intAge != lastHapticAge) {
-                haptics.tick()
-                lastHapticAge = intAge
-            }
-            val activeModel = scenarios[selectedPreset]
-            val bal = interpolateBalanceAtAge(activeModel?.accumulationPoints ?: emptyList(), age)
-            onAgeScrubbed?.invoke(age, bal)
-        } else {
-            lastHapticAge = null
-            onAgeScrubbed?.invoke(null, null)
-        }
+        rememberAnimatedFloatSeriesState(targets = targets, animate = !isDraggingControl)
     }
 
     val presetColors = rememberScenarioPresetColors()
@@ -132,7 +118,7 @@ fun RetirementProjectionChart(
         Brush.verticalGradient(listOf(selectedColor.copy(alpha = 0.22f), selectedColor.copy(alpha = 0.01f)))
     }
     val targetStroke = remember(density) {
-        Stroke(width = with(density) { 1.5.dp.toPx() }, pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 8f)))
+        Stroke(width = with(density) { 1.4.dp.toPx() }, pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 8f)))
     }
     val markerStroke = remember(density) {
         Stroke(width = with(density) { 1.dp.toPx() }, pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f)))
@@ -141,11 +127,12 @@ fun RetirementProjectionChart(
         Stroke(width = with(density) { 3.dp.toPx() }, cap = StrokeCap.Round, join = StrokeJoin.Round)
     }
     val normalCurveStroke = remember(density) {
-        Stroke(width = with(density) { 1.8.dp.toPx() }, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        Stroke(width = with(density) { 1.6.dp.toPx() }, cap = StrokeCap.Round, join = StrokeJoin.Round)
     }
     val actualStroke = remember(density) {
         Stroke(width = with(density) { 2.dp.toPx() }, cap = StrokeCap.Round, join = StrokeJoin.Round)
     }
+
     val areaPath = remember { Path() }
     val actualPath = remember { Path() }
     val linePath = remember { Path() }
@@ -154,22 +141,24 @@ fun RetirementProjectionChart(
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
     val tertiaryColor = MaterialTheme.colorScheme.tertiary
     val surfaceColor = MaterialTheme.colorScheme.surface
+    val surfaceHighColor = MaterialTheme.colorScheme.surfaceContainerHigh
+    val gridColor = OrbitTheme.colors.cardBorder
 
-    val ageSpan = max(1.0, maxAge - minAge)
-    val normalizedScrubTarget = scrubbedAge?.let { age ->
-        val xNorm = ((age - minAge) / ageSpan).toFloat().coerceIn(0f, 1f)
-        val activeBal = interpolateBalanceAtAge(scenarios[selectedPreset]?.accumulationPoints ?: emptyList(), age)
-        val yNorm = (1f - (activeBal.toFloat() / animatedMaxBalance.coerceAtLeast(1f))).coerceIn(0f, 1f)
-        Offset(xNorm, yNorm)
+    val tabularBase = TabularNumStyle
+    val axisStyle = remember(tabularBase, onSurfaceVariant) {
+        tabularBase.copy(fontSize = 9.5.sp, color = onSurfaceVariant)
     }
-    val smoothScrubNorm = rememberSmoothScrubPosition(normalizedScrubTarget)
+    val targetPillStyle = remember(tabularBase, tertiaryColor) {
+        tabularBase.copy(fontSize = 9.5.sp, fontWeight = FontWeight.Bold, color = tertiaryColor)
+    }
 
     Column(modifier = modifier.fillMaxWidth()) {
         RetirementChartReadoutBar(
             scrubbedAge = scrubbedAge,
             scenarios = scenarios,
             selectedPreset = selectedPreset,
-            presetColors = presetColors
+            presetColors = presetColors,
+            onSelectPreset = onSelectPreset
         )
 
         Box(
@@ -180,54 +169,83 @@ fun RetirementProjectionChart(
                     key = minAge to maxAge,
                     clearOnRelease = true,
                     onFractionChanged = { fraction ->
-                        scrubbedAge = fraction?.let { minAge + it * (maxAge - minAge) }
+                        val wasActive = scrubFraction != null
+                        val isNowActive = fraction != null
+                        if (wasActive != isNowActive) {
+                            onScrubActiveChanged?.invoke(isNowActive)
+                        }
+                        if (fraction != null) {
+                            val intAge = (minAge + fraction * ageSpan).roundToInt()
+                            if (intAge != lastHapticAge) {
+                                haptics.tick()
+                                lastHapticAge = intAge
+                            }
+                        } else {
+                            lastHapticAge = null
+                        }
+                        scrubFraction = fraction
                     }
                 )
         ) {
+            // Layer 1: Static + Draw-phase spring curves, right Y-axis ticks & inline target marker
             Canvas(modifier = Modifier.fillMaxSize()) {
-                val w = size.width
-                val h = size.height
-                val denom = animatedMaxBalance.toDouble().coerceAtLeast(1.0)
+                val axisGutterPx = 46.dp.toPx()
+                val topPadPx = 6.dp.toPx()
+                val bottomPadPx = 4.dp.toPx()
+                val plotW = (size.width - axisGutterPx).coerceAtLeast(1f)
+                val plotH = (size.height - topPadPx - bottomPadPx).coerceAtLeast(1f)
+                val denom = maxBalState.value.toDouble().coerceAtLeast(1.0)
 
-                fun ageToX(age: Double): Float = (((age - minAge) / ageSpan) * w).toFloat()
-                fun balToY(bal: Cents): Float = (h - ((bal.toDouble() / denom) * h).toFloat()).coerceIn(0f, h)
-                fun balFloatToY(bal: Float): Float = (h - ((bal.toDouble() / denom) * h).toFloat()).coerceIn(0f, h)
+                fun ageToX(age: Double): Float = (((age - minAge) / ageSpan) * plotW).toFloat().coerceIn(0f, plotW)
+                fun balToY(bal: Cents): Float = (topPadPx + plotH - ((bal.toDouble() / denom) * plotH).toFloat()).coerceIn(topPadPx, topPadPx + plotH)
+                fun balFloatToY(bal: Float): Float = (topPadPx + plotH - ((bal.toDouble() / denom) * plotH).toFloat()).coerceIn(topPadPx, topPadPx + plotH)
 
-                // 1. Target Nest Egg Horizontal Line
+                drawRetirementGridAndYAxis(
+                    textMeasurer = textMeasurer,
+                    axisStyle = axisStyle,
+                    gridColor = gridColor,
+                    plotW = plotW,
+                    topPadPx = topPadPx,
+                    plotH = plotH,
+                    maxBalance = denom.toLong()
+                )
+
+                // Target line + inline capsule pill anchored cleanly on the dashed line
                 val targetY = balToY(targetNestEggCents)
                 drawLine(
-                    color = tertiaryColor.copy(alpha = 0.7f),
+                    color = tertiaryColor.copy(alpha = 0.72f),
                     start = Offset(0f, targetY),
-                    end = Offset(w, targetY),
+                    end = Offset(plotW, targetY),
                     strokeWidth = targetStroke.width,
                     pathEffect = targetStroke.pathEffect
                 )
+                val targetLabel = "Target ${MoneyUtils.formatCompactCents(targetNestEggCents)}"
+                val measuredTarget = textMeasurer.measure(targetLabel, style = targetPillStyle, maxLines = 1)
+                val pillW = measuredTarget.size.width + 12.dp.toPx()
+                val pillH = measuredTarget.size.height + 4.dp.toPx()
+                val pillX = (plotW - pillW - 6.dp.toPx()).coerceAtLeast(4.dp.toPx())
+                val pillY = (targetY - pillH / 2f).coerceIn(topPadPx, topPadPx + plotH - pillH)
+                drawRoundRect(
+                    color = surfaceHighColor.copy(alpha = 0.94f),
+                    topLeft = Offset(pillX, pillY),
+                    size = Size(pillW, pillH),
+                    cornerRadius = CornerRadius(6.dp.toPx())
+                )
+                drawText(measuredTarget, topLeft = Offset(pillX + 6.dp.toPx(), pillY + 2.dp.toPx()))
 
-                // 2. Vertical "Today" Marker Line
                 val todayX = ageToX(currentAge)
                 drawLine(
-                    color = onSurfaceVariant.copy(alpha = 0.6f),
-                    start = Offset(todayX, 0f),
-                    end = Offset(todayX, h),
+                    color = onSurfaceVariant.copy(alpha = 0.5f),
+                    start = Offset(todayX, topPadPx),
+                    end = Offset(todayX, topPadPx + plotH),
                     strokeWidth = markerStroke.width,
                     pathEffect = markerStroke.pathEffect
                 )
 
-                // 3. Vertical Retirement Age Marker Line
-                val retireX = ageToX(retirementAge)
-                drawLine(
-                    color = selectedColor.copy(alpha = 0.6f),
-                    start = Offset(retireX, 0f),
-                    end = Offset(retireX, h),
-                    strokeWidth = markerStroke.width,
-                    pathEffect = markerStroke.pathEffect
-                )
-
-                // 4. Area fill for selected scenario
                 val selectedModel = scenarios[selectedPreset]
                 if (selectedModel != null && selectedModel.accumulationPoints.size >= 2) {
                     val pts = selectedModel.accumulationPoints
-                    val animPts = animatedScenarioBalances[selectedPreset]
+                    val animPts = animatedSeriesMap[selectedPreset]?.sampleInDrawPhase(pts.size)
                     fun ptY(i: Int): Float = balFloatToY(
                         animPts?.getOrElse(i) { pts[i].balanceCents.toFloat() } ?: pts[i].balanceCents.toFloat()
                     )
@@ -236,13 +254,12 @@ fun RetirementProjectionChart(
                     for (i in 1 until pts.size) {
                         areaPath.lineTo(ageToX(pts[i].age), ptY(i))
                     }
-                    areaPath.lineTo(ageToX(pts.last().age), h)
-                    areaPath.lineTo(ageToX(pts.first().age), h)
+                    areaPath.lineTo(ageToX(pts.last().age), topPadPx + plotH)
+                    areaPath.lineTo(ageToX(pts.first().age), topPadPx + plotH)
                     areaPath.close()
                     drawPath(areaPath, brush = areaBrush)
                 }
 
-                // 5. Historical Actual Balances Line (up to currentAge)
                 if (actualHistoryPoints.size >= 2) {
                     actualPath.rewind()
                     actualPath.moveTo(ageToX(actualHistoryPoints.first().age), balToY(actualHistoryPoints.first().balanceCents))
@@ -250,67 +267,73 @@ fun RetirementProjectionChart(
                         val pt = actualHistoryPoints[i]
                         actualPath.lineTo(ageToX(pt.age), balToY(pt.balanceCents))
                     }
-                    drawPath(actualPath, color = onSurfaceVariant.copy(alpha = 0.65f), style = actualStroke)
+                    drawPath(actualPath, color = onSurfaceVariant.copy(alpha = 0.7f), style = actualStroke)
                 }
 
-                // 6. Dot at Today's Balance
-                drawCircle(color = onSurface, radius = 4.5.dp.toPx(), center = Offset(todayX, balToY(currentBalanceCents)))
+                drawCircle(color = onSurface, radius = 4.dp.toPx(), center = Offset(todayX, balToY(currentBalanceCents)))
 
-                // 7. Simultaneous 3 Accumulation Curves
                 RetirementScenarioPreset.entries.forEach { preset ->
                     val model = scenarios[preset]
                     if (model != null && model.accumulationPoints.size >= 2) {
                         val color = presetColors[preset] ?: onSurfaceVariant
                         val isSelected = preset == selectedPreset
-                        linePath.rewind()
                         val pts = model.accumulationPoints
-                        val animPts = animatedScenarioBalances[preset]
+                        val animPts = animatedSeriesMap[preset]?.sampleInDrawPhase(pts.size)
                         fun ptY(i: Int): Float = balFloatToY(
                             animPts?.getOrElse(i) { pts[i].balanceCents.toFloat() } ?: pts[i].balanceCents.toFloat()
                         )
+                        linePath.rewind()
                         linePath.moveTo(ageToX(pts.first().age), ptY(0))
                         for (i in 0 until pts.size - 1) {
                             val i0 = (i - 1).coerceAtLeast(0)
-                            val i1 = i
                             val i2 = i + 1
                             val i3 = (i + 2).coerceAtMost(pts.lastIndex)
-                            val x1 = ageToX(pts[i1].age); val y1 = ptY(i1)
+                            val x1 = ageToX(pts[i].age); val y1 = ptY(i)
                             val x2 = ageToX(pts[i2].age); val y2 = ptY(i2)
                             val x0 = ageToX(pts[i0].age); val y0 = ptY(i0)
                             val x3 = ageToX(pts[i3].age); val y3 = ptY(i3)
                             linePath.cubicTo(
-                                x1 + (x2 - x0) / 6f, (y1 + (y2 - y0) / 6f).coerceIn(0f, h),
-                                x2 - (x3 - x1) / 6f, (y2 - (y3 - y1) / 6f).coerceIn(0f, h),
+                                x1 + (x2 - x0) / 6f, (y1 + (y2 - y0) / 6f).coerceIn(topPadPx, topPadPx + plotH),
+                                x2 - (x3 - x1) / 6f, (y2 - (y3 - y1) / 6f).coerceIn(topPadPx, topPadPx + plotH),
                                 x2, y2
                             )
                         }
                         drawPath(
                             linePath,
-                            color = if (isSelected) color else color.copy(alpha = 0.65f),
+                            color = if (isSelected) color else color.copy(alpha = 0.55f),
                             style = if (isSelected) thickCurveStroke else normalCurveStroke
                         )
                     }
                 }
-
-                // 8. Smoothly gliding scrub line & indicator
-                if (smoothScrubNorm != null) {
-                    val sx = smoothScrubNorm.x * w
-                    val sy = smoothScrubNorm.y * h
-                    drawLine(color = onSurface.copy(alpha = 0.8f), start = Offset(sx, 0f), end = Offset(sx, h), strokeWidth = markerStroke.width)
-                    drawCircle(color = selectedColor.copy(alpha = 0.25f), radius = 12.dp.toPx(), center = Offset(sx, sy))
-                    drawCircle(color = surfaceColor, radius = 5.dp.toPx(), center = Offset(sx, sy))
-                    drawCircle(color = selectedColor, radius = 5.dp.toPx(), center = Offset(sx, sy), style = Stroke(width = 2.5.dp.toPx()))
-                }
             }
 
-            // 9. On-chart badge for Pre-65 HSA Bridge
+            // Layer 2: Scrub indicator overlay reading fraction strictly in Draw phase
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val frac = scrubFraction ?: return@Canvas
+                val axisGutterPx = 46.dp.toPx()
+                val topPadPx = 6.dp.toPx()
+                val bottomPadPx = 4.dp.toPx()
+                val plotW = (size.width - axisGutterPx).coerceAtLeast(1f)
+                val plotH = (size.height - topPadPx - bottomPadPx).coerceAtLeast(1f)
+                val denom = maxBalState.value.toDouble().coerceAtLeast(1.0)
+                val activeAge = minAge + frac * ageSpan
+                val activeBal = interpolateBalanceAtAge(scenarios[selectedPreset]?.accumulationPoints ?: emptyList(), activeAge)
+                val sx = (frac * plotW).coerceIn(0f, plotW)
+                val sy = (topPadPx + plotH - ((activeBal.toDouble() / denom) * plotH).toFloat()).coerceIn(topPadPx, topPadPx + plotH)
+
+                drawLine(color = onSurface.copy(alpha = 0.75f), start = Offset(sx, topPadPx), end = Offset(sx, topPadPx + plotH), strokeWidth = markerStroke.width)
+                drawCircle(color = selectedColor.copy(alpha = 0.25f), radius = 11.dp.toPx(), center = Offset(sx, sy))
+                drawCircle(color = surfaceColor, radius = 5.dp.toPx(), center = Offset(sx, sy))
+                drawCircle(color = selectedColor, radius = 5.dp.toPx(), center = Offset(sx, sy), style = Stroke(width = 2.5.dp.toPx()))
+            }
+
             if (retirementAge < 65.0 && hsaBridge != null) {
                 Surface(
                     shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.9f),
-                    modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.92f),
+                    modifier = Modifier.align(Alignment.TopStart).padding(6.dp)
                 ) {
-                    val statusText = if (hsaBridge.isBridgeCovered) "Non-HSA: Covered" else "Non-HSA: ${MoneyUtils.formatCompactCents(hsaBridge.shortfallCents)} Short"
+                    val statusText = if (hsaBridge.isBridgeCovered) "Pre-65 Bridge: Covered" else "Bridge Gap: ${MoneyUtils.formatCompactCents(hsaBridge.shortfallCents)}"
                     val statusColor = if (hsaBridge.isBridgeCovered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
                     Text(
                         text = statusText,
@@ -323,29 +346,21 @@ fun RetirementProjectionChart(
             }
         }
 
-        // X-Axis Age Milestones Row
+        // Evenly spaced X-axis milestones aligned to plot width
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 4.dp),
+                .padding(top = 4.dp, end = 46.dp),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(
-                text = "Today (${currentAge.toInt()})",
-                style = MaterialTheme.typography.labelSmall,
-                color = onSurfaceVariant
-            )
-            Text(
-                text = "Target: ${MoneyUtils.formatCompactCents(targetNestEggCents)}",
-                style = MaterialTheme.typography.labelSmall,
-                color = tertiaryColor
-            )
-            Text(
-                text = "Retire (${retirementAge.toInt()})",
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = selectedColor
-            )
+            val mid1 = (currentAge + (retirementAge - currentAge) / 3.0).roundToInt()
+            val mid2 = (currentAge + 2.0 * (retirementAge - currentAge) / 3.0).roundToInt()
+            Text(text = "Today ${currentAge.roundToInt()}", style = TabularNumStyle.copy(fontSize = 11.sp), color = onSurfaceVariant)
+            if (mid2 - mid1 >= 4) {
+                Text(text = "$mid1", style = TabularNumStyle.copy(fontSize = 11.sp), color = onSurfaceVariant.copy(alpha = 0.78f))
+                Text(text = "$mid2", style = TabularNumStyle.copy(fontSize = 11.sp), color = onSurfaceVariant.copy(alpha = 0.78f))
+            }
+            Text(text = "Retire ${retirementAge.roundToInt()}", style = TabularNumStyle.copy(fontSize = 11.sp), fontWeight = FontWeight.SemiBold, color = selectedColor)
         }
     }
 }

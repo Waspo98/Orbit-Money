@@ -119,6 +119,7 @@ fun RollingTickerCents(
     style: TextStyle = MaterialTheme.typography.headlineLarge,
     color: Color = MaterialTheme.colorScheme.onSurface,
     showSign: Boolean = false,
+    showCents: Boolean = true,
     animate: Boolean = true
 ) {
     var previousCents by remember { mutableLongStateOf(cents) }
@@ -127,7 +128,7 @@ fun RollingTickerCents(
         previousCents = cents
         cmp
     }
-    val formatted = MoneyUtils.formatCents(cents, showCents = true, signed = showSign)
+    val formatted = MoneyUtils.formatCents(cents, showCents = showCents, signed = showSign)
     RollingTickerText(
         text = formatted,
         modifier = modifier,

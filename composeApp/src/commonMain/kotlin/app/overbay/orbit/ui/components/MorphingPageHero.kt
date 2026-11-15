@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.layout.positionInRoot
@@ -67,6 +68,7 @@ private class HeroMetricsHolder(
 fun MorphingPageHero(
     title: String,
     modifier: Modifier = Modifier,
+    collapsedTitle: String? = null,
     kicker: String? = null,
     subtitle: String? = null,
     scrollState: HeroScrollState? = null,
@@ -90,10 +92,11 @@ fun MorphingPageHero(
     val hasCanopyBar = canopyBar != null && morphingContent == null
     val hasMorphingSlot = morphingContent != null
 
+    val collapseDisplayTitle = collapsedTitle ?: title
     val expandedFontSize = if (title.length > 17) 26.sp else 30.sp
     val collapsedTargetSp = when {
-        title.length > 15 -> 17.5f
-        title.length > 11 -> 19f
+        collapseDisplayTitle.length > 15 -> 17.5f
+        collapseDisplayTitle.length > 11 -> 19f
         else -> 21f
     }
     val collapsedTitleScale = collapsedTargetSp / expandedFontSize.value
@@ -104,6 +107,10 @@ fun MorphingPageHero(
         fontWeight = FontWeight.SemiBold,
         letterSpacing = 0.sp
     )
+    val collapsedStyle = titleStyle.copy(
+        fontSize = collapsedTargetSp.sp,
+        lineHeight = (collapsedTargetSp + 4f).sp
+    )
     val kickerStyle = MaterialTheme.typography.labelSmall.copy(
         fontSize = 10.5.sp,
         fontWeight = FontWeight.SemiBold,
@@ -112,6 +119,9 @@ fun MorphingPageHero(
 
     val measuredTitleSize = remember(title, expandedFontSize, density) {
         textMeasurer.measure(text = title, style = titleStyle, maxLines = 1).size
+    }
+    val measuredCollapsedWidthPx = remember(collapseDisplayTitle, collapsedStyle, density) {
+        textMeasurer.measure(text = collapseDisplayTitle, style = collapsedStyle, maxLines = 1).size.width.toFloat()
     }
     val initialTitleTopPx = remember(kicker, density) {
         if (kicker != null) {
@@ -150,7 +160,9 @@ fun MorphingPageHero(
     val topPadPx = with(density) { topPadDp.toPx() }
     val bottomPadDp = if (hasMorphingSlot || hasCanopyBar || persistentBottomBar != null) 10.dp else 18.dp
     val backShiftBasePx = with(density) { (-6).dp.toPx() }
-    val collapsedTitleWidthDp = with(density) { (metrics.rawTitleWidthPx * collapsedTitleScale).toDp() }
+    val collapsedTitleWidthDp = with(density) { measuredCollapsedWidthPx.toDp() }
+    val collapsedMaxBoundFraction = 0.36f
+    val minCollapsedWidthPx = with(density) { 84.dp.toPx() }
     val iconTopOffsetDp = with(density) {
         (initialTitleTopPx + (measuredTitleSize.height - 36.dp.toPx()).coerceAtLeast(0f) / 2f).toDp()
     }
@@ -180,51 +192,65 @@ fun MorphingPageHero(
                     Spacer(modifier = Modifier.height(3.dp))
                 }
 
+                val morphTransform: Modifier.((Float) -> Float) -> Modifier = { alphaFn ->
+                    this.graphicsLayer {
+                        val f = scrollState?.collapseFraction ?: 0f
+                        val maxShiftY = (minBarHeightPx / 2f) - (topPadPx + metrics.titleTopInColumnPx + metrics.titleHeightPx / 2f)
+                        val scale = lerp(1f, collapsedTitleScale, f)
+                        alpha = alphaFn(f)
+                        scaleX = scale
+                        scaleY = scale
+                        transformOrigin = TransformOrigin(0f, 0.5f)
+                        translationX = backShiftBasePx * f
+                        translationY = maxShiftY * f
+                    }
+                }
+                val placeMetrics = Modifier.onPlaced { coords ->
+                    metrics.titleTopInColumnPx = coords.positionInParent().y
+                    metrics.titleHeightPx = coords.size.height.toFloat()
+                    metrics.rawTitleWidthPx = coords.size.width.toFloat()
+                }
                 if (heroContent != null) {
-                    Box(
-                        modifier = Modifier
-                            .onPlaced { coords ->
-                                metrics.titleTopInColumnPx = coords.positionInParent().y
-                                metrics.titleHeightPx = coords.size.height.toFloat()
-                                metrics.rawTitleWidthPx = coords.size.width.toFloat()
-                            }
-                            .graphicsLayer {
-                                val f = scrollState?.collapseFraction ?: 0f
-                                val maxShiftY = (minBarHeightPx / 2f) - (topPadPx + metrics.titleTopInColumnPx + metrics.titleHeightPx / 2f)
-                                val scale = lerp(1f, collapsedTitleScale, f)
-                                alpha = contentAlpha
-                                scaleX = scale
-                                scaleY = scale
-                                transformOrigin = TransformOrigin(0f, 0.5f)
-                                translationX = backShiftBasePx * f
-                                translationY = maxShiftY * f
-                            }
-                    ) { heroContent() }
+                    Box(modifier = placeMetrics.morphTransform { contentAlpha }) { heroContent() }
                 } else {
-                    Text(
-                        text = title,
-                        style = titleStyle,
-                        color = canopyColors.onCanopy,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier
-                            .onPlaced { coords ->
-                                metrics.titleTopInColumnPx = coords.positionInParent().y
-                                metrics.titleHeightPx = coords.size.height.toFloat()
-                                metrics.rawTitleWidthPx = coords.size.width.toFloat()
+                    val hasSeparateCollapsed = collapsedTitle != null && collapsedTitle != title
+                    val limitModifier = if (hasCanopyBar) {
+                        Modifier.layout { measurable, constraints ->
+                            val f = scrollState?.collapseFraction ?: 0f
+                            val scale = lerp(1f, collapsedTitleScale, f)
+                            val maxCollapsedW = (constraints.maxWidth * collapsedMaxBoundFraction).coerceAtLeast(minCollapsedWidthPx)
+                            val maxUnscaledW = if (f > 0.25f) {
+                                lerp(constraints.maxWidth.toFloat(), maxCollapsedW / scale, ((f - 0.25f) / 0.45f).coerceIn(0f, 1f)).roundToInt()
+                            } else constraints.maxWidth
+                            val p = measurable.measure(constraints.copy(maxWidth = maxUnscaledW.coerceIn(0, constraints.maxWidth)))
+                            layout(p.width, p.height) { p.placeRelative(0, 0) }
+                        }
+                    } else Modifier
+
+                    Box {
+                        Text(
+                            text = title,
+                            style = titleStyle,
+                            color = canopyColors.onCanopy,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = limitModifier.then(placeMetrics).morphTransform { f ->
+                                if (hasSeparateCollapsed) (1f - f * 2.3f).coerceIn(0f, 1f) * contentAlpha else contentAlpha
                             }
-                            .graphicsLayer {
-                                val f = scrollState?.collapseFraction ?: 0f
-                                val maxShiftY = (minBarHeightPx / 2f) - (topPadPx + metrics.titleTopInColumnPx + metrics.titleHeightPx / 2f)
-                                val scale = lerp(1f, collapsedTitleScale, f)
-                                alpha = contentAlpha
-                                scaleX = scale
-                                scaleY = scale
-                                transformOrigin = TransformOrigin(0f, 0.5f)
-                                translationX = backShiftBasePx * f
-                                translationY = maxShiftY * f
-                            }
-                    )
+                        )
+                        if (hasSeparateCollapsed) {
+                            Text(
+                                text = collapsedTitle!!,
+                                style = titleStyle,
+                                color = canopyColors.onCanopy,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = limitModifier.morphTransform { f ->
+                                    ((f - 0.35f) * 2.2f).coerceIn(0f, 1f) * contentAlpha
+                                }
+                            )
+                        }
+                    }
                 }
 
                 if (subtitle != null) {
@@ -335,9 +361,9 @@ fun MorphingPageHero(
                 if (hasMorphingSlot) {
                     measurables[1].measure(Constraints.fixed(constraints.maxWidth, zoneHeightPx))
                 } else {
-                    val maxCollapsedTitleW = (totalWidthPx * 0.36f).coerceAtLeast(84.dp.toPx())
-                    val clampedTitleW = (metrics.rawTitleWidthPx * collapsedTitleScale)
-                        .coerceIn(52.dp.toPx(), maxCollapsedTitleW)
+                    val maxCollapsedTitleW = (totalWidthPx * collapsedMaxBoundFraction).coerceAtLeast(minCollapsedWidthPx)
+                    val targetCollapsedW = if (collapsedTitle != null) measuredCollapsedWidthPx else (metrics.rawTitleWidthPx * collapsedTitleScale)
+                    val clampedTitleW = targetCollapsedW.coerceIn(52.dp.toPx(), maxCollapsedTitleW)
                     val collapsedRowLeftPx = 20.dp.toPx() + clampedTitleW + 10.dp.toPx()
                     val barHeightPx = lerp(46.dp.toPx(), 38.dp.toPx(), f)
                     val barLeftPx = lerp(20.dp.toPx(), collapsedRowLeftPx, f)

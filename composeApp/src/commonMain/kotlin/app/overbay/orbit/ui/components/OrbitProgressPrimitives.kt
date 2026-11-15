@@ -25,7 +25,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
-import app.overbay.orbit.ui.components.charts.rememberAnimatedFloatSeries
+import app.overbay.orbit.ui.components.charts.rememberAnimatedFloatSeriesState
 
 /**
  * Slim pill-shaped progress bar for budget pulse, goal funding, and category limits.
@@ -110,7 +110,7 @@ fun OrbitStackedSegmentBar(
     } else {
         segments.map { it.fraction.coerceIn(0f, 1f) }
     }
-    val animatedFractions = rememberAnimatedFloatSeries(targets = rawFractions)
+    val animatedState = rememberAnimatedFloatSeriesState(targets = rawFractions)
     val markerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f)
 
     Box(modifier = modifier.fillMaxWidth().height(height)) {
@@ -123,6 +123,7 @@ fun OrbitStackedSegmentBar(
             val h = size.height
             drawRect(color = trackColor, size = size)
 
+            val animatedFractions = animatedState.sampleInDrawPhase(segments.size)
             var currentX = 0f
             segments.forEachIndexed { index, segment ->
                 val frac = animatedFractions.getOrElse(index) { segment.fraction }.coerceAtLeast(0f)
