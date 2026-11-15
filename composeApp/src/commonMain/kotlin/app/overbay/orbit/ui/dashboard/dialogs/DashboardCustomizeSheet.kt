@@ -103,7 +103,8 @@ fun <K : Any> OrbitBentoCustomizeSheet(
     onMoveItem: (Int, Int) -> Unit = { _, _ -> },
     onReset: () -> Unit,
     onDismiss: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    headerContent: (@Composable () -> Unit)? = null
 ) {
     val haptics = LocalOrbitHaptics.current
     val showWidthPicker = true
@@ -152,6 +153,7 @@ fun <K : Any> OrbitBentoCustomizeSheet(
                 .padding(horizontal = 20.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            headerContent?.invoke()
             items.forEach { config ->
                 key(config.key) {
                     CustomizeCardRow(

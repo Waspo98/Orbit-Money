@@ -1,51 +1,38 @@
 package app.overbay.orbit.ui.cardperks
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import app.overbay.orbit.data.model.AccountType
-import app.overbay.orbit.domain.MoneyUtils
-import app.overbay.orbit.theme.OrbitSprings
+import androidx.compose.ui.unit.sp
+import app.overbay.orbit.data.model.BenefitCadence
+import app.overbay.orbit.domain.ActivePerkItem
+import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.ui.accounts.AccountsUiState
+import app.overbay.orbit.ui.accounts.PerkPeriodFilter
+import app.overbay.orbit.ui.accounts.cards.CardEditorTab
 import app.overbay.orbit.ui.accounts.cards.CardFormat
 import app.overbay.orbit.ui.accounts.cards.CardPerkRow
-import app.overbay.orbit.ui.accounts.cards.CardVisualPlate
-import app.overbay.orbit.ui.accounts.cards.Chase524PersonCard
+import app.overbay.orbit.ui.accounts.cards.Chase524SectionCard
 import app.overbay.orbit.ui.accounts.cards.WelcomeBonusesCard
-import app.overbay.orbit.ui.components.OrbitAccordionVisibility
 import app.overbay.orbit.ui.accounts.cards.WhichCardWhereCard
-import app.overbay.orbit.ui.components.OrbitBadge
+import app.overbay.orbit.ui.components.OrbitAccordionVisibility
 import app.overbay.orbit.ui.components.OrbitSectionCard
+import app.overbay.orbit.util.LocalOrbitHaptics
 
 @Composable
 fun CardPerksBentoItem(
@@ -62,6 +49,8 @@ fun CardPerksBentoItem(
             isExpanded = true,
             onToggleExpand = {},
             onInspectAccount = actions.onInspectAccount,
+            searchQuery = uiState.whichCardQuery,
+            onSearchQueryChange = actions.onWhichCardQueryChange,
             alwaysExpanded = true,
             modifier = modifier
         )
@@ -78,189 +67,124 @@ fun CardPerksBentoItem(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun CardWalletRoiBentoCard(
-    uiState: AccountsUiState,
-    actions: CardPerksBentoActions,
-    modifier: Modifier = Modifier
-) {
-    val creditAccounts = remember(uiState.accounts, uiState.selectedCardPlayer, uiState.householdMembers) {
-        uiState.accounts.filter { acct ->
-            acct.type == AccountType.CREDIT &&
-                !acct.isArchived &&
-                CardFormat.matchesSelectedPlayer(acct, uiState.selectedCardPlayer, uiState.householdMembers)
-        }
-    }
-
-    OrbitSectionCard(
-        title = "Card Wallet (${creditAccounts.size})",
-        subtitle = "Tap card for more details",
-        modifier = modifier
-    ) {
-        Column(
-            modifier = Modifier.animateContentSize(animationSpec = OrbitSprings.IntSizeAccordionFast),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            creditAccounts.forEach { account ->
-                val profile = account.creditCardProfile
-                val isSelected = uiState.selectedAccountId == account.id
-                val displayName = profile?.cardName?.takeIf { it.isNotBlank() } ?: account.name
-                val institution = account.institution?.takeIf { it.isNotBlank() }
-                    ?: profile?.issuerName?.takeIf { it.isNotBlank() }
-                val metaSubtitle = listOfNotNull(
-                    institution,
-                    account.accountNumberLast4?.takeIf { it.isNotBlank() }?.let { "•••• $it" }
-                ).joinToString(" · ")
-                val holderName = CardFormat.resolveCardholderName(profile, uiState.householdMembers)
-                val auNames = CardFormat.resolveAuthorizedUsers(profile, uiState.householdMembers)
-                val network = profile?.network?.takeIf { it.isNotBlank() }
-
-                val cardBg by animateColorAsState(
-                    targetValue = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
-                    else MaterialTheme.colorScheme.surfaceContainerLowest,
-                    animationSpec = OrbitSprings.ColorEffectsFast,
-                    label = "cardWalletSelectedBg"
-                )
-                val cardBorderColor by animateColorAsState(
-                    targetValue = if (isSelected) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
-                    animationSpec = OrbitSprings.ColorEffectsFast,
-                    label = "cardWalletSelectedBorder"
-                )
-
-                Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = cardBg,
-                    border = BorderStroke(1.dp, cardBorderColor),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
-                        .clickable { actions.onInspectAccount(account.id) }
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        CardVisualPlate(
-                            name = displayName,
-                            issuer = institution,
-                            artKey = profile?.imageUrl,
-                            artworkUrl = profile?.artworkUrl,
-                            last4 = account.accountNumberLast4,
-                            modifier = Modifier
-                                .fillMaxWidth(0.46f)
-                                .widthIn(max = 176.dp)
-                                .aspectRatio(1.586f)
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text(
-                                text = displayName,
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            if (metaSubtitle.isNotEmpty()) {
-                                Text(
-                                    text = metaSubtitle,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                            if (network != null || holderName != null || auNames.isNotEmpty()) {
-                                FlowRow(
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
-                                    if (network != null) {
-                                        OrbitBadge(
-                                            text = network,
-                                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                                        )
-                                    }
-                                    if (holderName != null) {
-                                        OrbitBadge(
-                                            text = holderName,
-                                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                    auNames.forEach { au ->
-                                        OrbitBadge(
-                                            text = "AU · $au",
-                                            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                                            contentColor = MaterialTheme.colorScheme.onTertiaryContainer
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                            contentDescription = "Inspect Card",
-                            tint = MaterialTheme.colorScheme.outline,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
 private fun PerksThisPeriodBentoCard(
     uiState: AccountsUiState,
     actions: CardPerksBentoActions,
     modifier: Modifier = Modifier
 ) {
+    val haptics = LocalOrbitHaptics.current
     val perks = uiState.cardPortfolioSummary.currentPeriodPerks
-    val activePerks = perks.filter { !it.isFullyUsed }
-    val usedPerks = perks.filter { it.isFullyUsed }
+    val activePerks = remember(perks) {
+        perks.filter { !it.isFullyUsed }.sortedWith(
+            compareBy<ActivePerkItem> { it.daysUntilReset ?: Int.MAX_VALUE }
+                .thenByDescending { it.remainingCents }
+        )
+    }
+    val usedPerks = remember(perks) { perks.filter { it.isFullyUsed } }
+    val expiringCount = remember(activePerks) { activePerks.count { (it.daysUntilReset ?: Int.MAX_VALUE) <= 7 } }
+    val filteredActive = remember(activePerks, uiState.perkPeriodFilter) {
+        when (uiState.perkPeriodFilter) {
+            PerkPeriodFilter.ALL -> activePerks
+            PerkPeriodFilter.EXPIRING_SOON -> activePerks.filter { (it.daysUntilReset ?: Int.MAX_VALUE) <= 7 }
+            PerkPeriodFilter.MONTHLY -> activePerks.filter { it.benefit.cadence == BenefitCadence.MONTHLY }
+            PerkPeriodFilter.ANNUAL_PLUS -> activePerks.filter { it.benefit.cadence != BenefitCadence.MONTHLY }
+        }
+    }
     val totalRemaining = activePerks.sumOf { it.remainingCents }
-    val subtitle = if (perks.isNotEmpty()) "${MoneyUtils.formatCents(totalRemaining)} left to use this period" else null
+    val subtitle = if (perks.isNotEmpty()) {
+        "${CardFormat.formatAdaptiveCents(totalRemaining)} remaining across ${activePerks.size} perk${if (activePerks.size == 1) "" else "s"}"
+    } else null
 
-    OrbitSectionCard(title = "Perks This Period", subtitle = subtitle, modifier = modifier) {
+    OrbitSectionCard(
+        title = "Perks This Period",
+        subtitle = subtitle,
+        actionText = when {
+            usedPerks.isEmpty() -> null
+            uiState.showUsedPerks -> "Hide Used"
+            else -> "Show ${usedPerks.size} Used"
+        },
+        onActionClick = if (usedPerks.isEmpty()) null else {
+            {
+                haptics.tick()
+                actions.onToggleShowUsedPerks()
+            }
+        },
+        modifier = modifier
+    ) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (perks.isEmpty()) {
                 Text(
-                    text = "No perks set up · Tap any card in your wallet to pick a template or add monthly/annual credits.",
+                    text = "No perks set up \u00B7 Link a card template in Card Wallet to track monthly, quarterly, or annual credits.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.outline,
                     modifier = Modifier.padding(vertical = 4.dp)
                 )
             } else {
-                activePerks.forEach { item ->
-                    CardPerkRow(
-                        title = "${item.cardTitle} · ${item.benefit.title}",
-                        subtitle = item.periodLabel,
-                        valueCents = item.periodValueCents,
-                        usedCents = item.usedCents,
-                        daysUntilReset = item.daysUntilReset,
-                        onToggle = { actions.onToggleBenefit(item.accountId, item.benefitId) },
-                        onEditAmount = { actions.onOpenPerkUsage(item.accountId, item.benefitId) }
+                if (activePerks.size > 4 || uiState.perkPeriodFilter != PerkPeriodFilter.ALL) {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        PerkPeriodFilter.entries.forEach { filterOption ->
+                            if (filterOption == PerkPeriodFilter.EXPIRING_SOON && expiringCount == 0 && uiState.perkPeriodFilter != filterOption) {
+                                return@forEach
+                            }
+                            val isSelected = uiState.perkPeriodFilter == filterOption
+                            val chipLabel = if (filterOption == PerkPeriodFilter.EXPIRING_SOON && expiringCount > 0) {
+                                "Expiring \u22647d ($expiringCount)"
+                            } else {
+                                filterOption.label
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(50),
+                                color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow,
+                                border = BorderStroke(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else OrbitTheme.colors.cardBorder),
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(50))
+                                    .clickable {
+                                        haptics.tick()
+                                        actions.onSelectPerkFilter(filterOption)
+                                    }
+                            ) {
+                                Text(
+                                    text = chipLabel,
+                                    style = TabularNumStyle.copy(fontSize = 12.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium),
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (filteredActive.isEmpty() && activePerks.isNotEmpty()) {
+                    Text(
+                        text = "No perks match \"${uiState.perkPeriodFilter.label}\".",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.padding(vertical = 4.dp)
                     )
+                } else {
+                    filteredActive.forEach { item ->
+                        CardPerkRow(
+                            title = item.benefit.title,
+                            subtitle = "${item.cardTitle} \u00B7 ${item.periodLabel}",
+                            valueCents = item.periodValueCents,
+                            usedCents = item.usedCents,
+                            daysUntilReset = item.daysUntilReset,
+                            onToggle = { actions.onToggleBenefit(item.accountId, item.benefitId) },
+                            onEditAmount = { actions.onOpenPerkUsage(item.accountId, item.benefitId) }
+                        )
+                    }
                 }
 
                 if (usedPerks.isNotEmpty()) {
-                    TextButton(onClick = { actions.onToggleShowUsedPerks() }, modifier = Modifier.align(Alignment.Start)) {
-                        Text(if (uiState.showUsedPerks) "Hide ${usedPerks.size} Used" else "Show ${usedPerks.size} Used")
-                    }
-
                     OrbitAccordionVisibility(visible = uiState.showUsedPerks) {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             usedPerks.forEach { item ->
                                 CardPerkRow(
-                                    title = "${item.cardTitle} · ${item.benefit.title}",
-                                    subtitle = item.periodLabel,
+                                    title = item.benefit.title,
+                                    subtitle = "${item.cardTitle} \u00B7 ${item.periodLabel}",
                                     valueCents = item.periodValueCents,
                                     usedCents = item.usedCents,
                                     daysUntilReset = item.daysUntilReset,
@@ -282,21 +206,12 @@ private fun Chase524BentoSection(
     actions: CardPerksBentoActions,
     modifier: Modifier = Modifier
 ) {
-    val people = uiState.cardPortfolioSummary.chase524ByPerson
-    if (people.isEmpty()) {
-        OrbitSectionCard(title = "Chase 5/24 Status", modifier = modifier) {
-            Text(
-                text = "Add card opening dates in your credit card tracker settings to track personal 5/24 eligibility.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.outline,
-                modifier = Modifier.padding(vertical = 4.dp)
-            )
-        }
-    } else {
-        Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            people.forEach { person ->
-                Chase524PersonCard(person = person, onInspectAccount = actions.onInspectAccount)
-            }
-        }
-    }
+    Chase524SectionCard(
+        people = uiState.cardPortfolioSummary.chase524ByPerson,
+        onInspectAccount = actions.onInspectAccount,
+        onFixMissingOpenDate = { accountId ->
+            actions.onOpenCardSetup(accountId, CardEditorTab.STRATEGY, false)
+        },
+        modifier = modifier
+    )
 }

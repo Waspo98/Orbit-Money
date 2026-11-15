@@ -556,5 +556,116 @@ class AccountsViewModelTest {
 
         collectJob.cancel()
     }
+
+    @Test
+    fun testToggleCardBenefit_threeStateProgressionAndUndo() = runTest(testDispatcher) {
+        val card = repository.saveAccount(
+            Account(
+                id = 601L,
+                name = "Gold Card",
+                type = AccountType.CREDIT,
+                creditCardProfile = app.overbay.orbit.data.model.CreditCardProfile(
+                    accountId = 601L,
+                    cardName = "Gold Card",
+                    benefits = listOf(
+                        app.overbay.orbit.data.model.CardBenefit(
+                            id = "dining",
+                            title = "Dining Credit",
+                            periodValueCents = 2_500L,
+                            cadence = app.overbay.orbit.data.model.BenefitCadence.MONTHLY
+                        )
+                    )
+                )
+            )
+        )
+
+        val collectJob = launch(testDispatcher) {
+            viewModel.uiState.collect {}
+        }
+        testScheduler.advanceUntilIdle()
+
+        // 0 -> 2500L
+        viewModel.toggleCardBenefit(card.id, "dining")
+        testScheduler.advanceUntilIdle()
+        val fullPerk = viewModel.uiState.value.cardPortfolioSummary.currentPeriodPerks.single { it.benefitId == "dining" }
+        assertEquals(2_500L, fullPerk.usedCents)
+        assertTrue(fullPerk.isFullyUsed)
+        val firstUndo = viewModel.uiState.value.lastPerkUndoEvent
+        assertNotNull(firstUndo)
+        assertEquals(null, firstUndo.previousAmountCents)
+        assertEquals(2_500L, firstUndo.newAmountCents)
+
+        // Undo 2500L -> null (0L)
+        viewModel.undoLastPerkToggle(firstUndo)
+        testScheduler.advanceUntilIdle()
+        val clearedPerk = viewModel.uiState.value.cardPortfolioSummary.currentPeriodPerks.single { it.benefitId == "dining" }
+        assertEquals(0L, clearedPerk.usedCents)
+        assertFalse(clearedPerk.isFullyUsed)
+        assertEquals(null, viewModel.uiState.value.lastPerkUndoEvent)
+
+        // Partial 700L -> toggle finishes to 2500L -> Undo restores 700L -> toggle twice clears to 0L
+        viewModel.setCardBenefitUsage(card.id, "dining", 700L)
+        testScheduler.advanceUntilIdle()
+        val partialPerk = viewModel.uiState.value.cardPortfolioSummary.currentPeriodPerks.single { it.benefitId == "dining" }
+        assertEquals(700L, partialPerk.usedCents)
+        assertFalse(partialPerk.isFullyUsed)
+
+        viewModel.toggleCardBenefit(card.id, "dining")
+        testScheduler.advanceUntilIdle()
+        val completedFromPartial = viewModel.uiState.value.cardPortfolioSummary.currentPeriodPerks.single { it.benefitId == "dining" }
+        assertEquals(2_500L, completedFromPartial.usedCents)
+        val partialUndo = viewModel.uiState.value.lastPerkUndoEvent
+        assertNotNull(partialUndo)
+        assertEquals(700L, partialUndo.previousAmountCents)
+        assertEquals(2_500L, partialUndo.newAmountCents)
+
+        viewModel.undoLastPerkToggle(partialUndo)
+        testScheduler.advanceUntilIdle()
+        val restoredPartial = viewModel.uiState.value.cardPortfolioSummary.currentPeriodPerks.single { it.benefitId == "dining" }
+        assertEquals(700L, restoredPartial.usedCents)
+        assertEquals(null, viewModel.uiState.value.lastPerkUndoEvent)
+
+        // Partial -> full -> toggle again -> null
+        viewModel.toggleCardBenefit(card.id, "dining")
+        testScheduler.advanceUntilIdle()
+        viewModel.toggleCardBenefit(card.id, "dining")
+        testScheduler.advanceUntilIdle()
+        val toggledClear = viewModel.uiState.value.cardPortfolioSummary.currentPeriodPerks.single { it.benefitId == "dining" }
+        assertEquals(0L, toggledClear.usedCents)
+        assertFalse(toggledClear.isFullyUsed)
+
+        collectJob.cancel()
+    }
+
+    @Test
+    fun testOpenCreditCardProfile_deepLinksToTabAndTemplatePicker() = runTest(testDispatcher) {
+        val card = repository.saveAccount(
+            Account(
+                id = 602L,
+                name = "Venture X",
+                type = AccountType.CREDIT
+            )
+        )
+
+        val collectJob = launch(testDispatcher) {
+            viewModel.uiState.collect {}
+        }
+        testScheduler.advanceUntilIdle()
+
+        viewModel.openCreditCardProfile(
+            account = card,
+            initialTab = app.overbay.orbit.ui.accounts.cards.CardEditorTab.BILLING,
+            forceTemplatePicker = true
+        )
+        testScheduler.advanceUntilIdle()
+
+        val draft = viewModel.uiState.value.cardEditorDraft
+        assertNotNull(draft)
+        assertEquals(602L, draft.accountId)
+        assertEquals(app.overbay.orbit.ui.accounts.cards.CardEditorTab.BILLING, draft.activeTab)
+        assertEquals(app.overbay.orbit.ui.accounts.cards.CardEditorStep.PICK_TEMPLATE, draft.step)
+
+        collectJob.cancel()
+    }
 }
 

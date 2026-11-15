@@ -236,13 +236,7 @@ object CreditCardCycleEngine {
     /**
      * Aggregates all active household credit card accounts and computes portfolio totals.
      */
-    fun summarize(
-        accounts: List<Account>,
-        txns: List<Transaction>,
-        today: LocalDate,
-        householdMembers: List<HouseholdMember> = emptyList()
-    ): Pair<HouseholdCreditSummary, List<CardCycleStatus>> {
-        val statuses = accounts.mapNotNull { status(it, txns, today, householdMembers) }
+    fun summarizeStatuses(statuses: List<CardCycleStatus>): HouseholdCreditSummary {
         val totalOwedCents = statuses.sumOf { it.owedNowCents }
         val totalLimitCents = statuses.mapNotNull { it.creditLimitCents }.sum()
         val utilizationBps = if (totalLimitCents > 0L) {
@@ -255,13 +249,21 @@ object CreditCardCycleEngine {
             .filter { it.daysUntilDue != null && it.daysUntilDue >= 0 }
             .minByOrNull { it.daysUntilDue!! }
 
-        val summary = HouseholdCreditSummary(
+        return HouseholdCreditSummary(
             totalOwedCents = totalOwedCents,
             totalLimitCents = totalLimitCents,
             utilizationBps = utilizationBps,
             nextDue = nextDue
         )
+    }
 
-        return Pair(summary, statuses)
+    fun summarize(
+        accounts: List<Account>,
+        txns: List<Transaction>,
+        today: LocalDate,
+        householdMembers: List<HouseholdMember> = emptyList()
+    ): Pair<HouseholdCreditSummary, List<CardCycleStatus>> {
+        val statuses = accounts.mapNotNull { status(it, txns, today, householdMembers) }
+        return Pair(summarizeStatuses(statuses), statuses)
     }
 }

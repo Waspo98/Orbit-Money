@@ -10,25 +10,20 @@ import app.overbay.orbit.data.engine.SyncResult
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.data.model.BalanceRecord
-import app.overbay.orbit.data.model.CardBenefit
 import app.overbay.orbit.data.model.CreditCardProfile
-import app.overbay.orbit.data.model.OrbitPreferences
-import app.overbay.orbit.data.model.OrbitWorkspaceSnapshot
-import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.reorderAccounts
 import app.overbay.orbit.data.saveCreditCardProfile
-import app.overbay.orbit.data.setCardBenefitUsage
 import app.overbay.orbit.data.setAccountArchived
 import app.overbay.orbit.data.unlinkSimpleFinAccount
 import app.overbay.orbit.domain.AccountClosureDetector
 import app.overbay.orbit.domain.BalanceHistoryEngine
-import app.overbay.orbit.domain.BenefitPeriod
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.CreditCardBenefitEngine
 import app.overbay.orbit.domain.CreditCardStrategyEngine
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.NetWorthEngine
 import app.overbay.orbit.ui.accounts.cards.CardEditorController
+import app.overbay.orbit.ui.accounts.cards.CardEditorTab
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -54,7 +49,6 @@ class AccountsViewModel(
     val cardEditor = CardEditorController(repository)
     val accountLogos = AccountLogoController(repository, viewModelScope)
     val closurePrompts = AccountClosureController(repository, viewModelScope)
-
     private val _selectedAccountId = MutableStateFlow<Long?>(null)
     internal val currentSelectedAccountId: Long? get() = _selectedAccountId.value
     private val _editingAccount = MutableStateFlow<Account?>(null)
@@ -79,10 +73,8 @@ class AccountsViewModel(
     private val _isSyncing = MutableStateFlow(false)
     private val _syncErrorMessage = MutableStateFlow<String?>(null)
     private val _selectedCardPlayer = MutableStateFlow(CreditCardStrategyEngine.ALL_PLAYERS)
-    private val _showUsedPerks = MutableStateFlow(false)
-    private val _showWhichCardWhere = MutableStateFlow(false)
-    private val _selectedRewardCategory = MutableStateFlow<String?>(null)
     private val _perkUsageTarget = MutableStateFlow<PerkUsageTarget?>(null)
+    val cardActions = CreditCardActionDelegate(repository, viewModelScope) { _syncErrorMessage.value = it }
 
     private val resolvedTodayFlow = (todayFlow ?: flow {
         while (true) {
@@ -100,12 +92,6 @@ class AccountsViewModel(
     ) { a, t, p, d, members ->
         CreditCardHubStateCalculator.calculate(a, t, p, d, members)
     }.distinctUntilChanged().flowOn(computeDispatcher)
-
-    private val hubUiControlFlow = combine(
-        _showUsedPerks, _showWhichCardWhere, _selectedRewardCategory
-    ) { showUsed, showWhich, cat ->
-        AccountsHubUiControl(showUsed, showWhich, cat)
-    }
 
     private val dataFlow = combine(
         repository.accounts, repository.transactions, repository.snapshot, repository.preferences
@@ -190,6 +176,7 @@ class AccountsViewModel(
             isSyncing = syncReorder.syncing, syncErrorMessage = syncReorder.err, isLoading = false,
             mhaEnabled = data.preferences.mhaTrackerEnabled,
             rewardsToolsEnabled = resolvedRewardsToolsEnabled,
+            cardRewardsToolsPref = data.preferences.cardRewardsToolsEnabled,
             cardPerksWidgets = data.preferences.cardPerksWidgets,
             closureCandidates = closureCandidates
         )
@@ -198,17 +185,23 @@ class AccountsViewModel(
     }.combine(_perkUsageTarget) { state, target -> state.copy(perkUsageTarget = target)
     }.combine(accountLogos.logoFinderAccount) { state, acct ->
         state.copy(logoFinderAccount = acct?.let { target -> state.accounts.find { it.id == target.id } ?: target })
-    }.combine(combine(hubUiControlFlow, creditCardsHubFlow) { ctrl, hub -> ctrl to hub }) { state, (ctrl, hub) ->
+    }.combine(combine(cardActions.uiOptionsFlow, creditCardsHubFlow) { ctrl, hub -> ctrl to hub }) { state, (ctrl, hub) ->
         state.copy(
+            todayDate = hub.today,
             showUsedPerks = ctrl.showUsedPerks,
             showWhichCardWhere = ctrl.showWhichCardWhere,
             selectedRewardCategory = ctrl.selectedRewardCategory,
+            showCardPerksCustomize = ctrl.showCardPerksCustomize,
+            perkPeriodFilter = ctrl.perkPeriodFilter,
+            whichCardQuery = ctrl.whichCardQuery,
+            lastPerkUndoEvent = ctrl.lastPerkUndoEvent,
             selectedCardPlayer = hub.portfolio.selectedPlayer,
             cardPortfolioSummary = hub.portfolio,
             householdCredit = hub.householdCredit,
             cardCycles = hub.cardCycles,
             feesAhead = hub.feesAhead,
-            missingBillingDatesCount = hub.missingBillingDatesCount
+            missingBillingDatesCount = hub.missingBillingDatesCount,
+            playerScopedHub = hub.playerScopedHub
         )
     }.combine(combine(_deleteConfirmAccountId, _deleteWarning524Date) { delId, warnDate -> delId to warnDate }) { state, (delId, warnDate) ->
         state.copy(deleteConfirmAccountId = delId, deleteWarning524Date = warnDate)
@@ -237,9 +230,9 @@ class AccountsViewModel(
     fun selectDetailTab(tab: AccountDetailTab) { _activeDetailTab.value = tab }
     fun setPhoneViewingDetail(viewing: Boolean) { _isPhoneViewingDetail.value = viewing }
     fun selectCardPlayer(player: String) { _selectedCardPlayer.value = player }
-    fun toggleShowUsedPerks() { _showUsedPerks.value = !_showUsedPerks.value }
-    fun toggleShowWhichCardWhere() { _showWhichCardWhere.value = !_showWhichCardWhere.value }
-    fun selectRewardCategory(category: String?) { _selectedRewardCategory.value = category }
+    fun toggleShowUsedPerks() = cardActions.toggleShowUsedPerks()
+    fun toggleShowWhichCardWhere() = cardActions.toggleShowWhichCardWhere()
+    fun selectRewardCategory(category: String?) = cardActions.selectRewardCategory(category)
 
     fun requestDeleteAccount(accountId: Long) {
         val count = repository.accountTransactionCount(accountId)
@@ -410,19 +403,27 @@ class AccountsViewModel(
         }
     }
 
-    fun updateCardPerksWidgets(transform: (List<app.overbay.orbit.data.model.DashboardWidgetConfig>) -> List<app.overbay.orbit.data.model.DashboardWidgetConfig>) {
-        viewModelScope.launch {
-            val prefs = repository.preferences.value
-            val updated = transform(prefs.cardPerksWidgets)
-            repository.updatePreferences(prefs.copy(cardPerksWidgets = updated))
-        }
-    }
+    fun updateCardPerksWidgets(transform: (List<app.overbay.orbit.data.model.DashboardWidgetConfig>) -> List<app.overbay.orbit.data.model.DashboardWidgetConfig>) =
+        cardActions.updateCardPerksWidgets(transform)
 
-    fun openCreditCardProfile(account: Account) {
+    fun openCreditCardProfile(
+        account: Account,
+        initialTab: CardEditorTab = CardEditorTab.CARD,
+        forceTemplatePicker: Boolean = false
+    ) {
         _selectedAccountId.value = account.id
         _showEditorSheet.value = false
         _showHistorySheet.value = false
-        cardEditor.startDraft(account, account.creditCardProfile)
+        cardEditor.startDraft(account, account.creditCardProfile, initialTab, forceTemplatePicker)
+    }
+
+    fun openCardSetupById(
+        accountId: Long,
+        initialTab: CardEditorTab = CardEditorTab.CARD,
+        forceTemplatePicker: Boolean = false
+    ) {
+        val acct = repository.accounts.value.find { it.id == accountId } ?: uiState.value.accounts.find { it.id == accountId } ?: return
+        openCreditCardProfile(acct, initialTab, forceTemplatePicker)
     }
 
     fun closeCreditCardProfile() {
@@ -449,43 +450,25 @@ class AccountsViewModel(
         }
     }
 
-    private fun resolveCardBenefitContext(
-        accountId: Long,
-        benefitId: String
-    ): Triple<LocalDate, CardBenefit, BenefitPeriod>? {
-        val rawProfile = uiState.value.accounts.find { it.id == accountId }?.creditCardProfile ?: return null
-        val today = LocalDateUtils.todayLocalDate()
-        val profile = CreditCardBenefitEngine.upgradeProfile(rawProfile, today)
-        val benefit = profile.benefits.find { it.id == benefitId } ?: return null
-        val opened = profile.strategy.openedDate?.let { LocalDateUtils.parseIsoDate(it) }
-        return Triple(today, benefit, CreditCardBenefitEngine.currentPeriod(benefit, opened, today))
-    }
+    private fun findCreditAccount(accountId: Long): Account? =
+        repository.accounts.value.find { it.id == accountId } ?: uiState.value.accounts.find { it.id == accountId }
 
-    fun setCardBenefitUsage(accountId: Long, benefitId: String, amountCents: Cents?) {
-        val (today, _, period) = resolveCardBenefitContext(accountId, benefitId) ?: return
-        viewModelScope.launch {
-            repository.setCardBenefitUsage(
-                accountId = accountId,
-                benefitId = benefitId,
-                periodKey = period.key,
-                amountCents = amountCents,
-                usedOn = if (amountCents != null && amountCents > 0) LocalDateUtils.formatIsoDate(today) else null
-            ).onFailure { e ->
-                _syncErrorMessage.value = "Couldn't update perk: ${e.message ?: "unknown error"}"
-            }
-        }
-    }
+    fun setCardBenefitUsage(accountId: Long, benefitId: String, amountCents: Cents?) =
+        cardActions.setCardBenefitUsage(findCreditAccount(accountId), benefitId, amountCents, uiState.value.todayDate)
 
-    fun toggleCardBenefit(accountId: Long, benefitId: String) {
-        val (_, benefit, period) = resolveCardBenefitContext(accountId, benefitId) ?: return
-        val used = CreditCardBenefitEngine.usedCents(benefit, period)
-        val periodValue = CreditCardBenefitEngine.periodValueCents(benefit)
-        val targetAmount = if (used > 0L) null else if (periodValue > 0L) periodValue else 1L
-        setCardBenefitUsage(accountId, benefitId, targetAmount)
-    }
+    fun toggleCardBenefit(accountId: Long, benefitId: String) =
+        cardActions.toggleCardBenefit(findCreditAccount(accountId), benefitId, uiState.value.todayDate)
+
+    fun undoLastPerkToggle(event: PerkToggleUndoEvent) =
+        cardActions.undoLastPerkToggle(findCreditAccount(event.accountId), event, uiState.value.todayDate)
 
     fun openPerkUsage(accountId: Long, benefitId: String) {
-        val (_, benefit, period) = resolveCardBenefitContext(accountId, benefitId) ?: return
+        val rawProfile = findCreditAccount(accountId)?.creditCardProfile ?: return
+        val today = uiState.value.todayDate
+        val profile = CreditCardBenefitEngine.upgradeProfile(rawProfile, today)
+        val benefit = profile.benefits.find { it.id == benefitId } ?: return
+        val opened = profile.strategy.openedDate?.let { LocalDateUtils.parseIsoDate(it) }
+        val period = CreditCardBenefitEngine.currentPeriod(benefit, opened, today)
         val periodValue = CreditCardBenefitEngine.periodValueCents(benefit)
         if (periodValue <= 0L) {
             toggleCardBenefit(accountId, benefitId)

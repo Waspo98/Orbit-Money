@@ -1,7 +1,6 @@
 package app.overbay.orbit.ui.cardperks
 
 import androidx.compose.animation.AnimatedContent
-import app.overbay.orbit.ui.components.orbitMorphContentTransform
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -12,9 +11,9 @@ import androidx.compose.ui.Modifier
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.ui.accounts.AccountsUiState
-import app.overbay.orbit.ui.accounts.AccountsViewModel
 import app.overbay.orbit.ui.accounts.cards.CardEditorSheetContent
 import app.overbay.orbit.ui.accounts.cards.CreditCardInspectorDetailContent
+import app.overbay.orbit.ui.components.orbitMorphContentTransform
 import app.overbay.orbit.util.BackHandler
 import app.overbay.orbit.util.LocalOrbitHaptics
 
@@ -26,7 +25,7 @@ private enum class CardPerksInspectorMode { DETAIL, EDIT_PERKS }
 @Composable
 fun CardPerksInspectorPane(
     state: AccountsUiState,
-    viewModel: AccountsViewModel,
+    actions: CardPerksActions,
     onNavigate: (OrbitNavKey) -> Unit,
     onClosePane: () -> Unit,
     modifier: Modifier = Modifier
@@ -39,8 +38,9 @@ fun CardPerksInspectorPane(
     }
     val inspecting = activeAccount ?: cachedAccount
 
-    val liveCardDraft = viewModel.cardEditor.currentDraft ?: state.cardEditorDraft
-    val mode = if (liveCardDraft != null) {
+    val cardEditor = actions.cardEditor
+    val liveCardDraft = cardEditor?.currentDraft ?: state.cardEditorDraft
+    val mode = if (liveCardDraft != null && cardEditor != null) {
         CardPerksInspectorMode.EDIT_PERKS
     } else {
         CardPerksInspectorMode.DETAIL
@@ -49,7 +49,7 @@ fun CardPerksInspectorPane(
     val canBackFromEdit = mode == CardPerksInspectorMode.EDIT_PERKS && state.selectedAccount != null
     BackHandler(enabled = canBackFromEdit) {
         haptics.tick()
-        viewModel.cardEditor.requestClose()
+        cardEditor?.requestClose()
     }
 
     AnimatedContent(
@@ -60,16 +60,15 @@ fun CardPerksInspectorPane(
     ) { currentMode ->
         when (currentMode) {
             CardPerksInspectorMode.EDIT_PERKS -> {
-                val draft = viewModel.cardEditor.currentDraft ?: state.cardEditorDraft
-                if (draft != null) {
+                if (liveCardDraft != null && cardEditor != null) {
                     CardEditorSheetContent(
-                        draft = draft,
-                        controller = viewModel.cardEditor,
+                        draft = liveCardDraft,
+                        controller = cardEditor,
                         householdMembers = state.householdMembers,
                         transactions = state.selectedAccountTransactions,
                         rewardsToolsEnabled = state.rewardsToolsEnabled,
                         onDismiss = {
-                            if (state.selectedAccount != null) viewModel.cardEditor.requestClose() else onClosePane()
+                            if (state.selectedAccount != null) cardEditor.requestClose() else onClosePane()
                         }
                     )
                 }
@@ -81,12 +80,13 @@ fun CardPerksInspectorPane(
                         transactions = state.selectedAccountTransactions,
                         householdMembers = state.householdMembers,
                         rewardsToolsEnabled = state.rewardsToolsEnabled,
-                        categoryMap = state.categoryMap,
-                        onEditCard = { viewModel.openCreditCardProfile(inspecting) },
-                        onToggleBenefit = { bId -> viewModel.toggleCardBenefit(inspecting.id, bId) },
-                        onOpenPerkUsage = { bId -> viewModel.openPerkUsage(inspecting.id, bId) },
+                        onEditCard = { actions.onEditCard(inspecting) },
+                        onToggleBenefit = { bId -> actions.bento.onToggleBenefit(inspecting.id, bId) },
+                        onOpenPerkUsage = { bId -> actions.bento.onOpenPerkUsage(inspecting.id, bId) },
                         onSeeFullTransactions = { onNavigate(OrbitNavKey.Transactions(accountId = inspecting.id)) },
-                        onClosePane = onClosePane
+                        onClosePane = onClosePane,
+                        today = state.todayDate,
+                        categoryMap = state.categoryMap
                     )
                 }
             }

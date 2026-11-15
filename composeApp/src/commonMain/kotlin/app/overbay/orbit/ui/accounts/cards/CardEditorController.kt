@@ -43,8 +43,19 @@ class CardEditorController(
         Snapshot.withMutableSnapshot { currentDraft = next }
     }
 
-    fun startDraft(account: Account, profile: CreditCardProfile? = null) {
-        setDraftValue(CardEditorDraft.fromAccountAndProfile(account, profile ?: account.creditCardProfile))
+    fun startDraft(
+        account: Account,
+        profile: CreditCardProfile? = null,
+        initialTab: CardEditorTab = CardEditorTab.CARD,
+        forceTemplatePicker: Boolean = false
+    ) {
+        val baseDraft = CardEditorDraft.fromAccountAndProfile(account, profile ?: account.creditCardProfile)
+        setDraftValue(
+            baseDraft.copy(
+                activeTab = initialTab,
+                step = if (forceTemplatePicker) CardEditorStep.PICK_TEMPLATE else baseDraft.step
+            )
+        )
         catalogScope.launch {
             runCatching { repository.refreshCardCatalog() }
         }

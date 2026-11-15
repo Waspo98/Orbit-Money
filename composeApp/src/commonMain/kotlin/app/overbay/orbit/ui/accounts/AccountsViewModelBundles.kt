@@ -40,9 +40,3 @@ internal data class SyncReorderBundle(
     val isReorderMode: Boolean,
     val groupOrder: List<AccountTypeCategory> = AccountTypeCategory.entries.toList()
 )
-
-internal data class AccountsHubUiControl(
-    val showUsedPerks: Boolean,
-    val showWhichCardWhere: Boolean,
-    val selectedRewardCategory: String?
-)

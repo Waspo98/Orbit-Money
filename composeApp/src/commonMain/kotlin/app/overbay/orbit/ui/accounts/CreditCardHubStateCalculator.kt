@@ -11,6 +11,7 @@ import app.overbay.orbit.domain.CreditCardCycleEngine
 import app.overbay.orbit.domain.CreditCardPortfolioSummary
 import app.overbay.orbit.domain.CreditCardStrategyEngine
 import app.overbay.orbit.domain.HouseholdCreditSummary
+import app.overbay.orbit.ui.accounts.cards.CardFormat
 import kotlinx.datetime.LocalDate
 
 data class AnnualFeeCardItem(
@@ -18,12 +19,24 @@ data class AnnualFeeCardItem(
     val ledger: CardValueLedger
 )
 
+data class PlayerScopedCreditHub(
+    val walletAccountIds: Set<Long> = emptySet(),
+    val householdCredit: HouseholdCreditSummary = HouseholdCreditSummary(0L, 0L, null, null),
+    val cardCycles: List<CardCycleStatus> = emptyList(),
+    val feesAhead: List<AnnualFeeCardItem> = emptyList(),
+    val missingBillingDatesCount: Int = 0,
+    val firstMissingBillingAccountId: Long? = null,
+    val firstMissingOpenDateAccountId: Long? = null
+)
+
 data class CreditCardHubBundle(
     val portfolio: CreditCardPortfolioSummary,
     val householdCredit: HouseholdCreditSummary,
     val cardCycles: List<CardCycleStatus>,
     val feesAhead: List<AnnualFeeCardItem>,
-    val missingBillingDatesCount: Int
+    val missingBillingDatesCount: Int,
+    val playerScopedHub: PlayerScopedCreditHub,
+    val today: LocalDate
 )
 
 object CreditCardHubStateCalculator {
@@ -67,12 +80,62 @@ object CreditCardHubStateCalculator {
             p == null || p.statementClosingDay == null || p.paymentDueDay == null
         }
 
+        val playerScopedHub = scopeForPlayer(
+            activeCreditAccounts = activeCreditAccounts,
+            cardCycles = cardCycles,
+            feesAhead = feesAhead,
+            portfolio = portfolio,
+            selectedPlayer = selectedPlayer,
+            householdMembers = householdMembers
+        )
+
         return CreditCardHubBundle(
             portfolio = portfolio,
             householdCredit = householdCredit,
             cardCycles = cardCycles,
             feesAhead = feesAhead,
-            missingBillingDatesCount = missingBillingDatesCount
+            missingBillingDatesCount = missingBillingDatesCount,
+            playerScopedHub = playerScopedHub,
+            today = today
+        )
+    }
+
+    fun scopeForPlayer(
+        activeCreditAccounts: List<Account>,
+        cardCycles: List<CardCycleStatus>,
+        feesAhead: List<AnnualFeeCardItem>,
+        portfolio: CreditCardPortfolioSummary,
+        selectedPlayer: String,
+        householdMembers: List<HouseholdMember>
+    ): PlayerScopedCreditHub {
+        val matchedAccounts = if (selectedPlayer == CreditCardStrategyEngine.ALL_PLAYERS) {
+            activeCreditAccounts
+        } else {
+            activeCreditAccounts.filter { CardFormat.matchesSelectedPlayer(it, selectedPlayer, householdMembers) }
+        }
+        val walletIds = matchedAccounts.map { it.id }.toSet()
+        val matchedCycles = cardCycles.filter { it.accountId in walletIds }
+        val scopedCredit = CreditCardCycleEngine.summarizeStatuses(matchedCycles)
+        val scopedFees = feesAhead.filter { it.status.accountId in walletIds }
+        val missingBillingAccounts = matchedAccounts.filter { acct ->
+            val p = acct.creditCardProfile
+            p == null || p.statementClosingDay == null || p.paymentDueDay == null
+        }
+        val firstMissingOpenDateId = portfolio.chase524ByPerson
+            .firstOrNull { person ->
+                (selectedPlayer == CreditCardStrategyEngine.ALL_PLAYERS || person.holderKey == selectedPlayer) &&
+                    person.summary.missingOpenDateAccountIds.isNotEmpty()
+            }?.summary?.missingOpenDateAccountIds?.firstOrNull()
+            ?: portfolio.chase524ByPerson.firstNotNullOfOrNull { it.summary.missingOpenDateAccountIds.firstOrNull() }
+
+        return PlayerScopedCreditHub(
+            walletAccountIds = walletIds,
+            householdCredit = scopedCredit,
+            cardCycles = matchedCycles,
+            feesAhead = scopedFees,
+            missingBillingDatesCount = missingBillingAccounts.size,
+            firstMissingBillingAccountId = missingBillingAccounts.firstOrNull()?.id,
+            firstMissingOpenDateAccountId = firstMissingOpenDateId
         )
     }
 }

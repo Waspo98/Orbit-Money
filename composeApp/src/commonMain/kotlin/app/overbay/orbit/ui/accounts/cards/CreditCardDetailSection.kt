@@ -17,7 +17,6 @@ import app.overbay.orbit.data.model.CreditCardProfile
 import app.overbay.orbit.data.model.HouseholdMember
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.domain.*
-import app.overbay.orbit.theme.OrbitColorTokens
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.ui.components.OrbitBadge
@@ -37,9 +36,9 @@ fun CreditCardDetailSection(
     showBillingDetails: Boolean = true,
     onToggleBenefit: (benefitId: String) -> Unit,
     onOpenPerkUsage: (benefitId: String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    today: LocalDate = LocalDateUtils.todayLocalDate()
 ) {
-    val today = remember { LocalDateUtils.todayLocalDate() }
     val openedDate = remember(profile.strategy.openedDate) {
         profile.strategy.openedDate?.let { LocalDateUtils.parseIsoDate(it) }
     }
@@ -65,13 +64,10 @@ fun CreditCardDetailSection(
     val network = profile.network?.takeIf { it.isNotBlank() }
     val balanceColor = if (account.currentBalanceCents != 0L) OrbitTheme.colors.expense else MaterialTheme.colorScheme.onSurface
 
-    Card(
+    Column(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             // 1. Fixed-width Card Plate + Balance & Cardholder/AU Badges
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -160,7 +156,6 @@ fun CreditCardDetailSection(
             profile.notes?.takeIf { it.isNotBlank() }?.let { notes ->
                 Text(notes, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f))
             }
-        }
     }
 }
 
@@ -254,14 +249,14 @@ private fun CardDetailPerksList(
 @Composable
 private fun CardDetailLedgerSection(ledger: CardValueLedger, nextFeeDate: LocalDate?, daysUntilFee: Int?) {
     Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = OrbitColorTokens.Purple.copy(alpha = 0.08f),
-        border = BorderStroke(1.dp, OrbitColorTokens.Purple.copy(alpha = 0.25f)),
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween) {
-                Text("Annual Fee & Value Ledger", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = OrbitColorTokens.Purple)
+                Text("Annual Fee & Value Ledger", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 if (nextFeeDate != null) {
                     val daysSuffix = daysUntilFee?.let { " (${CardFormat.formatDaysUntil(it)})" } ?: ""
                     Text("Renews ${CardFormat.formatCardDate(nextFeeDate.toString())}$daysSuffix", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
@@ -274,11 +269,11 @@ private fun CardDetailLedgerSection(ledger: CardValueLedger, nextFeeDate: LocalD
                 }
                 Column {
                     Text("Credits Captured", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
-                    Text("${MoneyUtils.formatCents(ledger.creditsCapturedCents)} of ${MoneyUtils.formatCents(ledger.creditsAvailableCents)}", style = TabularNumStyle.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = OrbitColorTokens.Green))
+                    Text("${MoneyUtils.formatCents(ledger.creditsCapturedCents)} of ${MoneyUtils.formatCents(ledger.creditsAvailableCents)}", style = TabularNumStyle.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = OrbitTheme.colors.income))
                 }
                 Column(horizontalAlignment = Alignment.End) {
-                    Text("Fee After Credits (This Card-Year)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
-                    val feeColor = if (ledger.feeAfterCreditsCents <= 0L) OrbitColorTokens.Green else MaterialTheme.colorScheme.onSurface
+                    Text("Fee After Credits (Card-Year)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                    val feeColor = if (ledger.feeAfterCreditsCents <= 0L) OrbitTheme.colors.income else MaterialTheme.colorScheme.onSurface
                     Text(MoneyUtils.formatCents(ledger.feeAfterCreditsCents), style = TabularNumStyle.copy(fontSize = 15.sp, fontWeight = FontWeight.Bold), color = feeColor)
                 }
             }

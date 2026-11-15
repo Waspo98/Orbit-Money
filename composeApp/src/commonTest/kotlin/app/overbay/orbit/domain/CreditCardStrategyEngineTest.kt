@@ -427,4 +427,165 @@ class CreditCardStrategyEngineTest {
         assertEquals("Alex Smith", summary.bestCardsByCategory.single().cardholder)
         assertEquals("Alex Smith", summary.chase524ByPerson.single().summary.slots.single().cardholder)
     }
+
+    @Test
+    fun computeBestCardsByCategory_preservesRotatingNotesAndPrefersNonRotatingOnTie() {
+        val rotatingFirst = Account(
+            id = 1L,
+            name = "Freedom Flex",
+            type = AccountType.CREDIT,
+            creditCardProfile = CreditCardProfile(
+                accountId = 1L,
+                cardName = "Freedom Flex",
+                rewardCategories = listOf(
+                    RewardCategory(category = "Dining", multiplier = 3.0, isRotating = true, notes = "Q1 bonus"),
+                    RewardCategory(category = "Gas Stations", multiplier = 5.0, isRotating = true, notes = "Q4 5% up to \$1,500")
+                )
+            )
+        )
+        val fixedSecond = Account(
+            id = 2L,
+            name = "Sapphire Preferred",
+            type = AccountType.CREDIT,
+            creditCardProfile = CreditCardProfile(
+                accountId = 2L,
+                cardName = "Sapphire Preferred",
+                rewardCategories = listOf(
+                    RewardCategory(category = "Dining", multiplier = 3.0, isRotating = false)
+                )
+            )
+        )
+
+        val picks = CreditCardStrategyEngine.computeBestCardsByCategory(
+            accounts = listOf(rotatingFirst, fixedSecond),
+            householdMembers = emptyList()
+        ).associateBy { it.categoryName }
+
+        val dining = picks["Dining & Restaurants"]
+        assertNotNull(dining)
+        assertEquals(2L, dining.accountId)
+        assertFalse(dining.isRotating)
+
+        val gas = picks["Gas & Transit"]
+        assertNotNull(gas)
+        assertEquals(1L, gas.accountId)
+        assertTrue(gas.isRotating)
+        assertEquals("Q4 5% up to \$1,500", gas.notes)
+    }
+
+    @Test
+    fun computeChase524Status_populatesMissingOpenDateAccountIds() {
+        val datedCard = Account(
+            id = 10L,
+            name = "Card 1",
+            type = AccountType.CREDIT,
+            creditCardProfile = CreditCardProfile(
+                accountId = 10L,
+                cardName = "Card 1",
+                strategy = CreditCardStrategy(openedDate = "2026-01-15")
+            )
+        )
+        val missing1 = Account(
+            id = 11L,
+            name = "Missing 1",
+            type = AccountType.CREDIT,
+            creditCardProfile = CreditCardProfile(
+                accountId = 11L,
+                cardName = "Missing 1",
+                strategy = CreditCardStrategy(openedDate = null)
+            )
+        )
+        val missing2 = Account(
+            id = 12L,
+            name = "Missing 2",
+            type = AccountType.CREDIT,
+            creditCardProfile = CreditCardProfile(
+                accountId = 12L,
+                cardName = "Missing 2",
+                strategy = CreditCardStrategy(openedDate = null)
+            )
+        )
+
+        val summary = CreditCardStrategyEngine.computeChase524Status(
+            creditAccounts = listOf(datedCard, missing1, missing2),
+            today = refToday
+        )
+
+        assertEquals(1, summary.count)
+        assertEquals(2, summary.missingOpenDateCount)
+        assertEquals(listOf(11L, 12L), summary.missingOpenDateAccountIds)
+    }
+
+    @Test
+    fun creditCardHubStateCalculator_scopeForPlayerFiltersCreditFeesAndFixTargets() {
+        val alex = HouseholdMember(id = 10L, name = "Alex")
+        val sam = HouseholdMember(id = 20L, name = "Sam")
+        val feeDueSoon = app.overbay.orbit.domain.LocalDateUtils.formatIsoDate(
+            app.overbay.orbit.domain.LocalDateUtils.addDays(refToday, 15)
+        )
+
+        val alexCard = Account(
+            id = 1L,
+            name = "Alex Sapphire",
+            type = AccountType.CREDIT,
+            currentBalanceCents = -100_000L,
+            creditCardProfile = CreditCardProfile(
+                accountId = 1L,
+                cardName = "Alex Sapphire",
+                creditLimitCents = 1_000_000L,
+                annualFeeCents = 95_00L,
+                annualFeePostDate = feeDueSoon,
+                statementClosingDay = null,
+                paymentDueDay = null,
+                strategy = CreditCardStrategy(cardholderMemberId = 10L, openedDate = null)
+            )
+        )
+        val samCard = Account(
+            id = 2L,
+            name = "Sam Gold",
+            type = AccountType.CREDIT,
+            currentBalanceCents = -200_000L,
+            creditCardProfile = CreditCardProfile(
+                accountId = 2L,
+                cardName = "Sam Gold",
+                creditLimitCents = 500_000L,
+                annualFeeCents = 250_00L,
+                annualFeePostDate = feeDueSoon,
+                statementClosingDay = 15,
+                paymentDueDay = 10,
+                strategy = CreditCardStrategy(cardholderMemberId = 20L, openedDate = null)
+            )
+        )
+
+        val samBundle = app.overbay.orbit.ui.accounts.CreditCardHubStateCalculator.calculate(
+            accounts = listOf(alexCard, samCard),
+            transactions = emptyList(),
+            selectedPlayer = "m:20",
+            today = refToday,
+            householdMembers = listOf(alex, sam)
+        )
+
+        assertEquals(setOf(2L), samBundle.playerScopedHub.walletAccountIds)
+        assertEquals(200_000L, samBundle.playerScopedHub.householdCredit.totalOwedCents)
+        assertEquals(500_000L, samBundle.playerScopedHub.householdCredit.totalLimitCents)
+        assertEquals(listOf(2L), samBundle.playerScopedHub.feesAhead.map { it.status.accountId })
+        assertEquals(0, samBundle.playerScopedHub.missingBillingDatesCount)
+        assertEquals(null, samBundle.playerScopedHub.firstMissingBillingAccountId)
+        assertEquals(2L, samBundle.playerScopedHub.firstMissingOpenDateAccountId)
+
+        val alexBundle = app.overbay.orbit.ui.accounts.CreditCardHubStateCalculator.calculate(
+            accounts = listOf(alexCard, samCard),
+            transactions = emptyList(),
+            selectedPlayer = "m:10",
+            today = refToday,
+            householdMembers = listOf(alex, sam)
+        )
+
+        assertEquals(setOf(1L), alexBundle.playerScopedHub.walletAccountIds)
+        assertEquals(100_000L, alexBundle.playerScopedHub.householdCredit.totalOwedCents)
+        assertEquals(listOf(1L), alexBundle.playerScopedHub.feesAhead.map { it.status.accountId })
+        assertEquals(1, alexBundle.playerScopedHub.missingBillingDatesCount)
+        assertEquals(1L, alexBundle.playerScopedHub.firstMissingBillingAccountId)
+        assertEquals(1L, alexBundle.playerScopedHub.firstMissingOpenDateAccountId)
+    }
 }

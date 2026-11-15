@@ -15,9 +15,11 @@ import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.CreditCardPortfolioSummary
 import app.overbay.orbit.domain.CreditCardStrategyEngine
 import app.overbay.orbit.domain.HouseholdCreditSummary
+import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.RealEstatePropertyEngine
 import app.overbay.orbit.domain.RealEstatePropertyUnit
 import app.overbay.orbit.ui.accounts.cards.CardEditorDraft
+import kotlinx.datetime.LocalDate
 
 enum class AccountTypeCategory(val displayName: String) {
     CASH_AND_CHECKING("Cash & Checking"),
@@ -89,6 +91,8 @@ data class AccountsUiState(
     val isLoading: Boolean = false,
     val mhaEnabled: Boolean = false,
     val rewardsToolsEnabled: Boolean = false,
+    val cardRewardsToolsPref: Boolean? = null,
+    val todayDate: LocalDate = LocalDateUtils.todayLocalDate(),
     val perkUsageTarget: PerkUsageTarget? = null,
     val selectedCardPlayer: String = CreditCardStrategyEngine.ALL_PLAYERS,
     val cardPortfolioSummary: CreditCardPortfolioSummary = CreditCardPortfolioSummary(),
@@ -96,9 +100,14 @@ data class AccountsUiState(
     val cardCycles: List<CardCycleStatus> = emptyList(),
     val feesAhead: List<AnnualFeeCardItem> = emptyList(),
     val missingBillingDatesCount: Int = 0,
+    val playerScopedHub: PlayerScopedCreditHub = PlayerScopedCreditHub(),
     val showUsedPerks: Boolean = false,
     val showWhichCardWhere: Boolean = false,
     val selectedRewardCategory: String? = null,
+    val showCardPerksCustomize: Boolean = false,
+    val perkPeriodFilter: PerkPeriodFilter = PerkPeriodFilter.ALL,
+    val whichCardQuery: String = "",
+    val lastPerkUndoEvent: PerkToggleUndoEvent? = null,
     val logoFinderAccount: Account? = null,
     val cardPerksWidgets: List<DashboardWidgetConfig> = OrbitPreferences.defaultCardPerksWidgets(),
     val closureCandidates: List<AccountClosureCandidate> = emptyList(),

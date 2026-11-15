@@ -29,7 +29,8 @@ data class Chase524SlotItem(
 data class Chase524Summary(
     val count: Int = 0, val maxSlots: Int = 5, val isUnder524: Boolean = true,
     val nextSlotFreeDate: String? = null, val daysUntilNextSlotFree: Int? = null, val under524DropDate: String? = null,
-    val slots: List<Chase524SlotItem> = emptyList(), val excludedBusinessCount: Int = 0, val missingOpenDateCount: Int = 0
+    val slots: List<Chase524SlotItem> = emptyList(), val excludedBusinessCount: Int = 0, val missingOpenDateCount: Int = 0,
+    val missingOpenDateAccountIds: List<Long> = emptyList()
 )
 
 data class Chase524PersonSummary(val holderKey: String, val holderLabel: String, val summary: Chase524Summary)
@@ -284,7 +285,7 @@ object CreditCardStrategyEngine {
         val memberMap = householdMembers.associateBy { it.id }
         val cutoffDate = LocalDateUtils.addMonthsClamped(today, -24)
         var excludedBiz = 0
-        var missingOpenDates = 0
+        val missingOpenDateAccountIds = mutableListOf<Long>()
         val slots = mutableListOf<Chase524SlotItem>()
 
         for (account in creditAccounts) {
@@ -296,7 +297,7 @@ object CreditCardStrategyEngine {
             }
             val opened = LocalDateUtils.parseIsoDate(strategy.openedDate)
             if (opened == null) {
-                missingOpenDates++
+                missingOpenDateAccountIds.add(account.id)
                 continue
             }
 
@@ -335,7 +336,8 @@ object CreditCardStrategyEngine {
             under524DropDate = under524Slot?.dropOffDate,
             slots = sortedSlots,
             excludedBusinessCount = excludedBiz,
-            missingOpenDateCount = missingOpenDates
+            missingOpenDateCount = missingOpenDateAccountIds.size,
+            missingOpenDateAccountIds = missingOpenDateAccountIds
         )
     }
 
@@ -500,14 +502,15 @@ object CreditCardStrategyEngine {
             val cardTitle = profile.cardName?.takeIf { it.isNotBlank() } ?: account.name
             val holder = resolveCardholderName(profile.strategy, memberMap)
             for (reward in profile.rewardCategories) {
-                if (reward.isRotating) continue
                 val rawCat = reward.category.ifBlank { reward.label }.trim()
                 if (rawCat.isEmpty()) continue
                 val normCat = normalizeCategoryBucket(rawCat)
                 val existing = bestByCat[normCat]
-                if (existing == null || reward.multiplier > existing.multiplier ||
-                    (reward.multiplier == existing.multiplier && cardTitle < existing.cardTitle)
-                ) {
+                val beatsExisting = existing == null ||
+                    reward.multiplier > existing.multiplier ||
+                    (reward.multiplier == existing.multiplier && !reward.isRotating && existing.isRotating) ||
+                    (reward.multiplier == existing.multiplier && reward.isRotating == existing.isRotating && cardTitle < existing.cardTitle)
+                if (beatsExisting) {
                     bestByCat[normCat] = CategoryBestCardPick(
                         categoryName = normCat,
                         accountId = account.id,
@@ -515,7 +518,7 @@ object CreditCardStrategyEngine {
                         cardholder = holder,
                         multiplier = reward.multiplier,
                         rateType = reward.rateType,
-                        isRotating = false,
+                        isRotating = reward.isRotating,
                         notes = reward.notes ?: reward.description
                     )
                 }

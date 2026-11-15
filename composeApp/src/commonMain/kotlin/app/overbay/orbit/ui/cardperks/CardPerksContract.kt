@@ -1,7 +1,14 @@
 package app.overbay.orbit.ui.cardperks
 
+import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.DashboardWidgetConfig
 import app.overbay.orbit.data.model.OrbitPreferences
+import app.overbay.orbit.domain.Cents
+import app.overbay.orbit.ui.accounts.AccountsViewModel
+import app.overbay.orbit.ui.accounts.PerkPeriodFilter
+import app.overbay.orbit.ui.accounts.PerkToggleUndoEvent
+import app.overbay.orbit.ui.accounts.cards.CardEditorController
+import app.overbay.orbit.ui.accounts.cards.CardEditorTab
 import app.overbay.orbit.ui.dashboard.dialogs.OrbitBentoCustomizeItem
 
 /**
@@ -83,9 +90,54 @@ data class CardPerksGridRow(
 
 data class CardPerksBentoActions(
     val onInspectAccount: (Long) -> Unit,
+    val onOpenCardSetup: (accountId: Long, initialTab: CardEditorTab, forceTemplatePicker: Boolean) -> Unit,
     val onToggleBenefit: (accountId: Long, benefitId: String) -> Unit,
     val onOpenPerkUsage: (accountId: Long, benefitId: String) -> Unit,
-    val onToggleShowUsedPerks: () -> Unit
+    val onToggleShowUsedPerks: () -> Unit,
+    val onSelectPerkFilter: (PerkPeriodFilter) -> Unit,
+    val onWhichCardQueryChange: (String) -> Unit
+)
+
+data class CardPerksActions(
+    val bento: CardPerksBentoActions,
+    val cardEditor: CardEditorController? = null,
+    val onSelectPlayer: (String) -> Unit,
+    val onOpenCustomize: () -> Unit,
+    val onDismissCustomize: () -> Unit,
+    val onUpdateWidgets: ((List<DashboardWidgetConfig>) -> List<DashboardWidgetConfig>) -> Unit,
+    val onSetRewardsToolsEnabled: (Boolean?) -> Unit,
+    val onDismissInspectorPane: () -> Unit,
+    val onEditCard: (Account) -> Unit,
+    val onSavePerkUsage: (accountId: Long, benefitId: String, amountCents: Cents?) -> Unit,
+    val onClosePerkUsage: () -> Unit,
+    val onUndoPerkToggle: (PerkToggleUndoEvent) -> Unit,
+    val onDismissPerkUndo: () -> Unit,
+    val onClearSyncError: () -> Unit
+)
+
+fun AccountsViewModel.toCardPerksActions(): CardPerksActions = CardPerksActions(
+    bento = CardPerksBentoActions(
+        onInspectAccount = ::selectAccountForInspect,
+        onOpenCardSetup = ::openCardSetupById,
+        onToggleBenefit = ::toggleCardBenefit,
+        onOpenPerkUsage = ::openPerkUsage,
+        onToggleShowUsedPerks = ::toggleShowUsedPerks,
+        onSelectPerkFilter = cardActions::selectPerkFilter,
+        onWhichCardQueryChange = cardActions::setWhichCardQuery
+    ),
+    cardEditor = cardEditor,
+    onSelectPlayer = ::selectCardPlayer,
+    onOpenCustomize = { cardActions.setCardPerksCustomize(true) },
+    onDismissCustomize = { cardActions.setCardPerksCustomize(false) },
+    onUpdateWidgets = ::updateCardPerksWidgets,
+    onSetRewardsToolsEnabled = cardActions::setCardRewardsToolsEnabled,
+    onDismissInspectorPane = ::dismissInspectorPane,
+    onEditCard = { acct -> openCreditCardProfile(acct) },
+    onSavePerkUsage = ::setCardBenefitUsage,
+    onClosePerkUsage = ::closePerkUsage,
+    onUndoPerkToggle = ::undoLastPerkToggle,
+    onDismissPerkUndo = cardActions::dismissPerkUndo,
+    onClearSyncError = ::clearSyncError
 )
 
 fun resolveCardPerksItems(

@@ -4,11 +4,20 @@ import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.CreditCardProfile
 import app.overbay.orbit.data.model.HouseholdMember
 import app.overbay.orbit.data.model.RewardCategory
+import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.CreditCardStrategyEngine
 import app.overbay.orbit.domain.LocalDateUtils
+import app.overbay.orbit.domain.MoneyUtils
 import kotlin.math.absoluteValue
 
 object CardFormat {
+
+    /**
+     * Formats [cents] cleanly: omits `.00` for whole-dollar amounts while preserving exact cents
+     * when fractional values exist so hero pills and perk rows stay consistent.
+     */
+    fun formatAdaptiveCents(cents: Cents): String =
+        MoneyUtils.formatCents(cents, showCents = cents % 100L != 0L)
 
     fun formatCardDate(iso: String?): String {
         if (iso.isNullOrBlank()) return "Not Set"

@@ -17,11 +17,13 @@ import app.overbay.orbit.data.model.CreditCardProfile
 import app.overbay.orbit.data.model.HouseholdMember
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.domain.CreditCardStrategyEngine
+import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.accounts.components.AccountClosureAlertBanner
 import app.overbay.orbit.ui.accounts.components.AccountInspectorHeader
 import app.overbay.orbit.ui.accounts.components.AccountRecentTransactionsSection
+import kotlinx.datetime.LocalDate
 
 /**
  * Unified Credit Card detail modal/pane shared by Credit Card Tracker and Accounts.
@@ -40,6 +42,7 @@ fun CreditCardInspectorDetailContent(
     onSeeFullTransactions: () -> Unit,
     onClosePane: () -> Unit,
     modifier: Modifier = Modifier,
+    today: LocalDate = LocalDateUtils.todayLocalDate(),
     categoryMap: Map<Long, Category> = emptyMap(),
     hasClosureAlert: Boolean = false,
     onReviewClosure: (() -> Unit)? = null,
@@ -120,7 +123,8 @@ fun CreditCardInspectorDetailContent(
                     rewardsToolsEnabled = rewardsToolsEnabled,
                     showBillingDetails = true,
                     onToggleBenefit = onToggleBenefit,
-                    onOpenPerkUsage = onOpenPerkUsage
+                    onOpenPerkUsage = onOpenPerkUsage,
+                    today = today
                 )
             }
 
