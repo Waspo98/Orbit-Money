@@ -152,4 +152,22 @@ class MhaAndCalculatorsTest {
         assertEquals(60_000_00L, annualWithdrawal) // $60,000/year
         assertEquals(5_000_00L, monthlyWithdrawal)  // $5,000/month
     }
+
+    @Test
+    fun testRetirementCalculator_singlePassPointsAndPlanLabelFormatting() {
+        val model = RetirementCalculatorEngine.calculateScenario(
+            currentAge = 32.0,
+            retirementAge = 60.0,
+            runwayEndAge = 95.0,
+            currentBalanceCents = 80_000_00L,
+            monthlySavingsCents = 2_000_00L,
+            annualSpendingCents = 60_000_00L
+        )
+        assertEquals(29, model.accumulationPoints.size) // Ages 32..60 inclusive
+        assertEquals(32.0, model.accumulationPoints.first().age)
+        assertEquals(60.0, model.accumulationPoints.last().age)
+        assertEquals("403(b)", RetirementCalculatorEngine.formatPlanKindLabel("403B"))
+        assertEquals("Roth IRA", RetirementCalculatorEngine.formatPlanKindLabel("ROTH_IRA"))
+        assertEquals("HSA", RetirementCalculatorEngine.formatPlanKindLabel("hsa"))
+    }
 }

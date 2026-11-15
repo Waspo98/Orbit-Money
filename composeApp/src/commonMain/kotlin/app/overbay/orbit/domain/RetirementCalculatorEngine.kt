@@ -48,6 +48,23 @@ object RetirementCalculatorEngine {
 
     const val DEFAULT_WITHDRAWAL_RATE = 0.04
 
+    /** Normalizes raw plan-type strings (e.g. "ROTH_IRA", "403b") into readable UI labels. */
+    fun formatPlanKindLabel(nameOrKind: String): String {
+        val lower = nameOrKind.lowercase()
+        return when {
+            lower.contains("hsa") -> "HSA"
+            lower.contains("roth") -> "Roth IRA"
+            lower.contains("401") -> "401(k)"
+            lower.contains("403") -> "403(b)"
+            lower.contains("457") -> "457(b)"
+            lower.contains("sep") -> "SEP IRA"
+            lower.contains("simple") -> "SIMPLE IRA"
+            lower.contains("pension") -> "Pension"
+            lower.contains("ira") -> "IRA"
+            else -> "Investment"
+        }
+    }
+
     fun computeRealReturn(nominalReturn: Double, inflation: Double): Double {
         return ((1.0 + nominalReturn) / (1.0 + inflation)) - 1.0
     }
@@ -246,19 +263,24 @@ object RetirementCalculatorEngine {
         val coastTarget = (targetNestEgg.toDouble() / coastDiscount).roundToLong()
         val isCoastReached = currentBalanceCents >= coastTarget
 
-        // Accumulation points
+        // Accumulation points & earliest FI age computed in a single pass
+        val startAgeInt = currentAge.toInt()
+        val retireAgeInt = retirementAge.toInt()
+        val maxHorizonAge = max(retireAgeInt, runwayEndAge.toInt())
         val accumPoints = mutableListOf<ProjectionPoint>()
-        for (age in currentAge.toInt()..retirementAge.toInt()) {
-            val m = ((age - currentAge) * 12.0).roundToLong().toInt()
-            accumPoints.add(ProjectionPoint(age.toDouble(), futureValue(currentBalanceCents, monthlySavingsCents, realReturn, m)))
-        }
+        var earliestAge: Double? = null
 
-        // Find earliest retirement age if savings continue
-        val longRangePoints = (currentAge.toInt()..runwayEndAge.toInt()).map { age ->
+        for (age in startAgeInt..maxHorizonAge) {
             val m = ((age - currentAge) * 12.0).roundToLong().toInt()
-            ProjectionPoint(age.toDouble(), futureValue(currentBalanceCents, monthlySavingsCents, realReturn, m))
+            val balance = futureValue(currentBalanceCents, monthlySavingsCents, realReturn, m)
+            val point = ProjectionPoint(age.toDouble(), balance)
+            if (age <= retireAgeInt) {
+                accumPoints.add(point)
+            }
+            if (earliestAge == null && balance >= targetNestEgg) {
+                earliestAge = point.age
+            }
         }
-        val earliestAge = longRangePoints.find { it.balanceCents >= targetNestEgg }?.age
 
         // Drawdown simulation
         val drawdown = simulateDrawdown(

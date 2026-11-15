@@ -37,6 +37,10 @@ class RetirementViewModel(
     private val _uiState = MutableStateFlow(RetirementUiState())
     val uiState: StateFlow<RetirementUiState> = _uiState.asStateFlow()
 
+    private val currentYearString: String by lazy { LocalDateUtils.todayLocalDate().year.toString() }
+    private var cachedHistoryAge: Double = Double.NaN
+    private var cachedBaseHistoryPoints: List<ProjectionPoint> = emptyList()
+
     init {
         vmScope.launch {
             combine(
@@ -70,14 +74,16 @@ class RetirementViewModel(
                     (plannedAnnualSavings.toDouble() / 12.0).roundToLong()
                 } else 1000_00L
 
-                // 4. Resolve connected retirement accounts
+                // 4. Resolve connected retirement accounts & precomputed member breakdowns
                 val investments = accounts.filter { !it.isArchived && it.type == AccountType.INVESTMENT }
+                val accountMap = accounts.associateBy { it.id }
                 val linkedDetails = buildLinkedAccountDetails(
                     members = members,
                     accounts = accounts,
                     investments = investments,
                     goals = goals
                 )
+                val memberSummaries = buildMemberSummaries(members, accountMap)
                 val connectedBalance = linkedDetails.sumOf { it.balanceCents }
 
                 _uiState.update { current ->
@@ -111,8 +117,10 @@ class RetirementViewModel(
                         currentBalanceCents = nextCurrentBalance,
                         investmentAccounts = investments,
                         allAccounts = accounts,
+                        accountById = accountMap,
                         householdMembers = members,
-                        linkedAccounts = linkedDetails
+                        linkedAccounts = linkedDetails,
+                        memberSummaries = memberSummaries
                     )
                 }
                 recalculate()
@@ -122,28 +130,44 @@ class RetirementViewModel(
         vmScope.launch {
             val history = repository.getRetirementHistory(1200)
             _uiState.update { current ->
-                val actualPoints = buildActualHistoryProjectionPoints(history, current.currentAge, current.currentBalanceCents)
+                cachedHistoryAge = current.currentAge
+                cachedBaseHistoryPoints = buildActualHistoryProjectionPoints(
+                    history = history,
+                    currentAge = current.currentAge,
+                    currentBalanceCents = current.currentBalanceCents
+                )
                 current.copy(
                     historyPoints = history,
-                    actualHistoryPoints = actualPoints
+                    filteredHistoryPoints = filterHistoryPoints(history, current.selectedHorizon, currentYearString),
+                    actualHistoryPoints = cachedBaseHistoryPoints
                 )
             }
         }
     }
 
+    fun selectTab(tab: RetirementWorkspaceTab) {
+        if (_uiState.value.selectedTab == tab) return
+        _uiState.update { it.copy(selectedTab = tab) }
+    }
+
     fun setRetirementAge(age: Double) {
-        val clampedAge = age.coerceIn(_uiState.value.currentAge + 1.0, _uiState.value.runwayEndAge - 1.0)
+        val current = _uiState.value
+        val clampedAge = age.coerceIn(current.currentAge + 1.0, current.runwayEndAge - 1.0)
+        if (clampedAge == current.retirementAge) return
         _uiState.update { it.copy(retirementAge = clampedAge) }
         recalculate()
     }
 
     fun setRunwayEndAge(age: Double) {
-        val clampedAge = age.coerceIn(_uiState.value.retirementAge + 1.0, 110.0)
+        val current = _uiState.value
+        val clampedAge = age.coerceIn(current.retirementAge + 1.0, 110.0)
+        if (clampedAge == current.runwayEndAge) return
         _uiState.update { it.copy(runwayEndAge = clampedAge) }
         recalculate()
     }
 
     fun setPreset(preset: RetirementScenarioPreset) {
+        if (_uiState.value.preset == preset) return
         _uiState.update { current ->
             current.copy(
                 preset = preset,
@@ -153,12 +177,14 @@ class RetirementViewModel(
     }
 
     fun setTargetMode(mode: RetirementTargetMode) {
+        if (_uiState.value.targetMode == mode) return
         _uiState.update { it.copy(targetMode = mode) }
         recalculate()
     }
 
     fun setCurrentBalance(cents: Cents) {
-        _uiState.update { it.copy(currentBalanceCents = max(0L, cents), currentBalanceOverridden = true) }
+        val safeCents = max(0L, cents)
+        _uiState.update { it.copy(currentBalanceCents = safeCents, currentBalanceOverridden = true) }
         recalculate()
     }
 
@@ -173,7 +199,9 @@ class RetirementViewModel(
     }
 
     fun setMonthlySavings(cents: Cents) {
-        _uiState.update { it.copy(monthlySavingsCents = max(0L, cents), monthlySavingsOverridden = true) }
+        val safeCents = max(0L, cents)
+        if (_uiState.value.monthlySavingsCents == safeCents && _uiState.value.monthlySavingsOverridden) return
+        _uiState.update { it.copy(monthlySavingsCents = safeCents, monthlySavingsOverridden = true) }
         recalculate()
     }
 
@@ -188,8 +216,16 @@ class RetirementViewModel(
     }
 
     fun setAnnualSpending(cents: Cents) {
-        _uiState.update { it.copy(annualSpendingCents = max(0L, cents), annualSpendingOverridden = true) }
+        val safeCents = max(0L, cents)
+        if (_uiState.value.annualSpendingCents == safeCents && _uiState.value.annualSpendingOverridden) return
+        _uiState.update { it.copy(annualSpendingCents = safeCents, annualSpendingOverridden = true) }
         recalculate()
+    }
+
+    fun applySpendingIncomeFraction(fraction: Double) {
+        val gross = _uiState.value.grossIncomeAnnualCents
+        val base = if (gross > 0L) (gross.toDouble() * fraction).roundToLong() else _uiState.value.baselineSpendingCents
+        setAnnualSpending(base)
     }
 
     fun resetAnnualSpendingToGuideline() {
@@ -213,52 +249,42 @@ class RetirementViewModel(
     }
 
     fun setSelectedHorizon(horizon: String) {
-        _uiState.update { it.copy(selectedHorizon = horizon) }
-    }
-
-    fun openTargetSettings() {
-        _uiState.update { it.copy(showTargetSettingsSheet = true) }
-    }
-
-    fun closeTargetSettings() {
-        _uiState.update { it.copy(showTargetSettingsSheet = false) }
-    }
-
-    fun saveTargetSettings(
-        mode: RetirementTargetMode,
-        customTarget: Cents?,
-        legacyAmount: Cents,
-        runwayEndAge: Double
-    ) {
-        _uiState.update {
-            it.copy(
-                targetMode = mode,
-                customTargetCents = customTarget,
-                legacyAmountCents = legacyAmount,
-                runwayEndAge = runwayEndAge,
-                showTargetSettingsSheet = false
+        if (_uiState.value.selectedHorizon == horizon) return
+        _uiState.update { current ->
+            current.copy(
+                selectedHorizon = horizon,
+                filteredHistoryPoints = filterHistoryPoints(current.historyPoints, horizon, currentYearString)
             )
         }
-        recalculate()
     }
 
-    fun onAgeScrubbed(age: Double?, balance: Cents?) {
-        _uiState.update {
-            it.copy(
-                scrubbedAge = age,
-                scrubbedBalanceCents = balance
-            )
+    fun openAssumptionsSheet() {
+        _uiState.update { it.copy(showAssumptionsSheet = true) }
+    }
+
+    fun dismissAssumptionsSheet() {
+        _uiState.update { it.copy(showAssumptionsSheet = false) }
+    }
+
+    fun openAmountEditor(field: RetirementAmountField) {
+        _uiState.update { it.copy(activeAmountField = field) }
+    }
+
+    fun dismissAmountEditor() {
+        _uiState.update { it.copy(activeAmountField = null) }
+    }
+
+    fun commitAmountEditor(field: RetirementAmountField, cents: Cents) {
+        _uiState.update { it.copy(activeAmountField = null) }
+        when (field) {
+            RetirementAmountField.MONTHLY_SAVINGS -> setMonthlySavings(cents)
+            RetirementAmountField.ANNUAL_SPENDING -> setAnnualSpending(cents)
+            RetirementAmountField.STARTING_BALANCE -> setCurrentBalance(cents)
         }
     }
 
     private fun recalculate() {
         val state = _uiState.value
-
-        // Separate HSA vs Non-HSA for pre-65 bridge analysis
-        val hsaAccountIds = state.linkedAccounts
-            .filter { it.planKind.equals("hsa", ignoreCase = true) }
-            .mapNotNull { it.accountId }
-            .toSet()
 
         val hsaBalance = state.linkedAccounts
             .filter { it.planKind.equals("hsa", ignoreCase = true) }
@@ -288,7 +314,7 @@ class RetirementViewModel(
 
         val activeScenario = allScenarios[state.preset] ?: allScenarios.values.first()
 
-        val actualPoints = buildActualHistoryProjectionPoints(
+        val actualPoints = resolveActualHistoryProjection(
             history = state.historyPoints,
             currentAge = state.currentAge,
             currentBalanceCents = state.currentBalanceCents
@@ -307,8 +333,44 @@ class RetirementViewModel(
         }
     }
 
+    private fun resolveActualHistoryProjection(
+        history: List<RetirementHistoryPoint>,
+        currentAge: Double,
+        currentBalanceCents: Cents
+    ): List<ProjectionPoint> {
+        if (history.isEmpty() && cachedBaseHistoryPoints.isEmpty()) {
+            return listOf(ProjectionPoint(currentAge, currentBalanceCents))
+        }
+        if (cachedHistoryAge != currentAge) {
+            cachedHistoryAge = currentAge
+            cachedBaseHistoryPoints = buildActualHistoryProjectionPoints(
+                history = history,
+                currentAge = currentAge,
+                currentBalanceCents = currentBalanceCents
+            )
+            return cachedBaseHistoryPoints
+        }
+        // Fast path during slider drags: reuse parsed dates & update only today's endpoint balance
+        val updated = cachedBaseHistoryPoints.toMutableList()
+        val lastIdx = updated.indexOfLast { kotlin.math.abs(it.age - currentAge) < 0.08 }
+        if (lastIdx >= 0) {
+            updated[lastIdx] = ProjectionPoint(currentAge, currentBalanceCents)
+        } else {
+            updated.add(ProjectionPoint(currentAge, currentBalanceCents))
+        }
+        return updated
+    }
+
     companion object {
-        fun calculateMemberRetirementAnnual(member: HouseholdMember): Cents {
+        private data class MemberContributionBreakdown(
+            val employeeSavingsCents: Cents,
+            val employerMatchCents: Cents,
+            val matchCapReached: Boolean,
+            val hsaCents: Cents,
+            val totalAnnualCents: Cents
+        )
+
+        private fun computeMemberBreakdown(member: HouseholdMember): MemberContributionBreakdown {
             val gross = member.grossIncomeAnnualCents
             val empPct = member.employeeContributionPercent ?: 0.0
             val empContribCents = if (member.employeeContributionAnnualCents > 0L) {
@@ -325,27 +387,70 @@ class RetirementViewModel(
             val uncappedMatchCents = if (eligiblePct > 0.0 && gross > 0L) {
                 ((gross.toDouble() * eligiblePct / 100.0) * matchRate).roundToLong()
             } else 0L
+            val matchCapReached = matchCap > 0L && uncappedMatchCents > matchCap
             val matchCents = if (matchCap > 0L) min(matchCap, uncappedMatchCents) else uncappedMatchCents
-
             val hsaCents = member.hsaContributionAnnualCents
-            return empContribCents + matchCents + hsaCents
+            return MemberContributionBreakdown(
+                employeeSavingsCents = empContribCents,
+                employerMatchCents = matchCents,
+                matchCapReached = matchCapReached,
+                hsaCents = hsaCents,
+                totalAnnualCents = empContribCents + matchCents + hsaCents
+            )
         }
 
-        fun classifyPlanKind(nameOrKind: String): String {
-            val lower = nameOrKind.lowercase()
-            return when {
-                lower.contains("hsa") -> "HSA"
-                lower.contains("roth") -> "Roth IRA"
-                lower.contains("401") -> "401(k)"
-                lower.contains("403") -> "403(b)"
-                lower.contains("457") -> "457(b)"
-                lower.contains("sep") -> "SEP IRA"
-                lower.contains("simple") -> "SIMPLE IRA"
-                lower.contains("pension") -> "Pension"
-                lower.contains("ira") -> "IRA"
-                else -> "Investment"
+        fun calculateMemberRetirementAnnual(member: HouseholdMember): Cents =
+            computeMemberBreakdown(member).totalAnnualCents
+
+        fun buildMemberSummaries(
+            members: List<HouseholdMember>,
+            accountMap: Map<Long, Account>
+        ): List<MemberRetirementSummary> {
+            return members.map { member ->
+                val breakdown = computeMemberBreakdown(member)
+                val payPeriods = if (member.payPeriodsPerYear > 0.0) member.payPeriodsPerYear else 26.0
+                val perPaycheck = (breakdown.totalAnnualCents.toDouble() / payPeriods).roundToLong()
+                val chips = member.retirementAccounts.map { link ->
+                    val acct = accountMap[link.accountId]
+                    val labelSource = link.accountKind.ifBlank { acct?.name ?: "" }
+                    LinkedAccountChip(
+                        id = link.accountId,
+                        displayKind = classifyPlanKind(labelSource),
+                        name = acct?.name ?: "Account #${link.accountId}"
+                    )
+                }
+                MemberRetirementSummary(
+                    memberId = member.id,
+                    name = member.name,
+                    employer = member.employer,
+                    payFrequencyLabel = member.payFrequency.replaceFirstChar { it.uppercase() },
+                    perPaycheckCents = perPaycheck,
+                    annualEmployeeSavingsCents = breakdown.employeeSavingsCents,
+                    annualEmployerMatchCents = breakdown.employerMatchCents,
+                    matchCapReached = breakdown.matchCapReached,
+                    annualHsaCents = breakdown.hsaCents,
+                    annualTotalCents = breakdown.totalAnnualCents,
+                    linkedAccounts = chips
+                )
             }
         }
+
+        fun filterHistoryPoints(
+            history: List<RetirementHistoryPoint>,
+            horizon: String,
+            currentYear: String
+        ): List<RetirementHistoryPoint> {
+            return when (horizon) {
+                "YTD" -> history.filter { it.month.startsWith(currentYear) }.ifEmpty { history.takeLast(12) }
+                "3Y" -> history.takeLast(36)
+                "5Y" -> history.takeLast(60)
+                "10Y" -> history.takeLast(120)
+                else -> history
+            }
+        }
+
+        fun classifyPlanKind(nameOrKind: String): String =
+            RetirementCalculatorEngine.formatPlanKindLabel(nameOrKind)
 
         fun buildLinkedAccountDetails(
             members: List<HouseholdMember>,

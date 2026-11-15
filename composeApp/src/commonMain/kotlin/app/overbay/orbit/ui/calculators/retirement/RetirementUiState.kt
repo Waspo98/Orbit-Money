@@ -1,5 +1,6 @@
 package app.overbay.orbit.ui.calculators.retirement
 
+import androidx.compose.runtime.Immutable
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.HouseholdMember
 import app.overbay.orbit.data.model.RetirementHistoryPoint
@@ -9,6 +10,54 @@ import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.ProjectionPoint
 import app.overbay.orbit.domain.RetirementCalculatorEngine
 import app.overbay.orbit.domain.RetirementScenarioModel
+
+enum class RetirementWorkspaceTab(val label: String) {
+    WHAT_IF("What-If"),
+    RUNWAY("Runway"),
+    ACCOUNTS("Accounts")
+}
+
+enum class RetirementAmountField(
+    val title: String,
+    val subtitle: String,
+    val unitSuffix: String
+) {
+    MONTHLY_SAVINGS(
+        title = "Monthly Savings Pace",
+        subtitle = "Combined monthly retirement contributions across accounts",
+        unitSuffix = "/ mo"
+    ),
+    ANNUAL_SPENDING(
+        title = "Annual Retirement Spending",
+        subtitle = "Target annual retirement budget in today's purchasing power",
+        unitSuffix = "/ yr"
+    ),
+    STARTING_BALANCE(
+        title = "Starting Portfolio Override",
+        subtitle = "Enter an override or reset to track connected accounts",
+        unitSuffix = ""
+    )
+}
+
+data class LinkedAccountChip(
+    val id: Long,
+    val displayKind: String,
+    val name: String
+)
+
+data class MemberRetirementSummary(
+    val memberId: Long,
+    val name: String,
+    val employer: String?,
+    val payFrequencyLabel: String,
+    val perPaycheckCents: Cents,
+    val annualEmployeeSavingsCents: Cents,
+    val annualEmployerMatchCents: Cents,
+    val matchCapReached: Boolean,
+    val annualHsaCents: Cents,
+    val annualTotalCents: Cents,
+    val linkedAccounts: List<LinkedAccountChip>
+)
 
 data class LinkedRetirementAccountDetail(
     val id: Long,
@@ -43,11 +92,16 @@ data class RetirementUiState(
     val investmentAccounts: List<Account> = emptyList(),
     val householdMembers: List<HouseholdMember> = emptyList(),
     val allAccounts: List<Account> = emptyList(),
+    val accountById: Map<Long, Account> = emptyMap(),
     val linkedAccounts: List<LinkedRetirementAccountDetail> = emptyList(),
+    val memberSummaries: List<MemberRetirementSummary> = emptyList(),
     val historyPoints: List<RetirementHistoryPoint> = emptyList(),
+    val filteredHistoryPoints: List<RetirementHistoryPoint> = emptyList(),
     val actualHistoryPoints: List<ProjectionPoint> = emptyList(),
     val selectedHorizon: String = "All",
-    val showTargetSettingsSheet: Boolean = false,
+    val selectedTab: RetirementWorkspaceTab = RetirementWorkspaceTab.WHAT_IF,
+    val showAssumptionsSheet: Boolean = false,
+    val activeAmountField: RetirementAmountField? = null,
     val nonHsaCurrentBalanceCents: Cents = 100_000_00L,
     val nonHsaMonthlySavingsCents: Cents = 1000_00L,
     val hsaCurrentBalanceCents: Cents = 0L,
@@ -62,9 +116,7 @@ data class RetirementUiState(
         annualSpendingCents = 60_000_00L,
         preset = RetirementScenarioPreset.BALANCED,
         targetMode = RetirementTargetMode.WITHDRAWAL_4_PERCENT
-    ),
-    val scrubbedAge: Double? = null,
-    val scrubbedBalanceCents: Cents? = null
+    )
 ) {
     val savingsRatePercent: Double
         get() = if (grossIncomeAnnualCents > 0L) {
@@ -77,3 +129,27 @@ data class RetirementUiState(
     val surplusOrGapCents: Cents
         get() = scenario.projectedBalanceCents - scenario.targetNestEggCents
 }
+
+@Immutable
+data class RetirementActions(
+    val onSelectTab: (RetirementWorkspaceTab) -> Unit,
+    val onSelectPreset: (RetirementScenarioPreset) -> Unit,
+    val onSetRetirementAge: (Double) -> Unit,
+    val onSetRunwayEndAge: (Double) -> Unit,
+    val onSetTargetMode: (RetirementTargetMode) -> Unit,
+    val onSetMonthlySavings: (Cents) -> Unit,
+    val onResetMonthlySavings: () -> Unit,
+    val onSetAnnualSpending: (Cents) -> Unit,
+    val onApplySpendingFraction: (Double) -> Unit,
+    val onResetAnnualSpending: () -> Unit,
+    val onSetCurrentBalance: (Cents) -> Unit,
+    val onResetCurrentBalance: () -> Unit,
+    val onSetCustomTarget: (Cents?) -> Unit,
+    val onSetLegacyAmount: (Cents) -> Unit,
+    val onSelectHorizon: (String) -> Unit,
+    val onOpenAssumptionsSheet: () -> Unit,
+    val onDismissAssumptionsSheet: () -> Unit,
+    val onOpenAmountEditor: (RetirementAmountField) -> Unit,
+    val onDismissAmountEditor: () -> Unit,
+    val onCommitAmountEditor: (RetirementAmountField, Cents) -> Unit
+)

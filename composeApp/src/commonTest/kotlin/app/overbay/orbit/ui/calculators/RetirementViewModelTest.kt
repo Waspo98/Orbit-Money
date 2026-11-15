@@ -3,9 +3,13 @@ package app.overbay.orbit.ui.calculators
 import app.overbay.orbit.data.OrbitRepository
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.AccountType
+import app.overbay.orbit.data.model.HouseholdMember
+import app.overbay.orbit.data.model.HouseholdRetirementAccount
 import app.overbay.orbit.data.model.RetirementScenarioPreset
 import app.overbay.orbit.data.model.RetirementTargetMode
+import app.overbay.orbit.ui.calculators.retirement.RetirementAmountField
 import app.overbay.orbit.ui.calculators.retirement.RetirementViewModel
+import app.overbay.orbit.ui.calculators.retirement.RetirementWorkspaceTab
 import app.overbay.orbit.util.PlatformStorage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -137,19 +141,58 @@ class RetirementViewModelTest {
     }
 
     @Test
-    fun testScrubbing_recordsAgeAndBalance() = runTest(testDispatcher) {
-        viewModel.onAgeScrubbed(50.0, 450_000_00L)
+    fun testWorkspaceState_tabsSheetsAndAmountEditorWork() = runTest(testDispatcher) {
+        viewModel.selectTab(RetirementWorkspaceTab.RUNWAY)
+        assertEquals(RetirementWorkspaceTab.RUNWAY, viewModel.uiState.value.selectedTab)
+
+        viewModel.openAssumptionsSheet()
+        assertTrue(viewModel.uiState.value.showAssumptionsSheet)
+        viewModel.dismissAssumptionsSheet()
+        assertFalse(viewModel.uiState.value.showAssumptionsSheet)
+
+        viewModel.openAmountEditor(RetirementAmountField.MONTHLY_SAVINGS)
+        assertEquals(RetirementAmountField.MONTHLY_SAVINGS, viewModel.uiState.value.activeAmountField)
+
+        viewModel.commitAmountEditor(RetirementAmountField.MONTHLY_SAVINGS, 2_250_00L)
+        testScheduler.advanceUntilIdle()
+        assertNull(viewModel.uiState.value.activeAmountField)
+        assertEquals(2_250_00L, viewModel.uiState.value.monthlySavingsCents)
+        assertTrue(viewModel.uiState.value.monthlySavingsOverridden)
+    }
+
+    @Test
+    fun testMemberSummariesAndSpendingFraction_computeCorrectly() = runTest(testDispatcher) {
+        val inv = Account(id = 10L, name = "Campus 403b", type = AccountType.INVESTMENT, currentBalanceCents = 42_000_00L)
+        repository.saveAccount(inv)
+        repository.saveHouseholdMember(
+            HouseholdMember(
+                id = 1L,
+                name = "Jordan",
+                role = "adult",
+                grossIncomeAnnualCents = 120_000_00L,
+                employeeContributionPercent = 10.0,
+                employerMatchPercent = 50.0,
+                employerMatchLimitPercent = 6.0,
+                hsaContributionAnnualCents = 3_600_00L,
+                payFrequency = "biweekly",
+                payPeriodsPerYear = 26.0,
+                retirementAccounts = listOf(
+                    HouseholdRetirementAccount(memberId = 1L, accountId = 10L, accountKind = "403B")
+                )
+            )
+        )
         testScheduler.advanceUntilIdle()
 
         val state = viewModel.uiState.value
-        assertEquals(50.0, state.scrubbedAge)
-        assertEquals(450_000_00L, state.scrubbedBalanceCents)
+        assertEquals(1, state.memberSummaries.size)
+        val member = state.memberSummaries.first()
+        assertEquals("403(b)", member.linkedAccounts.first().displayKind)
+        // 10% of $120k = $12,000 + 50% match on 6% ($3,600) + $3,600 HSA = $19,200/yr
+        assertEquals(19_200_00L, member.annualTotalCents)
 
-        viewModel.onAgeScrubbed(null, null)
+        viewModel.applySpendingIncomeFraction(0.55)
         testScheduler.advanceUntilIdle()
-
-        assertNull(viewModel.uiState.value.scrubbedAge)
-        assertNull(viewModel.uiState.value.scrubbedBalanceCents)
+        assertEquals(66_000_00L, viewModel.uiState.value.annualSpendingCents)
     }
 
     @Test
