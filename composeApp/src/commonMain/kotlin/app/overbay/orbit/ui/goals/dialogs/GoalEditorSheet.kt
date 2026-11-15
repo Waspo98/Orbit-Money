@@ -3,14 +3,17 @@ package app.overbay.orbit.ui.goals.dialogs
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -34,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.GOAL_PRESETS
 import app.overbay.orbit.data.model.Goal
@@ -50,7 +54,6 @@ import app.overbay.orbit.ui.components.DateFieldButton
 import app.overbay.orbit.ui.components.OrbitAccordionVisibility
 import app.overbay.orbit.ui.components.OrbitActionChip
 import app.overbay.orbit.ui.components.OrbitModalScaffold
-import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.ui.components.OrbitTextField
 import app.overbay.orbit.ui.goals.components.GoalAllocationRowEditor
 import app.overbay.orbit.util.LocalOrbitHaptics
@@ -58,34 +61,11 @@ import kotlinx.datetime.LocalDate
 import kotlin.math.max
 import kotlin.math.min
 
-@Composable
-fun GoalEditorSheet(
-    goal: Goal?,
-    accounts: List<Account>,
-    existingGoals: List<Goal> = emptyList(),
-    onSave: (Goal, Boolean) -> Unit,
-    onDelete: (Long) -> Unit,
-    onDismiss: () -> Unit,
-    onOpenLinkedAccount: ((Long) -> Unit)? = null,
-    modifier: Modifier = Modifier
-) {
-    OrbitModalSheet(
-        onDismissRequest = onDismiss,
-        modifier = modifier
-    ) {
-        GoalEditorContent(
-            goal = goal,
-            accounts = accounts,
-            existingGoals = existingGoals,
-            onSave = onSave,
-            onDelete = onDelete,
-            onDismiss = onDismiss,
-            onOpenLinkedAccount = onOpenLinkedAccount
-        )
-    }
-}
+private val GOAL_EMOJI_OPTIONS = listOf(
+    "🎯", "🚗", "🎓", "🏠", "🛡️", "✈️", "💍", "🏥", "💻", "🏖️", "👶", "💰"
+)
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun GoalEditorContent(
     goal: Goal?,
@@ -94,6 +74,7 @@ fun GoalEditorContent(
     onSave: (Goal, Boolean) -> Unit,
     onDelete: (Long) -> Unit,
     onDismiss: () -> Unit,
+    onNavigateBack: (() -> Unit)? = null,
     onOpenLinkedAccount: ((Long) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
@@ -145,9 +126,12 @@ fun GoalEditorContent(
         )
     }
 
+    var showEmojiPicker by remember(goal?.id) { mutableStateOf(false) }
+
     OrbitModalScaffold(
         title = if (isEditing) "Edit Savings Goal" else "New Savings Goal",
         onDismiss = onDismiss,
+        onNavigateBack = onNavigateBack,
         headerTrailingActions = {
             if (goal != null && goal.id > 0L) {
                 OrbitActionChip(
@@ -226,18 +210,23 @@ fun GoalEditorContent(
             }
         }
 
-        // Emoji & Name
+        // Emoji badge & Goal Name
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            OrbitTextField(
-                value = selectedIcon,
-                onValueChange = { selectedIcon = it.take(16) },
-                label = { Text("Emoji") },
-                modifier = Modifier.width(84.dp)
-            )
+            Surface(
+                onClick = { haptics.tick(); showEmojiPicker = !showEmojiPicker },
+                shape = RoundedCornerShape(14.dp),
+                color = if (showEmojiPicker) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f) else MaterialTheme.colorScheme.surfaceContainerLow,
+                border = BorderStroke(1.dp, if (showEmojiPicker) MaterialTheme.colorScheme.primary else OrbitTheme.colors.cardBorder),
+                modifier = Modifier.size(52.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(text = selectedIcon.ifBlank { "🎯" }, fontSize = 22.sp)
+                }
+            }
             OrbitTextField(
                 value = name,
                 onValueChange = { name = it },
@@ -245,6 +234,43 @@ fun GoalEditorContent(
                 placeholder = { Text("e.g. Emergency Fund, New Car") },
                 modifier = Modifier.weight(1f)
             )
+        }
+
+        OrbitAccordionVisibility(visible = showEmojiPicker) {
+            Surface(
+                modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder)
+            ) {
+                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        GOAL_EMOJI_OPTIONS.forEach { emoji ->
+                            val isSelected = selectedIcon == emoji
+                            Surface(
+                                onClick = { haptics.tick(); selectedIcon = emoji; showEmojiPicker = false },
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+                                border = BorderStroke(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else OrbitTheme.colors.cardBorder),
+                                modifier = Modifier.size(40.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) { Text(text = emoji, fontSize = 18.sp) }
+                            }
+                        }
+                    }
+                    OrbitTextField(
+                        value = selectedIcon,
+                        onValueChange = { selectedIcon = it.take(16) },
+                        label = { Text("Custom Emoji") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
         }
 
         // Target Amount & Read-Only Allocated Amount Summary Banner

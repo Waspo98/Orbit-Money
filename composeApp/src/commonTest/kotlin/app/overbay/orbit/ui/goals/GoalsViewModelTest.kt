@@ -2,8 +2,11 @@ package app.overbay.orbit.ui.goals
 
 import app.overbay.orbit.data.OrbitRepository
 import app.overbay.orbit.data.model.Account
+import app.overbay.orbit.data.model.AccountAllocationSummary
 import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.data.model.Goal
+import app.overbay.orbit.data.model.GoalAllocation
+import app.overbay.orbit.data.model.GoalAllocationType
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.util.PlatformStorage
 import kotlinx.coroutines.Dispatchers
@@ -213,6 +216,135 @@ class GoalsViewModelTest {
         viewModel.deleteGoal(50L)
         testScheduler.advanceUntilIdle()
         assertEquals(0, repository.goals.value.size)
+
+        collectJob.cancel()
+    }
+
+    @Test
+    fun testActiveAggregatesAndFundingSplit() = runTest(testDispatcher) {
+        val allocatedAcct = Account(id = 1L, name = "Brokerage", type = AccountType.INVESTMENT, currentBalanceCents = 205281L)
+        val idleAcct = Account(id = 2L, name = "Reserve Savings", type = AccountType.SAVINGS, currentBalanceCents = 500000L)
+        repository.saveAccount(allocatedAcct)
+        repository.saveAccount(idleAcct)
+
+        val activeGoal = Goal(
+            id = 1L,
+            name = "New Car",
+            targetAmountCents = 2500000L,
+            currentAmountCents = 205281L,
+            allocations = listOf(
+                GoalAllocation(
+                    goalId = 1L,
+                    accountId = 1L,
+                    accountName = "Brokerage",
+                    allocationType = GoalAllocationType.FIXED,
+                    allocationAmountCents = 205281L,
+                    currentAmountCents = 205281L
+                )
+            )
+        )
+        val completedGoal = Goal(
+            id = 2L,
+            name = "Emergency Fund",
+            targetAmountCents = 1500000L,
+            currentAmountCents = 1500000L
+        )
+        repository.saveGoal(activeGoal)
+        repository.saveGoal(completedGoal)
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        testScheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(205281L, state.activeSavedCents)
+        assertEquals(2500000L, state.activeTargetCents)
+        assertEquals(1500000L, state.completedSavedCents)
+        assertEquals(1, state.allocatedAccountSummaries.size)
+        assertEquals(1, state.unallocatedAccountSummaries.size)
+        assertEquals(500000L, state.totalUnallocatedCashCents)
+
+        collectJob.cancel()
+    }
+
+    @Test
+    fun testHistoryReconstructionSupports24MonthsAndPreferences() = runTest(testDispatcher) {
+        val goal = Goal(id = 7L, name = "Sabbatical", targetAmountCents = 1200000L, currentAmountCents = 100000L)
+        repository.saveGoal(goal)
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(24, viewModel.uiState.value.goals.first().history.size)
+        assertEquals(GoalsTab.GOALS, viewModel.uiState.value.activeTab)
+
+        viewModel.selectTab(GoalsTab.FUNDING)
+        viewModel.setHistoryMonths(24)
+        viewModel.setHistoryMonths(99) // ignored invalid window
+        viewModel.toggleCompletedGoals()
+        viewModel.toggleUnallocatedAccounts()
+        viewModel.toggleFundingDetails()
+        testScheduler.advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertEquals(GoalsTab.FUNDING, state.activeTab)
+        assertEquals(24, state.historyMonths)
+        assertFalse(state.showCompletedGoals)
+        assertTrue(state.showUnallocatedAccounts)
+        assertTrue(state.showFundingDetails)
+
+        collectJob.cancel()
+    }
+
+    @Test
+    fun testSmartDefaultWhatIfBoostAndOverAllocatedFlag() = runTest(testDispatcher) {
+        val targetIso = LocalDateUtils.formatIsoDate(
+            LocalDateUtils.addMonthsClamped(LocalDateUtils.todayLocalDate(), 10)
+        )
+        val stalledWithTarget = Goal(
+            id = 11L,
+            name = "College",
+            targetAmountCents = 1000000L,
+            currentAmountCents = 0L,
+            targetDate = targetIso
+        )
+        val doneGoal = Goal(
+            id = 12L,
+            name = "Done",
+            targetAmountCents = 50000L,
+            currentAmountCents = 50000L
+        )
+        repository.saveGoal(stalledWithTarget)
+        repository.saveGoal(doneGoal)
+
+        val collectJob = launch { viewModel.uiState.collect {} }
+        testScheduler.advanceUntilIdle()
+
+        viewModel.selectGoalForInspect(11L)
+        testScheduler.advanceUntilIdle()
+        assertEquals(100000L, viewModel.uiState.value.whatIfBoostCents)
+
+        viewModel.setWhatIfBoostCents(25000L)
+        testScheduler.advanceUntilIdle()
+        assertEquals(25000L, viewModel.uiState.value.whatIfBoostCents)
+
+        viewModel.selectGoalForInspect(12L)
+        testScheduler.advanceUntilIdle()
+        assertEquals(0L, viewModel.uiState.value.whatIfBoostCents)
+
+        val fullSummary = AccountAllocationSummary(
+            accountId = 1L,
+            accountName = "Brokerage",
+            accountType = AccountType.INVESTMENT,
+            currentBalanceCents = 205281L,
+            allocatableAmountCents = 205281L,
+            allocatedAmountCents = 205281L,
+            remainingAmountCents = 0L,
+            allocatedPercent = 100.0
+        )
+        assertFalse(fullSummary.isOverAllocated)
+
+        val overSummary = fullSummary.copy(allocatedAmountCents = 210000L, allocatedPercent = 102.3)
+        assertTrue(overSummary.isOverAllocated)
 
         collectJob.cancel()
     }

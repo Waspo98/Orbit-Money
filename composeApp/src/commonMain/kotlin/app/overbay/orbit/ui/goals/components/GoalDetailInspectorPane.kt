@@ -1,15 +1,12 @@
 package app.overbay.orbit.ui.goals.components
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,54 +14,52 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.Goal
-import app.overbay.orbit.data.model.GoalAllocationType
 import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.Cents
+import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MoneyUtils
-import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
+import app.overbay.orbit.ui.components.LocalOrbitSheetDismiss
 import app.overbay.orbit.ui.components.OrbitActionChip
+import app.overbay.orbit.ui.components.OrbitBadge
+import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.OrbitPillProgressBar
+import app.overbay.orbit.ui.components.OrbitSheetHeader
+import app.overbay.orbit.ui.components.OrbitStatTile
+import app.overbay.orbit.ui.components.orbitMorphContentTransform
 import app.overbay.orbit.ui.goals.GoalsUiState
 import app.overbay.orbit.ui.goals.GoalsViewModel
 import app.overbay.orbit.ui.goals.dialogs.GoalEditorContent
 import app.overbay.orbit.util.BackHandler
 import app.overbay.orbit.util.LocalOrbitHaptics
+import kotlin.math.roundToInt
 
 private enum class GoalInspectorSubMode { DETAIL, EDIT }
 
 /**
- * Right-hand morphing inspector pane for Savings Goals on unfolded phones, tablets, and desktops.
- * Shows the read-only goal overview, historical growth canvas chart, and "Imagine" simulator by default,
- * and morphs smoothly into the Edit or Deposit form.
- *
+ * Unified goal detail & edit inspector used both inside the two-pane split layout
+ * and inside a mobile modal bottom sheet.
  */
 @Composable
 fun GoalDetailInspectorPane(
@@ -75,63 +70,75 @@ fun GoalDetailInspectorPane(
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
-    var cachedGoal by remember { mutableStateOf<Goal?>(null) }
-    val activeGoal = state.inspectingGoal
-    if (activeGoal != null) {
-        cachedGoal = activeGoal
-    }
-    val inspecting = activeGoal ?: cachedGoal
+    val inspecting = state.inspectingGoal
+    val isInsideSheet = LocalOrbitSheetDismiss.current != null
+    val subMode = if (state.showEditorSheet) GoalInspectorSubMode.EDIT else GoalInspectorSubMode.DETAIL
 
-    val subMode = when {
-        state.showEditorSheet -> GoalInspectorSubMode.EDIT
-        else -> GoalInspectorSubMode.DETAIL
-    }
+    val canBackToDetail = subMode == GoalInspectorSubMode.EDIT &&
+        state.inspectingGoalId != null &&
+        state.editingGoal?.id == state.inspectingGoalId
 
-    val canBackFromSubMode = subMode != GoalInspectorSubMode.DETAIL && state.inspectingGoalId != null
-    BackHandler(enabled = canBackFromSubMode) {
+    BackHandler(enabled = canBackToDetail) {
         haptics.tick()
-        when (subMode) {
-            GoalInspectorSubMode.EDIT -> viewModel.closeEditorSheet()
-            else -> {}
-        }
+        viewModel.closeEditorSheet()
     }
 
     AnimatedContent(
-        targetState = subMode,
-        transitionSpec = { fadeIn(OrbitSprings.effectsDefault()) togetherWith fadeOut(OrbitSprings.effectsDefault()) },
-        modifier = modifier.fillMaxSize(),
-        label = "goalInspectorSubModeTransition"
-    ) { mode ->
+        targetState = Pair(subMode, state.inspectingGoalId ?: state.editingGoal?.id),
+        transitionSpec = { orbitMorphContentTransform() },
+        label = "goalInspectorSubModeTransition",
+        modifier = if (isInsideSheet) modifier.fillMaxWidth() else modifier.fillMaxSize()
+    ) { (mode, _) ->
         when (mode) {
             GoalInspectorSubMode.EDIT -> {
                 GoalEditorContent(
                     goal = state.editingGoal,
                     accounts = state.accounts,
                     existingGoals = state.goals,
-                    onSave = { goal, steal -> viewModel.saveGoalWithAllocations(goal, steal) },
-                    onDelete = { viewModel.requestDeleteGoal(it) },
-                    onDismiss = {
-                        if (state.inspectingGoalId != null) viewModel.closeEditorSheet() else onClosePane()
-                    }
+                    onSave = { updated, steal -> viewModel.saveGoalWithAllocations(updated, steal) },
+                    onDelete = { id ->
+                        viewModel.closeEditorSheet()
+                        viewModel.requestDeleteGoal(id)
+                    },
+                    onDismiss = onClosePane,
+                    onNavigateBack = if (canBackToDetail) {
+                        {
+                            haptics.tick()
+                            viewModel.closeEditorSheet()
+                        }
+                    } else {
+                        null
+                    },
+                    onOpenLinkedAccount = { accountId ->
+                        onNavigate(OrbitNavKey.Accounts(accountId))
+                    },
+                    modifier = if (isInsideSheet) Modifier.fillMaxWidth() else Modifier.fillMaxSize()
                 )
             }
             GoalInspectorSubMode.DETAIL -> {
                 if (inspecting != null) {
-                    val acct = inspecting.linkedAccountId?.let { state.accountMap[it] }
-                    val monthlyNeeded = viewModel.calculateMonthlyRequiredCents(inspecting)
-                    val neededExtra = viewModel.calculateNeededExtraMonthlyCents(inspecting)
                     GoalReadOnlyDetailContent(
                         goal = inspecting,
-                        linkedAccount = acct,
-                        monthlyNeededCents = monthlyNeeded,
-                        neededExtraMonthlyCents = neededExtra,
-                        onClose = onClosePane,
-                        onEdit = { viewModel.openEditGoal(inspecting) },
-                        onDelete = { viewModel.requestDeleteGoal(inspecting.id) },
-                        onOpenLinkedAccount = if (acct != null) {
-                            { onNavigate(OrbitNavKey.Accounts(accountId = acct.id)) }
-                        } else null
+                        accountMap = state.accountMap,
+                        monthlyNeededCents = viewModel.calculateMonthlyRequiredCents(inspecting),
+                        historyMonths = state.historyMonths,
+                        whatIfBoostCents = state.whatIfBoostCents,
+                        onTimeframeChanged = viewModel::setHistoryMonths,
+                        onWhatIfBoostChanged = viewModel::setWhatIfBoostCents,
+                        onOpenEdit = { viewModel.openEditGoal(inspecting) },
+                        onOpenAccount = { accountId -> onNavigate(OrbitNavKey.Accounts(accountId)) },
+                        onRequestDelete = { viewModel.requestDeleteGoal(inspecting.id) },
+                        onDismiss = onClosePane,
+                        isInsideSheet = isInsideSheet
                     )
+                } else {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "Select a goal to inspect",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
         }
@@ -142,130 +149,234 @@ fun GoalDetailInspectorPane(
 @Composable
 private fun GoalReadOnlyDetailContent(
     goal: Goal,
-    linkedAccount: Account?,
+    accountMap: Map<Long, Account>,
     monthlyNeededCents: Cents?,
-    neededExtraMonthlyCents: Cents?,
-    onClose: () -> Unit,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit,
-    onOpenLinkedAccount: (() -> Unit)?
+    historyMonths: Int,
+    whatIfBoostCents: Cents,
+    onTimeframeChanged: (Int) -> Unit,
+    onWhatIfBoostChanged: (Cents) -> Unit,
+    onOpenEdit: () -> Unit,
+    onOpenAccount: (Long) -> Unit,
+    onRequestDelete: () -> Unit,
+    onDismiss: () -> Unit,
+    isInsideSheet: Boolean
 ) {
-    val haptics = LocalOrbitHaptics.current
     val colors = OrbitTheme.colors
-    val progress = goal.progressRatio.toFloat()
-    val isDone = goal.isCompleted
-    val progressColor = if (isDone) colors.income else MaterialTheme.colorScheme.primary
+    val haptics = LocalOrbitHaptics.current
+    val pct = (goal.progressRatio * 100.0).roundToInt()
+    val progressColor = if (goal.isCompleted) colors.income else MaterialTheme.colorScheme.primary
+    val projectedLabel = goal.projectedLandingLabel()
+    val isStalled = !goal.isCompleted && projectedLabel == "Stalled"
+    val isPastTarget = !goal.isCompleted && !isStalled && goal.isProjectedPastTargetDate()
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
+        modifier = (if (isInsideSheet) Modifier.fillMaxWidth() else Modifier.fillMaxSize())
             .verticalScroll(rememberScrollState())
-            .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+            .padding(horizontal = 20.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Title Header
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = goal.labelWithEmoji,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = "${MoneyUtils.formatCents(goal.currentAmountCents, showCents = false)} of ${MoneyUtils.formatCents(goal.targetAmountCents, showCents = false)}",
-                    style = TabularNumStyle.copy(fontSize = 20.sp, fontWeight = FontWeight.Bold),
-                    color = progressColor
+        OrbitSheetHeader(
+            title = goal.labelWithEmoji,
+            subtitle = if (goal.isCompleted) "Completed Goal" else goal.sourceSummaryLabel(accountMap),
+            onDismiss = onDismiss,
+            trailingActions = {
+                OrbitActionChip(
+                    label = "Edit",
+                    leadingIcon = Icons.Default.Edit,
+                    onClick = {
+                        haptics.tick()
+                        onOpenEdit()
+                    }
                 )
             }
-            IconButton(onClick = { haptics.tick(); onClose() }, modifier = Modifier.size(36.dp)) {
-                Icon(Icons.Default.Close, contentDescription = "Close Details", tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-
-        OrbitPillProgressBar(
-            percent = progress,
-            customFillColor = progressColor,
-            height = 8.dp
         )
 
-        // Historical Chart & What-If Simulator Card
-        GoalHistoryAndImagineCard(goal = goal)
-
-        // Metadata 2-Column Grid
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                GoalMetaField(label = "PROGRESS", value = "${(goal.progressRatio * 100).toInt()}%")
-                GoalMetaField(label = "REMAINING", value = MoneyUtils.formatCents(goal.remainingAmountCents, showCents = false))
-                GoalMetaField(
-                    label = "PACE NEEDED",
-                    value = if (monthlyNeededCents != null && monthlyNeededCents > 0L) {
-                        val extraStr = if (neededExtraMonthlyCents != null && neededExtraMonthlyCents > 0L) {
-                            " (+${MoneyUtils.formatCents(neededExtraMonthlyCents, showCents = false)} extra)"
-                        } else ""
-                        "${MoneyUtils.formatCents(monthlyNeededCents, showCents = false)}/mo$extraStr"
-                    } else if (isDone) "Goal reached" else "Ongoing"
+        // Hero Progress Summary
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Bottom
+            ) {
+                Text(
+                    text = formatCurrencySmart(goal.currentAmountCents),
+                    style = MaterialTheme.typography.headlineSmall.merge(TabularNumStyle),
+                    fontWeight = FontWeight.Bold,
+                    color = progressColor
+                )
+                OrbitBadge(
+                    text = "$pct% of ${formatCurrencySmart(goal.targetAmountCents)}",
+                    containerColor = progressColor.copy(alpha = 0.14f),
+                    contentColor = progressColor
                 )
             }
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                GoalMetaField(label = "TARGET DATE", value = goal.targetDate ?: "Ongoing")
-                GoalMetaField(label = "CATEGORY KIND", value = goal.kind.replaceFirstChar { it.uppercase() })
-                val allocCount = goal.allocations.size
-                GoalMetaField(
-                    label = "SOURCES",
-                    value = if (allocCount > 0) "$allocCount Accounts Linked" else linkedAccount?.name ?: "Unlinked"
+
+            OrbitPillProgressBar(
+                percent = goal.progressRatio.toFloat(),
+                customFillColor = progressColor,
+                height = 10.dp
+            )
+
+            Text(
+                text = if (goal.isCompleted) {
+                    "Goal target reached"
+                } else {
+                    "${formatCurrencySmart(goal.remainingAmountCents)} remaining to target"
+                },
+                style = MaterialTheme.typography.labelMedium.merge(TabularNumStyle),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        // 2x2 Key Metrics Grid
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                OrbitStatTile(
+                    label = "Monthly Pace",
+                    value = formatMonthlyPace(goal.monthlyPaceCents),
+                    valueColor = when {
+                        goal.monthlyPaceCents > 0L -> colors.income
+                        isStalled -> colors.warning
+                        else -> MaterialTheme.colorScheme.onSurface
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+                OrbitStatTile(
+                    label = "Monthly Needed",
+                    value = monthlyNeededCents?.let {
+                        "${MoneyUtils.formatCents(it, showCents = false)}/mo"
+                    } ?: "Flexible",
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                OrbitStatTile(
+                    label = "Desired Date",
+                    value = goal.targetDate?.let { LocalDateUtils.formatMonthShortLabel(it.take(7)) } ?: "ASAP",
+                    modifier = Modifier.weight(1f)
+                )
+                OrbitStatTile(
+                    label = "Projected",
+                    value = projectedLabel,
+                    valueColor = when {
+                        goal.isCompleted -> colors.income
+                        isStalled || isPastTarget -> colors.warning
+                        else -> MaterialTheme.colorScheme.primary
+                    },
+                    modifier = Modifier.weight(1f)
                 )
             }
         }
 
-        // Notes block if present
-        if (!goal.notes.isNullOrBlank()) {
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Text(text = "NOTES", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(text = goal.notes, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurface)
+        // Linked Funding Accounts (supports multi-account allocations + legacy single account)
+        val sourceChips = goal.allocations.mapNotNull { alloc ->
+            val acct = accountMap[alloc.accountId]
+            val acctName = acct?.name ?: alloc.accountName.takeIf { it.isNotBlank() }
+            val fundedCents = alloc.resolvedFundedCents(acct?.currentBalanceCents ?: 0L)
+            acctName?.let { Triple(alloc.accountId, it, formatCurrencySmart(fundedCents)) }
+        }.ifEmpty {
+            listOfNotNull(
+                goal.linkedAccountId?.let { id ->
+                    accountMap[id]?.let { acct -> Triple(id, acct.name, formatCurrencySmart(acct.currentBalanceCents)) }
+                }
+            )
+        }
+
+        if (sourceChips.isNotEmpty()) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "Funding Sources",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    sourceChips.forEach { (accountId, accountName, amountLabel) ->
+                        Surface(
+                            onClick = {
+                                haptics.tick()
+                                onOpenAccount(accountId)
+                            },
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                            border = BorderStroke(1.dp, colors.cardBorder)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    OrbitIcons.Accounts,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = "$accountName · $amountLabel",
+                                    style = MaterialTheme.typography.labelMedium.merge(TabularNumStyle),
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Icon(
+                                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                    contentDescription = "Open account",
+                                    modifier = Modifier.size(14.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
 
-        HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
-
-        // Action Buttons FlowRow
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            OrbitActionChip(label = "Edit Goal", onClick = onEdit)
-            if (onOpenLinkedAccount != null) {
-                OrbitActionChip(label = "View Linked Account", onClick = onOpenLinkedAccount)
+        goal.notes?.takeIf { it.isNotBlank() }?.let { note ->
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = "Notes",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = note,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
             }
-            OrbitActionChip(label = "Delete", isDestructive = true, onClick = onDelete)
         }
-    }
-}
 
-@Composable
-private fun GoalMetaField(label: String, value: String) {
-    Column {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+        GoalHistoryAndImagineCard(
+            goal = goal,
+            selectedMonths = historyMonths,
+            onTimeframeChanged = onTimeframeChanged,
+            whatIfBoostCents = whatIfBoostCents,
+            onWhatIfBoostChanged = onWhatIfBoostChanged
         )
-        Spacer(modifier = Modifier.height(2.dp))
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface
-        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+            horizontalArrangement = Arrangement.End
+        ) {
+            OrbitActionChip(
+                label = "Delete Goal",
+                leadingIcon = Icons.Default.Delete,
+                isDestructive = true,
+                onClick = {
+                    haptics.reject()
+                    onRequestDelete()
+                }
+            )
+        }
+        Spacer(Modifier.height(12.dp))
     }
 }

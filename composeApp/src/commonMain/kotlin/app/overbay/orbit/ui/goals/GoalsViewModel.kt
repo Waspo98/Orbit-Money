@@ -18,7 +18,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlin.math.max
 
 class GoalsViewModel(
     private val repository: OrbitRepository,
@@ -30,7 +29,12 @@ class GoalsViewModel(
     private val _showEditorSheet = MutableStateFlow(false)
     private val _deleteConfirmGoalId = MutableStateFlow<Long?>(null)
     private val _isReorderMode = MutableStateFlow(false)
-    private val _showAccountsOverview = MutableStateFlow(true)
+    private val _activeTab = MutableStateFlow(GoalsTab.GOALS)
+    private val _showCompletedGoals = MutableStateFlow(true)
+    private val _showUnallocatedAccounts = MutableStateFlow(false)
+    private val _showFundingDetails = MutableStateFlow(false)
+    private val _historyMonths = MutableStateFlow(12)
+    private val _whatIfBoostCents = MutableStateFlow(0L)
     private val _goalSortOverrides = MutableStateFlow<Map<Long, Int>>(emptyMap())
 
     private val dataFlow = combine(
@@ -50,13 +54,24 @@ class GoalsViewModel(
         GoalsDialogState(editing, showSheet, deleteConfirmId)
     }
 
+    private val displayPrefsFlow = combine(
+        _activeTab,
+        _showCompletedGoals,
+        _showUnallocatedAccounts,
+        _showFundingDetails,
+        _historyMonths
+    ) { activeTab, showCompleted, showUnallocated, showDetails, historyMonths ->
+        GoalsDisplayPrefs(activeTab, showCompleted, showUnallocated, showDetails, historyMonths)
+    }
+
     private val controlFlow = combine(
         _inspectingGoalId,
         _isReorderMode,
-        _showAccountsOverview,
-        _goalSortOverrides
-    ) { inspectingId, isReorder, showOverview, sortOverrides ->
-        GoalsControlState(inspectingId, isReorder, showOverview, sortOverrides)
+        _whatIfBoostCents,
+        _goalSortOverrides,
+        displayPrefsFlow
+    ) { inspectingId, isReorder, whatIfBoost, sortOverrides, prefs ->
+        GoalsControlState(inspectingId, isReorder, whatIfBoost, sortOverrides, prefs)
     }
 
     val uiState: StateFlow<GoalsUiState> = combine(
@@ -64,18 +79,13 @@ class GoalsViewModel(
         dialogFlow,
         controlFlow
     ) { input, dialog, control ->
-        val inspectingId = control.inspectingId
-        val isReorder = control.isReorder
-        val showOverview = control.showOverview
-        val sortOverrides = control.sortOverrides
-        // Enrich goals with 12-month historical reconstruction, trailing pace, and ETA projections
         val enrichedGoals = input.goals.map { goal ->
             val history = GoalAllocationEngine.reconstructGoalHistory(
                 goal = goal,
                 accounts = input.accounts,
                 balanceRecords = input.balanceRecords,
                 transactions = input.transactions,
-                monthsCount = 12
+                monthsCount = 24
             )
             val (pace, eta) = GoalAllocationEngine.computeMonthlyPaceAndEta(goal, history)
             goal.copy(
@@ -87,7 +97,7 @@ class GoalsViewModel(
 
         val sortedGoals = enrichedGoals.sortedWith(
             compareBy<Goal> { it.isCompleted }
-                .thenBy { sortOverrides[it.id] ?: it.sortOrder }
+                .thenBy { control.sortOverrides[it.id] ?: it.sortOrder }
                 .thenBy { it.id }
         )
 
@@ -96,8 +106,22 @@ class GoalsViewModel(
             goals = enrichedGoals
         )
 
-        val totalSaved = enrichedGoals.sumOf { it.currentAmountCents }
-        val totalTarget = enrichedGoals.sumOf { it.targetAmountCents }
+        val activeGoals = sortedGoals.filter { !it.isCompleted }
+        val totalSaved = sortedGoals.sumOf { it.currentAmountCents }
+        val totalTarget = sortedGoals.sumOf { it.targetAmountCents }
+        val activeSaved = activeGoals.sumOf { it.currentAmountCents }
+        val activeTarget = activeGoals.sumOf { it.targetAmountCents }
+        val combinedPace = activeGoals.sumOf { it.monthlyPaceCents.coerceAtLeast(0L) }
+        val combinedRequired = activeGoals.sumOf { calculateMonthlyRequiredCents(it) ?: 0L }
+        val totalUnallocated = accountSummaries.sumOf { it.remainingAmountCents }
+        val onTrackCount = activeGoals.count { goal ->
+            val pace = goal.monthlyPaceCents
+            if (pace <= 0L) false
+            else {
+                val req = calculateMonthlyRequiredCents(goal)
+                req == null || pace >= req
+            }
+        }
 
         GoalsUiState(
             goals = sortedGoals,
@@ -106,12 +130,23 @@ class GoalsViewModel(
             accountSummaries = accountSummaries,
             totalSavedCents = totalSaved,
             totalTargetCents = totalTarget,
-            inspectingGoalId = inspectingId,
+            activeSavedCents = activeSaved,
+            activeTargetCents = activeTarget,
+            combinedMonthlyPaceCents = combinedPace,
+            combinedMonthlyRequiredCents = combinedRequired,
+            totalUnallocatedCashCents = totalUnallocated,
+            onTrackActiveCount = onTrackCount,
+            activeTab = control.prefs.activeTab,
+            showCompletedGoals = control.prefs.showCompletedGoals,
+            showUnallocatedAccounts = control.prefs.showUnallocatedAccounts,
+            showFundingDetails = control.prefs.showFundingDetails,
+            historyMonths = control.prefs.historyMonths,
+            whatIfBoostCents = control.whatIfBoostCents,
+            inspectingGoalId = control.inspectingId,
             editingGoal = dialog.editing,
             showEditorSheet = dialog.showSheet,
             deleteConfirmGoalId = dialog.deleteConfirmId,
-            isReorderMode = isReorder,
-            showAccountsOverview = showOverview,
+            isReorderMode = control.isReorder,
             isLoading = false
         )
     }.flowOn(computeDispatcher).stateIn(
@@ -123,10 +158,13 @@ class GoalsViewModel(
     fun selectGoalForInspect(id: Long?) {
         if (id != null && _inspectingGoalId.value == id && !_showEditorSheet.value) {
             _inspectingGoalId.value = null
+            _whatIfBoostCents.value = 0L
         } else {
+            val targetGoal = id?.let { targetId -> uiState.value.goals.find { it.id == targetId } }
             _inspectingGoalId.value = id
             _showEditorSheet.value = false
             _editingGoal.value = null
+            _whatIfBoostCents.value = targetGoal?.let { computeSmartDefaultBoostCents(it) } ?: 0L
         }
     }
 
@@ -136,6 +174,7 @@ class GoalsViewModel(
         _inspectingGoalId.value = null
         _showEditorSheet.value = false
         _editingGoal.value = null
+        _whatIfBoostCents.value = 0L
     }
 
     fun openAddGoal() {
@@ -159,12 +198,34 @@ class GoalsViewModel(
         _editingGoal.value = null
     }
 
+    fun selectTab(tab: GoalsTab) {
+        _activeTab.value = tab
+    }
+
     fun toggleReorderMode() {
         _isReorderMode.value = !_isReorderMode.value
     }
 
-    fun toggleAccountsOverview() {
-        _showAccountsOverview.value = !_showAccountsOverview.value
+    fun toggleCompletedGoals() {
+        _showCompletedGoals.value = !_showCompletedGoals.value
+    }
+
+    fun toggleUnallocatedAccounts() {
+        _showUnallocatedAccounts.value = !_showUnallocatedAccounts.value
+    }
+
+    fun toggleFundingDetails() {
+        _showFundingDetails.value = !_showFundingDetails.value
+    }
+
+    fun setHistoryMonths(months: Int) {
+        if (months in listOf(6, 12, 24)) {
+            _historyMonths.value = months
+        }
+    }
+
+    fun setWhatIfBoostCents(cents: Cents) {
+        _whatIfBoostCents.value = cents.coerceAtLeast(0L)
     }
 
     fun moveGoal(completedGroup: Boolean, fromIndex: Int, toIndex: Int) {
@@ -233,8 +294,15 @@ class GoalsViewModel(
 
     fun calculateNeededExtraMonthlyCents(goal: Goal): Cents? {
         val requiredMonthly = calculateMonthlyRequiredCents(goal) ?: return null
-        val pace = (goal.monthlyPaceCents ?: 0L).coerceAtLeast(0L)
+        val pace = (goal.monthlyPaceCents).coerceAtLeast(0L)
         return (requiredMonthly - pace).coerceAtLeast(0L)
+    }
+
+    private fun computeSmartDefaultBoostCents(goal: Goal): Cents {
+        if (goal.isCompleted) return 0L
+        val neededExtra = calculateNeededExtraMonthlyCents(goal)
+        if (neededExtra != null && neededExtra > 0L) return neededExtra
+        return if (goal.monthlyPaceCents <= 0L) 100_00L else 0L
     }
 
     private data class GoalEngineInput(
@@ -250,10 +318,19 @@ class GoalsViewModel(
         val deleteConfirmId: Long?
     )
 
+    private data class GoalsDisplayPrefs(
+        val activeTab: GoalsTab,
+        val showCompletedGoals: Boolean,
+        val showUnallocatedAccounts: Boolean,
+        val showFundingDetails: Boolean,
+        val historyMonths: Int
+    )
+
     private data class GoalsControlState(
         val inspectingId: Long?,
         val isReorder: Boolean,
-        val showOverview: Boolean,
-        val sortOverrides: Map<Long, Int>
+        val whatIfBoostCents: Cents,
+        val sortOverrides: Map<Long, Int>,
+        val prefs: GoalsDisplayPrefs
     )
 }

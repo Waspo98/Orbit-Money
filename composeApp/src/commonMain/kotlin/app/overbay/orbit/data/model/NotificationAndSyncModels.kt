@@ -166,7 +166,10 @@ data class AccountAllocationSummary(
     val allocatedAmountCents: Cents = 0L,
     val remainingAmountCents: Cents = 0L,
     val allocatedPercent: Double = 0.0
-)
+) {
+    val isOverAllocated: Boolean
+        get() = allocatedAmountCents > allocatableAmountCents && allocatableAmountCents > 0L
+}
 
 @Serializable
 data class MhaFilingStatusRef(

@@ -2,380 +2,293 @@ package app.overbay.orbit.ui.goals.components
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.Goal
-import app.overbay.orbit.data.model.GoalMonthlyPoint
+import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.GoalAllocationEngine
 import app.overbay.orbit.domain.LocalDateUtils
-import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.ui.components.CurrencyTextField
+import app.overbay.orbit.ui.components.OrbitActionChip
 import app.overbay.orbit.ui.components.OrbitBadge
-import app.overbay.orbit.ui.components.charts.rememberAnimatedFloatSeries
+import app.overbay.orbit.ui.components.OrbitSectionCard
+import app.overbay.orbit.ui.components.OrbitSegmentedTabRow
 import app.overbay.orbit.ui.components.orbitMorphContentTransform
 import app.overbay.orbit.util.LocalOrbitHaptics
-import kotlin.math.max
+import kotlin.math.roundToInt
 
 /**
- * Historical 6-24 month balance trend canvas chart paired with 7-month trailing pace,
- * ETA pill, and interactive "Imagine" What-If monthly boost simulator.
- *
+ * Interactive historical balance chart and What-If monthly boost simulator for a goal.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun GoalHistoryAndImagineCard(
     goal: Goal,
-    onTimeframeChanged: (Int) -> Unit = {},
+    selectedMonths: Int,
+    onTimeframeChanged: (Int) -> Unit,
+    whatIfBoostCents: Cents,
+    onWhatIfBoostChanged: (Cents) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var selectedMonths by remember { mutableIntStateOf(12) }
-    var boostDollars by remember { mutableFloatStateOf(100f) }
-    val haptics = LocalOrbitHaptics.current
     val colors = OrbitTheme.colors
+    val haptics = LocalOrbitHaptics.current
+    val baselinePace = goal.monthlyPaceCents ?: 0L
+    val isStalled = !goal.isCompleted && baselinePace <= 0L
+    val isPastTarget = !goal.isCompleted && goal.isProjectedPastTargetDate()
 
-    val history = remember(goal.history, selectedMonths) {
-        if (goal.history.isEmpty()) emptyList()
-        else goal.history.takeLast(selectedMonths)
+    val (badgeLabel, badgeColor) = when {
+        goal.isCompleted -> "Reached" to colors.income
+        isStalled -> "Pace Stalled" to colors.warning
+        isPastTarget -> "Behind Target" to colors.warning
+        else -> "On Track" to colors.income
     }
 
-    val baselinePace = goal.monthlyPaceCents
-    val additionalCents = (boostDollars.toLong() * 100L)
-    val simulatedEta = remember(goal, baselinePace, additionalCents) {
-        GoalAllocationEngine.simulateWhatIf(
-            currentAmountCents = goal.currentAmountCents,
-            targetAmountCents = goal.targetAmountCents,
-            baselinePaceCents = baselinePace,
-            additionalMonthlyCents = additionalCents
-        )
-    }
-
-    Surface(
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        border = BorderStroke(1.dp, colors.cardBorder),
-        modifier = modifier.fillMaxWidth()
+    OrbitSectionCard(
+        modifier = modifier,
+        title = "Growth & What-If Planner",
+        headerBadge = {
+            OrbitBadge(
+                text = badgeLabel,
+                containerColor = badgeColor.copy(alpha = 0.14f),
+                contentColor = badgeColor
+            )
+        }
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            // Header & Timeframe Selector Row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = "HISTORICAL GROWTH & ETA",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        letterSpacing = 0.5.sp
-                    )
-                    Text(
-                        text = if (baselinePace > 0L) {
-                            "+${MoneyUtils.formatCents(baselinePace, showCents = false)}/mo avg pace"
-                        } else {
-                            "Pace stalled"
-                        },
-                        style = TabularNumStyle.copy(fontSize = 12.sp, fontWeight = FontWeight.SemiBold),
-                        color = if (baselinePace > 0L) colors.income else colors.warning
-                    )
-                }
+        OrbitSegmentedTabRow(
+            items = listOf(6, 12, 24),
+            selected = selectedMonths,
+            onSelect = { months ->
+                haptics.tick()
+                onTimeframeChanged(months)
+            },
+            label = { "${it}M" }
+        )
 
-                val monthOptions = listOf(6, 12, 24)
-                SingleChoiceSegmentedButtonRow {
-                    monthOptions.forEachIndexed { idx, m ->
-                        SegmentedButton(
-                            selected = selectedMonths == m,
-                            onClick = {
-                                haptics.tick()
-                                selectedMonths = m
-                                onTimeframeChanged(m)
-                            },
-                            shape = SegmentedButtonDefaults.itemShape(index = idx, count = monthOptions.size),
-                            icon = {},
-                            label = { Text("${m}M", fontSize = 11.sp, fontWeight = FontWeight.SemiBold) }
-                        )
-                    }
-                }
-            }
+        Spacer(Modifier.height(12.dp))
 
-            // Canvas Line & Area Chart
-            AnimatedContent(
-                targetState = history.size >= 2,
-                transitionSpec = { orbitMorphContentTransform(clip = false) },
-                label = "goalHistoryChartMode"
-            ) { hasChart ->
-                if (hasChart) {
-                    GoalHistoryCanvasChart(
-                        points = history,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(135.dp)
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(80.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "Historical balances will chart here as account syncs accumulate.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.outline
-                        )
-                    }
-                }
-            }
-
-            // ETA Status Pill
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Projected Landing:",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                val etaText = when (goal.eta?.status) {
-                    "complete" -> "Goal Reached! 🎉"
-                    "stalled" -> "Pace Stalled"
-                    else -> "${goal.eta?.date ?: "Unknown"} (${goal.eta?.months ?: 0} mos left)"
-                }
-                OrbitBadge(
-                    text = etaText,
-                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
-                    contentColor = MaterialTheme.colorScheme.primary
-                )
-            }
-
-            HorizontalDivider(thickness = 1.dp, color = colors.cardBorder)
-
-            // "Imagine" What-If Monthly Simulator
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "✨ What-If Contribution Boost",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        letterSpacing = 0.5.sp
-                    )
-                    Text(
-                        text = "+$${boostDollars.toInt()}/mo",
-                        style = TabularNumStyle.copy(fontSize = 14.sp, fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-
-                // Slider & compact CurrencyTextField for typing exact monthly boost
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Slider(
-                        value = boostDollars.coerceIn(0f, 1500f),
-                        onValueChange = {
-                            boostDollars = it
-                        },
-                        valueRange = 0f..1500f,
-                        steps = 29,
-                        modifier = Modifier.weight(1f)
-                    )
-
-                    CurrencyTextField(
-                        cents = (boostDollars.toLong() * 100L),
-                        onCentsChange = { newCents ->
-                            boostDollars = (newCents / 100L).toFloat()
-                        },
-                        label = null,
-                        modifier = Modifier.width(115.dp)
-                    )
-                }
-
-                val baselineMonths = goal.eta?.months ?: 999
-                val simMonths = simulatedEta.months ?: 0
-                val monthsSaved = max(0, baselineMonths - simMonths)
-
-                val simulationSummary = if (simulatedEta.date != null) {
-                    if (monthsSaved > 0) {
-                        "Reaches target ${simulatedEta.date} ($simMonths mos · Saves $monthsSaved months! 🚀)"
-                    } else {
-                        "Reaches target ${simulatedEta.date} ($simMonths months)"
-                    }
-                } else if (goal.isCompleted) {
-                    "Goal already reached! Extra funds accelerate your next priority."
-                } else {
-                    "Add monthly deposits to estimate completion date."
-                }
-
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.surface,
-                    border = BorderStroke(1.dp, colors.cardBorder),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        text = simulationSummary,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Medium,
-                        color = if (monthsSaved > 0) colors.income else MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-                    )
-                }
-            }
+        val visiblePoints = remember(goal.history, selectedMonths) {
+            goal.history.takeLast(selectedMonths)
         }
-    }
-}
+        GoalHistoryChart(
+            goalId = goal.id,
+            points = visiblePoints,
+            targetAmountCents = goal.targetAmountCents
+        )
 
-@Composable
-private fun GoalHistoryCanvasChart(
-    points: List<GoalMonthlyPoint>,
-    modifier: Modifier = Modifier
-) {
-    val primaryColor = MaterialTheme.colorScheme.primary
-    val values = remember(points) { points.map { it.amountCents.toFloat() } }
-    val maxVal = remember(values) { max(1f, values.maxOrNull() ?: 1f) }
-    val minVal = remember(values) { values.minOrNull() ?: 0f }
-    val range = remember(maxVal, minVal) { (maxVal - minVal).coerceAtLeast(1f) }
-    val normalizedTargets = remember(values, minVal, range) {
-        values.map { ((it - minVal) / range).coerceIn(0f, 1f) }
-    }
-    val animatedNorms = rememberAnimatedFloatSeries(targets = normalizedTargets)
+        Spacer(Modifier.height(12.dp))
 
-    val first = points.firstOrNull()
-    val last = points.lastOrNull()
-    val firstLabel = first?.let { LocalDateUtils.formatMonthShortLabel(it.month) } ?: ""
-    val lastLabel = last?.let { LocalDateUtils.formatMonthShortLabel(it.month) } ?: ""
-    val lastAmount = last?.let { MoneyUtils.formatCents(it.amountCents, showCents = false) } ?: ""
-    val path = remember { Path() }
-    val fillPath = remember { Path() }
-
-    Column(modifier = modifier) {
-        Canvas(modifier = Modifier.fillMaxWidth().weight(1f)) {
-            val w = size.width
-            val h = size.height
-            val stepX = w / (points.size - 1).coerceAtLeast(1)
-
-            path.rewind()
-            fillPath.rewind()
-
-            points.forEachIndexed { i, _ ->
-                val x = i * stepX
-                val norm = animatedNorms.getOrElse(i) { normalizedTargets.getOrElse(i) { 0f } }
-                val y = h - (norm * (h - 18f)) - 8f
-
-                if (i == 0) {
-                    path.moveTo(x, y)
-                    fillPath.moveTo(x, h)
-                    fillPath.lineTo(x, y)
-                } else {
-                    path.lineTo(x, y)
-                    fillPath.lineTo(x, y)
-                }
-
-                if (i == points.size - 1) {
-                    fillPath.lineTo(x, h)
-                    fillPath.close()
-                }
-            }
-
-            // Draw gradient area
-            drawPath(
-                path = fillPath,
-                brush = Brush.verticalGradient(
-                    colors = listOf(primaryColor.copy(alpha = 0.28f), Color.Transparent),
-                    startY = 0f,
-                    endY = h
-                )
-            )
-
-            // Draw stroke line
-            drawPath(
-                path = path,
-                color = primaryColor,
-                style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
-            )
-
-            // Draw dot at latest point
-            val lastX = (points.size - 1) * stepX
-            val lastNorm = animatedNorms.lastOrNull() ?: normalizedTargets.lastOrNull() ?: 0f
-            val lastY = h - (lastNorm * (h - 18f)) - 8f
-            drawCircle(color = primaryColor, radius = 5.dp.toPx(), center = Offset(lastX, lastY))
-        }
-
-        Spacer(modifier = Modifier.height(4.dp))
-
-        // Bottom row with start month label, latest month label, and latest amount
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = firstLabel,
-                style = MaterialTheme.typography.labelSmall,
+                text = "Current Trajectory",
+                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            val landingColor = if (isStalled || isPastTarget) colors.warning else colors.income
             Text(
-                text = "$lastLabel · $lastAmount",
-                style = TabularNumStyle.copy(fontSize = 11.sp, fontWeight = FontWeight.SemiBold),
-                color = MaterialTheme.colorScheme.primary
+                text = goal.projectedLandingLabel(),
+                style = MaterialTheme.typography.labelLarge.merge(TabularNumStyle),
+                fontWeight = FontWeight.SemiBold,
+                color = landingColor
             )
+        }
+
+        if (!goal.isCompleted) {
+            Spacer(Modifier.height(14.dp))
+            HorizontalDivider(color = colors.cardBorder)
+            Spacer(Modifier.height(14.dp))
+
+            GoalWhatIfPlannerSection(
+                goal = goal,
+                baselinePace = baselinePace,
+                whatIfBoostCents = whatIfBoostCents,
+                onWhatIfBoostChanged = onWhatIfBoostChanged
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun GoalWhatIfPlannerSection(
+    goal: Goal,
+    baselinePace: Cents,
+    whatIfBoostCents: Cents,
+    onWhatIfBoostChanged: (Cents) -> Unit
+) {
+    val colors = OrbitTheme.colors
+    val haptics = LocalOrbitHaptics.current
+    val remainingCents = (goal.targetAmountCents - goal.currentAmountCents).coerceAtLeast(0L)
+    val targetMonths = remember(goal.targetDate) { goal.monthsUntilTargetDate() }
+    val requiredMonthlyCents = if (targetMonths != null && targetMonths > 0 && remainingCents > 0L) {
+        (remainingCents + targetMonths - 1) / targetMonths
+    } else {
+        0L
+    }
+    val matchTargetBoostCents = remember(requiredMonthlyCents, baselinePace) {
+        val raw = (requiredMonthlyCents - baselinePace.coerceAtLeast(0L)).coerceAtLeast(0L)
+        if (raw <= 0L) 0L else ((raw + 99L) / 100L) * 100L
+    }
+    val maxSliderDollars = remember(matchTargetBoostCents) {
+        val suggested = (matchTargetBoostCents / 100L).toFloat() * 1.5f
+        maxOf(2500f, suggested).coerceAtMost(25000f)
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "What-If Monthly Boost",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Text(
+            text = "+${formatCurrencySmart(whatIfBoostCents)}/mo",
+            style = MaterialTheme.typography.labelLarge.merge(TabularNumStyle),
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+    }
+
+    Spacer(Modifier.height(10.dp))
+
+    CurrencyTextField(
+        cents = whatIfBoostCents,
+        onCentsChange = { onWhatIfBoostChanged(it.coerceAtLeast(0L)) },
+        label = "Additional Monthly Contribution",
+        modifier = Modifier.fillMaxWidth()
+    )
+
+    Spacer(Modifier.height(6.dp))
+
+    Slider(
+        value = (whatIfBoostCents / 100f).coerceIn(0f, maxSliderDollars),
+        onValueChange = { dollars ->
+            val snappedDollars = (dollars / 25f).roundToInt() * 25L
+            onWhatIfBoostChanged((snappedDollars * 100L).coerceAtLeast(0L))
+        },
+        valueRange = 0f..maxSliderDollars,
+        colors = SliderDefaults.colors(
+            thumbColor = MaterialTheme.colorScheme.primary,
+            activeTrackColor = MaterialTheme.colorScheme.primary,
+            inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+        ),
+        modifier = Modifier.fillMaxWidth()
+    )
+
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        if (matchTargetBoostCents > 0L) {
+            OrbitActionChip(
+                label = "Match Target (+${formatCurrencySmart(matchTargetBoostCents)})",
+                onClick = {
+                    haptics.tick()
+                    onWhatIfBoostChanged(matchTargetBoostCents)
+                }
+            )
+        }
+        listOf(100_00L, 250_00L, 500_00L).forEach { presetCents ->
+            OrbitActionChip(
+                label = "+${formatCurrencySmart(presetCents)}",
+                onClick = {
+                    haptics.tick()
+                    onWhatIfBoostChanged(presetCents)
+                }
+            )
+        }
+        if (whatIfBoostCents > 0L) {
+            OrbitActionChip(
+                label = "Reset",
+                onClick = {
+                    haptics.tick()
+                    onWhatIfBoostChanged(0L)
+                }
+            )
+        }
+    }
+
+    Spacer(Modifier.height(12.dp))
+
+    val simulatedEta = remember(goal.currentAmountCents, goal.targetAmountCents, baselinePace, whatIfBoostCents) {
+        GoalAllocationEngine.simulateWhatIf(
+            currentAmountCents = goal.currentAmountCents,
+            targetAmountCents = goal.targetAmountCents,
+            baselinePaceCents = baselinePace,
+            additionalMonthlyCents = whatIfBoostCents
+        )
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = BorderStroke(1.dp, colors.cardBorder)
+    ) {
+        AnimatedContent(
+            targetState = Triple(simulatedEta.date, simulatedEta.months, targetMonths),
+            transitionSpec = { orbitMorphContentTransform() },
+            label = "what_if_projection",
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+        ) { (simDate, simMonths, desiredMonths) ->
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                val primaryLine = when {
+                    simMonths != null && simMonths > 240 -> "> 20 years at this pace"
+                    simDate != null && simMonths != null -> "Projected $simDate ($simMonths mo)"
+                    else -> "Add a monthly boost to project a completion date"
+                }
+                Text(
+                    text = primaryLine,
+                    style = MaterialTheme.typography.bodyMedium.merge(TabularNumStyle),
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+
+                val targetIso = goal.targetDate
+                if (!targetIso.isNullOrBlank() && desiredMonths != null && simMonths != null && simMonths <= 240) {
+                    val targetLabel = LocalDateUtils.formatMonthShortLabel(targetIso.take(7))
+                    val diff = simMonths - desiredMonths
+                    val (comparisonText, toneColor) = when {
+                        diff <= 0 -> "On time for $targetLabel goal" to colors.income
+                        else -> "$diff mo after $targetLabel goal" to colors.warning
+                    }
+                    Text(
+                        text = comparisonText,
+                        style = MaterialTheme.typography.labelSmall.merge(TabularNumStyle),
+                        color = toneColor
+                    )
+                }
+            }
         }
     }
 }
