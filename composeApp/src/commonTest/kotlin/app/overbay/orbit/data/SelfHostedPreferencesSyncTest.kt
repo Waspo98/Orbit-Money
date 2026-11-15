@@ -201,4 +201,43 @@ class SelfHostedPreferencesSyncTest {
         assertEquals(listOf(101L, 104L, 103L), pushedArray)
         storage.clear()
     }
+
+    @Test
+    fun testRetirementIncludedAccountIds_syncsAndClearsAcrossInstances() = runTest(testDispatcher) {
+        val backend = FakeOrbitBackend(wireJson)
+        val storageA = PlatformStorage().apply { clear() }
+        LocalSnapshotEngine(storageA).saveStartupPreferences(
+            OrbitPreferences(storageMode = StorageMode.SELF_HOSTED, selfHostedServerUrl = "https://orbit.example.com", onboardingCompleted = true)
+        )
+        val scopeA = CoroutineScope(SupervisorJob() + testDispatcher)
+        val repoA = OrbitRepository(storageA, customApiClient = backend.createClient(storageA, testDispatcher), scope = scopeA)
+        repoA.initialize()
+        repoA.updatePreferences(repoA.preferences.value.copy(retirementIncludedAccountIds = listOf(10L, 12L)))
+        testScheduler.advanceUntilIdle()
+
+        val remoteIds = backend.preferences["retirementIncludedAccountIds"]?.jsonArray?.map { it.jsonPrimitive.long }
+        assertEquals(listOf(10L, 12L), remoteIds)
+
+        val storageB = PlatformStorage().apply { clear() }
+        LocalSnapshotEngine(storageB).saveStartupPreferences(
+            OrbitPreferences(storageMode = StorageMode.SELF_HOSTED, selfHostedServerUrl = "https://orbit.example.com", onboardingCompleted = true)
+        )
+        val scopeB = CoroutineScope(SupervisorJob() + testDispatcher)
+        val repoB = OrbitRepository(storageB, customApiClient = backend.createClient(storageB, testDispatcher), scope = scopeB)
+        repoB.initialize()
+        testScheduler.advanceUntilIdle()
+        assertEquals(listOf(10L, 12L), repoB.preferences.value.retirementIncludedAccountIds)
+
+        // Clearing back to Auto Default pushes JsonNull and syncs null on reload
+        repoB.updatePreferences(repoB.preferences.value.copy(retirementIncludedAccountIds = null))
+        testScheduler.advanceUntilIdle()
+        repoA.initialize()
+        testScheduler.advanceUntilIdle()
+        assertEquals(null, repoA.preferences.value.retirementIncludedAccountIds)
+
+        scopeA.cancel()
+        scopeB.cancel()
+        storageA.clear()
+        storageB.clear()
+    }
 }

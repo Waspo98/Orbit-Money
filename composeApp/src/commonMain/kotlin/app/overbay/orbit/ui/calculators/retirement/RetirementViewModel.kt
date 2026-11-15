@@ -10,6 +10,7 @@ import app.overbay.orbit.data.model.HouseholdMember
 import app.overbay.orbit.data.model.RetirementHistoryPoint
 import app.overbay.orbit.data.model.RetirementScenarioPreset
 import app.overbay.orbit.data.model.RetirementTargetMode
+import app.overbay.orbit.data.model.StorageMode
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.ProjectionPoint
@@ -26,8 +27,14 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
 import kotlin.math.max
-import kotlin.math.min
 import kotlin.math.roundToLong
+
+private data class RetirementInputs(
+    val accounts: List<Account>,
+    val members: List<HouseholdMember>,
+    val goals: List<app.overbay.orbit.data.model.Goal>,
+    val customIncludedIds: Set<Long>?
+)
 
 class RetirementViewModel(
     private val repository: OrbitRepository,
@@ -39,7 +46,10 @@ class RetirementViewModel(
 
     private val currentYearString: String by lazy { LocalDateUtils.todayLocalDate().year.toString() }
     private var cachedHistoryAge: Double = Double.NaN
+    private var cachedHistoryCustomIds: Set<Long>? = null
     private var cachedBaseHistoryPoints: List<ProjectionPoint> = emptyList()
+    private var lastObservedCustomIds: Set<Long>? = null
+    private var hasObservedCustomIds: Boolean = false
 
     init {
         vmScope.launch {
@@ -48,11 +58,26 @@ class RetirementViewModel(
                 repository.snapshot
                     .map { Triple(it.members, it.retirementAccountLinks, it.household) }
                     .distinctUntilChanged(),
-                repository.goals
-            ) { accounts, (members, links, _), goals ->
-                Triple(accounts, members to links, goals)
-            }.collect { (accounts, membersAndLinks, goals) ->
-                val (members, links) = membersAndLinks
+                repository.goals,
+                repository.preferences
+                    .map { it.retirementIncludedAccountIds }
+                    .distinctUntilChanged()
+            ) { accounts, (members, _, _), goals, customIncludedList ->
+                RetirementInputs(
+                    accounts = accounts,
+                    members = members,
+                    goals = goals,
+                    customIncludedIds = customIncludedList?.toSet()
+                )
+            }.collect { inputs ->
+                val accounts = inputs.accounts
+                val members = inputs.members
+                val goals = inputs.goals
+                val customIds = inputs.customIncludedIds
+                val customChanged = hasObservedCustomIds && customIds != lastObservedCustomIds
+                hasObservedCustomIds = true
+                lastObservedCustomIds = customIds
+
                 val adultMembers = members.filter { it.role.equals("adult", ignoreCase = true) }
 
                 // 1. Inferred current age from oldest adult household member
@@ -69,29 +94,38 @@ class RetirementViewModel(
                 } else 60_000_00L
 
                 // 3. Planned monthly retirement savings from household member contributions
-                val plannedAnnualSavings = adultMembers.sumOf { calculateMemberRetirementAnnual(it) }
+                val plannedAnnualSavings = adultMembers.sumOf {
+                    RetirementAccountResolver.calculateMemberRetirementAnnual(it)
+                }
                 val plannedMonthly = if (plannedAnnualSavings > 0L) {
                     (plannedAnnualSavings.toDouble() / 12.0).roundToLong()
                 } else 1000_00L
 
-                // 4. Resolve connected retirement accounts & precomputed member breakdowns
+                // 4. Resolve included retirement accounts & precomputed member breakdowns
                 val investments = accounts.filter { !it.isArchived && it.type == AccountType.INVESTMENT }
                 val accountMap = accounts.associateBy { it.id }
-                val linkedDetails = buildLinkedAccountDetails(
+                val linkedDetails = RetirementAccountResolver.buildLinkedAccountDetails(
                     members = members,
                     accounts = accounts,
+                    accountMap = accountMap,
                     investments = investments,
-                    goals = goals
+                    goals = goals,
+                    customIncludedIds = customIds
                 )
-                val memberSummaries = buildMemberSummaries(members, accountMap)
+                val memberSummaries = RetirementAccountResolver.buildMemberSummaries(members, accountMap)
+                val defaultIds = RetirementAccountResolver.resolveDefaultIncludedAccountIds(members, investments, goals)
                 val connectedBalance = linkedDetails.sumOf { it.balanceCents }
+                val includedIds = linkedDetails.mapNotNull { it.accountId }.toSet()
+                val hasCustomSelection = customIds != null
+                val hasSources = linkedDetails.isNotEmpty() || hasCustomSelection
 
                 _uiState.update { current ->
                     val nextCurrentAge = derivedAge
                     val nextRetirementAge = max(nextCurrentAge + 1.0, current.retirementAge)
                     val nextRunwayEndAge = max(nextRetirementAge + 1.0, current.runwayEndAge)
 
-                    val nextCurrentBalance = if (!current.currentBalanceOverridden && connectedBalance > 0L) {
+                    val clearBalanceOverride = customChanged || !current.currentBalanceOverridden
+                    val nextCurrentBalance = if (clearBalanceOverride && hasSources) {
                         connectedBalance
                     } else current.currentBalanceCents
 
@@ -115,12 +149,22 @@ class RetirementViewModel(
                         monthlySavingsCents = nextMonthlySavings,
                         connectedBalanceCents = connectedBalance,
                         currentBalanceCents = nextCurrentBalance,
+                        currentBalanceOverridden = if (customChanged) false else current.currentBalanceOverridden,
                         investmentAccounts = investments,
                         allAccounts = accounts,
                         accountById = accountMap,
                         householdMembers = members,
                         linkedAccounts = linkedDetails,
-                        memberSummaries = memberSummaries
+                        defaultIncludedAccountIds = defaultIds,
+                        hasCustomAccountSelection = hasCustomSelection,
+                        includedAccountIds = includedIds,
+                        memberSummaries = memberSummaries,
+                        filteredHistoryPoints = RetirementAccountResolver.filterHistoryPoints(
+                            history = current.historyPoints,
+                            horizon = current.selectedHorizon,
+                            currentYear = currentYearString,
+                            customIncludedIds = customIds
+                        )
                     )
                 }
                 recalculate()
@@ -128,17 +172,25 @@ class RetirementViewModel(
         }
 
         vmScope.launch {
-            val history = repository.getRetirementHistory(1200)
+            val initialCustomIds = repository.preferences.value.retirementIncludedAccountIds?.toSet()
+            val history = repository.getRetirementHistory(1200, initialCustomIds)
             _uiState.update { current ->
+                val activeCustomIds = lastObservedCustomIds ?: initialCustomIds
                 cachedHistoryAge = current.currentAge
-                cachedBaseHistoryPoints = buildActualHistoryProjectionPoints(
-                    history = history,
+                cachedHistoryCustomIds = activeCustomIds
+                cachedBaseHistoryPoints = RetirementAccountResolver.buildActualHistoryProjectionPoints(
+                    history = RetirementAccountResolver.filterHistoryByAccounts(history, activeCustomIds),
                     currentAge = current.currentAge,
                     currentBalanceCents = current.currentBalanceCents
                 )
                 current.copy(
                     historyPoints = history,
-                    filteredHistoryPoints = filterHistoryPoints(history, current.selectedHorizon, currentYearString),
+                    filteredHistoryPoints = RetirementAccountResolver.filterHistoryPoints(
+                        history = history,
+                        horizon = current.selectedHorizon,
+                        currentYear = currentYearString,
+                        customIncludedIds = activeCustomIds
+                    ),
                     actualHistoryPoints = cachedBaseHistoryPoints
                 )
             }
@@ -253,7 +305,12 @@ class RetirementViewModel(
         _uiState.update { current ->
             current.copy(
                 selectedHorizon = horizon,
-                filteredHistoryPoints = filterHistoryPoints(current.historyPoints, horizon, currentYearString)
+                filteredHistoryPoints = RetirementAccountResolver.filterHistoryPoints(
+                    history = current.historyPoints,
+                    horizon = horizon,
+                    currentYear = currentYearString,
+                    customIncludedIds = lastObservedCustomIds
+                )
             )
         }
     }
@@ -264,6 +321,43 @@ class RetirementViewModel(
 
     fun dismissAssumptionsSheet() {
         _uiState.update { it.copy(showAssumptionsSheet = false) }
+    }
+
+    fun openIncludedAccountsSheet() {
+        _uiState.update { it.copy(showIncludedAccountsSheet = true) }
+    }
+
+    fun dismissIncludedAccountsSheet() {
+        _uiState.update { it.copy(showIncludedAccountsSheet = false) }
+    }
+
+    fun setIncludedAccounts(accountIds: List<Long>?) {
+        val normalized = accountIds?.distinct()?.sorted()
+        _uiState.update { it.copy(showIncludedAccountsSheet = false, currentBalanceOverridden = false) }
+        vmScope.launch {
+            val currentPrefs = repository.preferences.value
+            if (currentPrefs.retirementIncludedAccountIds != normalized) {
+                repository.updatePreferences(currentPrefs.copy(retirementIncludedAccountIds = normalized))
+            }
+            if (repository.storageMode.value != StorageMode.SELF_HOSTED) {
+                val customSet = normalized?.toSet()
+                val refreshed = repository.getRetirementHistory(1200, customSet)
+                cachedHistoryAge = Double.NaN
+                _uiState.update { cur ->
+                    val filtered = RetirementAccountResolver.filterHistoryPoints(
+                        history = refreshed,
+                        horizon = cur.selectedHorizon,
+                        currentYear = currentYearString,
+                        customIncludedIds = customSet
+                    )
+                    cur.copy(
+                        historyPoints = refreshed,
+                        filteredHistoryPoints = filtered
+                    )
+                }
+                recalculate()
+            }
+        }
     }
 
     fun openAmountEditor(field: RetirementAmountField) {
@@ -341,10 +435,11 @@ class RetirementViewModel(
         if (history.isEmpty() && cachedBaseHistoryPoints.isEmpty()) {
             return listOf(ProjectionPoint(currentAge, currentBalanceCents))
         }
-        if (cachedHistoryAge != currentAge) {
+        if (cachedHistoryAge != currentAge || cachedHistoryCustomIds != lastObservedCustomIds) {
             cachedHistoryAge = currentAge
-            cachedBaseHistoryPoints = buildActualHistoryProjectionPoints(
-                history = history,
+            cachedHistoryCustomIds = lastObservedCustomIds
+            cachedBaseHistoryPoints = RetirementAccountResolver.buildActualHistoryProjectionPoints(
+                history = RetirementAccountResolver.filterHistoryByAccounts(history, lastObservedCustomIds),
                 currentAge = currentAge,
                 currentBalanceCents = currentBalanceCents
             )
@@ -359,217 +454,5 @@ class RetirementViewModel(
             updated.add(ProjectionPoint(currentAge, currentBalanceCents))
         }
         return updated
-    }
-
-    companion object {
-        private data class MemberContributionBreakdown(
-            val employeeSavingsCents: Cents,
-            val employerMatchCents: Cents,
-            val matchCapReached: Boolean,
-            val hsaCents: Cents,
-            val totalAnnualCents: Cents
-        )
-
-        private fun computeMemberBreakdown(member: HouseholdMember): MemberContributionBreakdown {
-            val gross = member.grossIncomeAnnualCents
-            val empPct = member.employeeContributionPercent ?: 0.0
-            val empContribCents = if (member.employeeContributionAnnualCents > 0L) {
-                member.employeeContributionAnnualCents
-            } else if (empPct > 0.0 && gross > 0L) {
-                ((gross.toDouble() * empPct) / 100.0).roundToLong()
-            } else 0L
-
-            val matchPct = member.employerMatchPercent
-            val matchLimitPct = member.employerMatchLimitPercent
-            val matchCap = member.employerMatchAnnualCapCents
-            val eligiblePct = if (matchLimitPct > 0.0) min(empPct, matchLimitPct) else empPct
-            val matchRate = if (matchPct > 0.0) matchPct / 100.0 else 0.0
-            val uncappedMatchCents = if (eligiblePct > 0.0 && gross > 0L) {
-                ((gross.toDouble() * eligiblePct / 100.0) * matchRate).roundToLong()
-            } else 0L
-            val matchCapReached = matchCap > 0L && uncappedMatchCents > matchCap
-            val matchCents = if (matchCap > 0L) min(matchCap, uncappedMatchCents) else uncappedMatchCents
-            val hsaCents = member.hsaContributionAnnualCents
-            return MemberContributionBreakdown(
-                employeeSavingsCents = empContribCents,
-                employerMatchCents = matchCents,
-                matchCapReached = matchCapReached,
-                hsaCents = hsaCents,
-                totalAnnualCents = empContribCents + matchCents + hsaCents
-            )
-        }
-
-        fun calculateMemberRetirementAnnual(member: HouseholdMember): Cents =
-            computeMemberBreakdown(member).totalAnnualCents
-
-        fun buildMemberSummaries(
-            members: List<HouseholdMember>,
-            accountMap: Map<Long, Account>
-        ): List<MemberRetirementSummary> {
-            return members.map { member ->
-                val breakdown = computeMemberBreakdown(member)
-                val payPeriods = if (member.payPeriodsPerYear > 0.0) member.payPeriodsPerYear else 26.0
-                val perPaycheck = (breakdown.totalAnnualCents.toDouble() / payPeriods).roundToLong()
-                val chips = member.retirementAccounts.map { link ->
-                    val acct = accountMap[link.accountId]
-                    val labelSource = link.accountKind.ifBlank { acct?.name ?: "" }
-                    LinkedAccountChip(
-                        id = link.accountId,
-                        displayKind = classifyPlanKind(labelSource),
-                        name = acct?.name ?: "Account #${link.accountId}"
-                    )
-                }
-                MemberRetirementSummary(
-                    memberId = member.id,
-                    name = member.name,
-                    employer = member.employer,
-                    payFrequencyLabel = member.payFrequency.replaceFirstChar { it.uppercase() },
-                    perPaycheckCents = perPaycheck,
-                    annualEmployeeSavingsCents = breakdown.employeeSavingsCents,
-                    annualEmployerMatchCents = breakdown.employerMatchCents,
-                    matchCapReached = breakdown.matchCapReached,
-                    annualHsaCents = breakdown.hsaCents,
-                    annualTotalCents = breakdown.totalAnnualCents,
-                    linkedAccounts = chips
-                )
-            }
-        }
-
-        fun filterHistoryPoints(
-            history: List<RetirementHistoryPoint>,
-            horizon: String,
-            currentYear: String
-        ): List<RetirementHistoryPoint> {
-            return when (horizon) {
-                "YTD" -> history.filter { it.month.startsWith(currentYear) }.ifEmpty { history.takeLast(12) }
-                "3Y" -> history.takeLast(36)
-                "5Y" -> history.takeLast(60)
-                "10Y" -> history.takeLast(120)
-                else -> history
-            }
-        }
-
-        fun classifyPlanKind(nameOrKind: String): String =
-            RetirementCalculatorEngine.formatPlanKindLabel(nameOrKind)
-
-        fun buildLinkedAccountDetails(
-            members: List<HouseholdMember>,
-            accounts: List<Account>,
-            investments: List<Account>,
-            goals: List<app.overbay.orbit.data.model.Goal>
-        ): List<LinkedRetirementAccountDetail> {
-            val accountMap = accounts.associateBy { it.id }
-            val list = mutableListOf<LinkedRetirementAccountDetail>()
-            var colorIndex = 0
-
-            // 1. Check member retirement accounts
-            members.forEach { member ->
-                member.retirementAccounts.forEach { ra ->
-                    val acct = accountMap[ra.accountId]
-                    val planKind = classifyPlanKind(ra.accountKind.ifBlank { acct?.name ?: "" })
-                    val balance = acct?.currentBalanceCents ?: 0L
-                    list.add(
-                        LinkedRetirementAccountDetail(
-                            id = ra.accountId,
-                            accountId = ra.accountId,
-                            name = acct?.name ?: "Retirement Account #${ra.accountId}",
-                            ownerName = member.name,
-                            planKind = planKind,
-                            institution = acct?.institution,
-                            balanceCents = max(0L, balance),
-                            colorIndex = colorIndex++
-                        )
-                    )
-                }
-            }
-            if (list.isNotEmpty()) return list
-
-            // 2. Check general investment accounts
-            if (investments.isNotEmpty()) {
-                investments.forEach { acct ->
-                    list.add(
-                        LinkedRetirementAccountDetail(
-                            id = acct.id,
-                            accountId = acct.id,
-                            name = acct.name,
-                            ownerName = null,
-                            planKind = classifyPlanKind(acct.name),
-                            institution = acct.institution,
-                            balanceCents = max(0L, acct.currentBalanceCents),
-                            colorIndex = colorIndex++
-                        )
-                    )
-                }
-                return list
-            }
-
-            // 3. Fallback to goal named "Retirement"
-            val retirementGoal = goals.find { it.name.trim().equals("retirement", ignoreCase = true) }
-            if (retirementGoal != null) {
-                if (retirementGoal.allocations.isNotEmpty()) {
-                    retirementGoal.allocations.forEach { alloc ->
-                        val acct = accountMap[alloc.accountId]
-                        list.add(
-                            LinkedRetirementAccountDetail(
-                                id = alloc.id,
-                                accountId = alloc.accountId,
-                                name = alloc.accountName.ifBlank { acct?.name ?: "Retirement Allocation" },
-                                ownerName = null,
-                                planKind = classifyPlanKind(alloc.accountName),
-                                institution = acct?.institution,
-                                balanceCents = max(0L, alloc.currentAmountCents),
-                                colorIndex = colorIndex++
-                            )
-                        )
-                    }
-                } else if (retirementGoal.currentAmountCents > 0L) {
-                    list.add(
-                        LinkedRetirementAccountDetail(
-                            id = retirementGoal.id,
-                            accountId = retirementGoal.linkedAccountId,
-                            name = retirementGoal.name,
-                            ownerName = null,
-                            planKind = "Retirement Goal",
-                            institution = null,
-                            balanceCents = retirementGoal.currentAmountCents,
-                            colorIndex = colorIndex
-                        )
-                    )
-                }
-            }
-
-            return list
-        }
-
-        fun buildActualHistoryProjectionPoints(
-            history: List<RetirementHistoryPoint>,
-            currentAge: Double,
-            currentBalanceCents: Cents
-        ): List<ProjectionPoint> {
-            val today = LocalDateUtils.todayLocalDate()
-            val result = mutableListOf<ProjectionPoint>()
-
-            history.forEach { pt ->
-                val year = pt.month.take(4).toIntOrNull()
-                val month = pt.month.drop(5).take(2).toIntOrNull()
-                if (year != null && month != null) {
-                    val monthDiff = (today.year - year) * 12 + (today.monthNumber - month)
-                    val age = currentAge - (monthDiff.toDouble() / 12.0)
-                    if (age <= currentAge + 0.05) {
-                        result.add(ProjectionPoint(age, pt.balanceCents))
-                    }
-                }
-            }
-
-            result.sortBy { it.age }
-
-            // Ensure today point is present
-            if (result.none { kotlin.math.abs(it.age - currentAge) < 0.08 }) {
-                result.add(ProjectionPoint(currentAge, currentBalanceCents))
-                result.sortBy { it.age }
-            }
-
-            return result
-        }
     }
 }

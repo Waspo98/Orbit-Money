@@ -56,6 +56,8 @@ fun RetirementAccountsListCard(
     uiState: RetirementUiState,
     onEditStartingBalance: () -> Unit,
     onResetCurrentBalance: () -> Unit,
+    onChooseIncludedAccounts: () -> Unit,
+    onResetToAutoAccounts: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
@@ -68,7 +70,9 @@ fun RetirementAccountsListCard(
 
     OrbitSectionCard(
         title = "Connected Portfolio Sources",
-        subtitle = "Linked investment accounts and starting balance override",
+        subtitle = "Accounts included in projections and starting balance override",
+        actionText = "Choose",
+        onActionClick = onChooseIncludedAccounts,
         modifier = modifier
     ) {
         // Starting Portfolio Summary + Override Action
@@ -87,9 +91,17 @@ fun RetirementAccountsListCard(
             ) {
                 Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                     Text(
-                        text = if (uiState.currentBalanceOverridden) "Starting Balance (Override)" else "Connected Portfolio Total",
+                        text = if (uiState.currentBalanceOverridden) {
+                            "Starting Balance (Override)"
+                        } else if (uiState.hasCustomAccountSelection) {
+                            "Custom Selection Total (${linkedAccounts.size})"
+                        } else {
+                            "Connected Portfolio Total (${linkedAccounts.size})"
+                        },
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         text = MoneyUtils.formatCents(uiState.currentBalanceCents, showCents = false),
@@ -98,6 +110,17 @@ fun RetirementAccountsListCard(
                     )
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (uiState.hasCustomAccountSelection && !uiState.currentBalanceOverridden) {
+                        TextButton(
+                            onClick = {
+                                haptics.tick()
+                                onResetToAutoAccounts()
+                            },
+                            modifier = Modifier.height(34.dp)
+                        ) {
+                            Text("Auto", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
                     if (uiState.currentBalanceOverridden) {
                         TextButton(
                             onClick = {
@@ -128,8 +151,14 @@ fun RetirementAccountsListCard(
 
         if (linkedAccounts.isEmpty()) {
             EmptyStateCard(
-                title = "No Linked Retirement Accounts",
-                description = "Link investment accounts or assign a member retirement plan to track real balances automatically."
+                title = if (uiState.hasCustomAccountSelection) "No Accounts Included" else "No Linked Retirement Accounts",
+                description = if (uiState.hasCustomAccountSelection) {
+                    "No accounts are currently selected for retirement projections."
+                } else {
+                    "Choose specific accounts to include, or link investment accounts to a household member."
+                },
+                actionButtonText = "Choose Accounts",
+                onActionClick = onChooseIncludedAccounts
             )
         } else {
             if (totalLinkedBalance > 0L) {

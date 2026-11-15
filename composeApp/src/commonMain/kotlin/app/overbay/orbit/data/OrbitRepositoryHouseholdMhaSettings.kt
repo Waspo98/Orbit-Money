@@ -199,14 +199,18 @@ suspend fun OrbitRepository.addHouseholdIncomeRecord(record: HouseholdIncomeReco
     }
 }
 
-suspend fun OrbitRepository.getRetirementHistory(months: Int = 1200): List<RetirementHistoryPoint> {
+suspend fun OrbitRepository.getRetirementHistory(
+    months: Int = 1200,
+    customAccountIds: Set<Long>? = null
+): List<RetirementHistoryPoint> {
     if (storageMode.value == StorageMode.SELF_HOSTED) {
         val remote = createApiClient().getRetirementHistoryRemote(months).getOrNull()
         if (remote != null) return remote
     }
 
-    val linkedAccountIds = snapshot.value.retirementAccountLinks.map { it.accountId }.toSet()
-        .ifEmpty { accounts.value.filter { it.type == AccountType.INVESTMENT }.map { it.id }.toSet() }
+    val linkedAccountIds = customAccountIds
+        ?: snapshot.value.retirementAccountLinks.map { it.accountId }.toSet()
+            .ifEmpty { accounts.value.filter { it.type == AccountType.INVESTMENT }.map { it.id }.toSet() }
     val allBalRecords = snapshot.value.balanceRecords.filter { it.accountId in linkedAccountIds }
     val monthsSet = allBalRecords.map { it.recordDate.take(7) }.filter { it.length == 7 }.toSet()
         .ifEmpty { transactions.value.map { it.effectiveDate.take(7) }.filter { it.length == 7 }.toSet() }

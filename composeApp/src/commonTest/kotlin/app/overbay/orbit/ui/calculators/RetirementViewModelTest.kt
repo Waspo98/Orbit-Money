@@ -5,8 +5,11 @@ import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.data.model.HouseholdMember
 import app.overbay.orbit.data.model.HouseholdRetirementAccount
+import app.overbay.orbit.data.model.RetirementAccountMonthBalance
+import app.overbay.orbit.data.model.RetirementHistoryPoint
 import app.overbay.orbit.data.model.RetirementScenarioPreset
 import app.overbay.orbit.data.model.RetirementTargetMode
+import app.overbay.orbit.ui.calculators.retirement.RetirementAccountResolver
 import app.overbay.orbit.ui.calculators.retirement.RetirementAmountField
 import app.overbay.orbit.ui.calculators.retirement.RetirementViewModel
 import app.overbay.orbit.ui.calculators.retirement.RetirementWorkspaceTab
@@ -213,5 +216,93 @@ class RetirementViewModelTest {
         assertEquals(0L, funded.fundingGapCents)
         assertEquals(0L, funded.monthlySavingsGapCents)
         assertTrue(funded.readinessPercent >= 100.0)
+    }
+
+    @Test
+    fun testCustomIncludedAccounts_updatesBalancesHsaSplitAndResetsToAuto() = runTest(testDispatcher) {
+        repository.saveAccount(
+            Account(id = 10L, name = "Campus 403b", type = AccountType.INVESTMENT, currentBalanceCents = 40_000_00L)
+        )
+        repository.saveAccount(
+            Account(id = 11L, name = "Taxable Brokerage", type = AccountType.INVESTMENT, currentBalanceCents = 25_000_00L)
+        )
+        repository.saveAccount(
+            Account(id = 12L, name = "HealthEquity HSA", type = AccountType.SAVINGS, currentBalanceCents = 10_000_00L)
+        )
+        repository.saveHouseholdMember(
+            HouseholdMember(
+                id = 1L,
+                name = "Jordan",
+                role = "adult",
+                retirementAccounts = listOf(
+                    HouseholdRetirementAccount(memberId = 1L, accountId = 10L, accountKind = "403b")
+                )
+            )
+        )
+        testScheduler.advanceUntilIdle()
+
+        // Auto default uses only Household link (403b = $40k)
+        val initial = viewModel.uiState.value
+        assertFalse(initial.hasCustomAccountSelection)
+        assertEquals(setOf(10L), initial.includedAccountIds)
+        assertEquals(40_000_00L, initial.currentBalanceCents)
+        assertEquals(0L, initial.hsaCurrentBalanceCents)
+
+        // Include 403b + unlinked HSA savings account
+        viewModel.openIncludedAccountsSheet()
+        assertTrue(viewModel.uiState.value.showIncludedAccountsSheet)
+
+        viewModel.setIncludedAccounts(listOf(10L, 12L))
+        testScheduler.advanceUntilIdle()
+
+        val custom = viewModel.uiState.value
+        assertFalse(custom.showIncludedAccountsSheet)
+        assertTrue(custom.hasCustomAccountSelection)
+        assertEquals(setOf(10L, 12L), custom.includedAccountIds)
+        assertEquals(50_000_00L, custom.connectedBalanceCents)
+        assertEquals(50_000_00L, custom.currentBalanceCents)
+        assertEquals(10_000_00L, custom.hsaCurrentBalanceCents)
+        assertEquals(40_000_00L, custom.nonHsaCurrentBalanceCents)
+        assertEquals(listOf(10L, 12L), repository.preferences.value.retirementIncludedAccountIds)
+
+        // Explicit empty selection drops connected & starting balance to $0
+        viewModel.setIncludedAccounts(emptyList())
+        testScheduler.advanceUntilIdle()
+        val emptyState = viewModel.uiState.value
+        assertTrue(emptyState.hasCustomAccountSelection)
+        assertTrue(emptyState.linkedAccounts.isEmpty())
+        assertEquals(0L, emptyState.currentBalanceCents)
+
+        // Reset back to Auto Default restores $40k Household link
+        viewModel.setIncludedAccounts(null)
+        testScheduler.advanceUntilIdle()
+        val reset = viewModel.uiState.value
+        assertFalse(reset.hasCustomAccountSelection)
+        assertEquals(setOf(10L), reset.includedAccountIds)
+        assertEquals(40_000_00L, reset.currentBalanceCents)
+        assertNull(repository.preferences.value.retirementIncludedAccountIds)
+    }
+
+    @Test
+    fun testFilterHistoryByAccounts_resumsMatchingAccountsOnly() {
+        val raw = listOf(
+            RetirementHistoryPoint(
+                month = "2026-10",
+                balanceCents = 34_000_00L,
+                accounts = listOf(
+                    RetirementAccountMonthBalance(accountId = 10L, balanceCents = 24_000_00L),
+                    RetirementAccountMonthBalance(accountId = 11L, balanceCents = 10_000_00L)
+                )
+            )
+        )
+        val filtered = RetirementAccountResolver.filterHistoryPoints(
+            history = raw,
+            horizon = "All",
+            currentYear = "2026",
+            customIncludedIds = setOf(11L)
+        )
+        assertEquals(1, filtered.size)
+        assertEquals(10_000_00L, filtered.first().balanceCents)
+        assertEquals(listOf(11L), filtered.first().accounts.map { it.accountId })
     }
 }

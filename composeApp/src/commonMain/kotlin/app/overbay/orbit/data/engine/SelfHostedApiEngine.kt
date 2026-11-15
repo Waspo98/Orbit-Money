@@ -174,6 +174,9 @@ class SelfHostedApiEngine(
             dismissedClosurePrompts = remotePrefs?.prefOr("dismissedClosurePrompts", currentPrefs.dismissedClosurePrompts) ?: currentPrefs.dismissedClosurePrompts,
             accountInstitutionLogoOverrides = remotePrefs?.prefOr("accountInstitutionLogoOverrides", currentPrefs.accountInstitutionLogoOverrides) ?: currentPrefs.accountInstitutionLogoOverrides,
             includeHsaInRetirementRate = remotePrefs?.prefOr("includeHsaInRetirementRate", currentPrefs.includeHsaInRetirementRate) ?: currentPrefs.includeHsaInRetirementRate,
+            retirementIncludedAccountIds = if (remotePrefs != null) {
+                remotePrefs.prefOr<List<Long>?>("retirementIncludedAccountIds", currentPrefs.retirementIncludedAccountIds)
+            } else currentPrefs.retirementIncludedAccountIds,
             notificationPreferences = remotePrefs?.prefOr("notificationPreferences", currentPrefs.notificationPreferences) ?: currentPrefs.notificationPreferences,
             transactionPinnedActions = remotePrefs?.prefOr("transactionPinnedActions", currentPrefs.transactionPinnedActions) ?: currentPrefs.transactionPinnedActions,
             transactionActionOrder = remotePrefs?.prefOr("transactionActionOrder", currentPrefs.transactionActionOrder) ?: currentPrefs.transactionActionOrder,
@@ -435,6 +438,9 @@ class SelfHostedApiEngine(
             map["dashboardRetirementAge"] = JsonPrimitive(preferences.dashboardRetirementAge)
             map["dashboardRetirementPreset"] = JsonPrimitive(preferences.dashboardRetirementPreset)
             map["includeHsaInRetirementRate"] = JsonPrimitive(preferences.includeHsaInRetirementRate)
+            map["retirementIncludedAccountIds"] = preferences.retirementIncludedAccountIds?.let {
+                json.encodeToJsonElement(it)
+            } ?: JsonNull
             preferences.dashboardFocusedGoalId?.let { map["dashboardFocusedGoalId"] = JsonPrimitive(it) }
             preferences.simpleFinCutoverDate?.let { map["simpleFinCutoverDate"] = JsonPrimitive(it) }
             map["hiddenRouteNames"] = json.encodeToJsonElement(preferences.hiddenRouteNames)

@@ -53,6 +53,7 @@ fun AssumptionsSheet(
     onSetCurrentBalance: (Cents) -> Unit,
     onResetCurrentBalance: () -> Unit,
     onSetRunwayEndAge: (Double) -> Unit,
+    onOpenIncludedAccounts: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -238,20 +239,37 @@ fun AssumptionsSheet(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
-                    if (uiState.currentBalanceOverridden) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                         OutlinedButton(
                             onClick = {
                                 haptics.tick()
-                                onResetCurrentBalance()
+                                onDismiss()
+                                onOpenIncludedAccounts()
                             },
                             border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
                             contentPadding = ButtonDefaults.TextButtonContentPadding,
                             modifier = Modifier.height(30.dp)
                         ) {
                             Text(
-                                text = "Use Linked (${MoneyUtils.formatCompactCents(uiState.connectedBalanceCents)})",
+                                text = "Accounts (${uiState.linkedAccounts.size})",
                                 style = MaterialTheme.typography.labelSmall
                             )
+                        }
+                        if (uiState.currentBalanceOverridden) {
+                            OutlinedButton(
+                                onClick = {
+                                    haptics.tick()
+                                    onResetCurrentBalance()
+                                },
+                                border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
+                                contentPadding = ButtonDefaults.TextButtonContentPadding,
+                                modifier = Modifier.height(30.dp)
+                            ) {
+                                Text(
+                                    text = "Use Linked (${MoneyUtils.formatCompactCents(uiState.connectedBalanceCents)})",
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                            }
                         }
                     }
                 }

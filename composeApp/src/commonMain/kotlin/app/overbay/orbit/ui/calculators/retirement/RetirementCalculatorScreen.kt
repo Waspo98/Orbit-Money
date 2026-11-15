@@ -33,6 +33,7 @@ import app.overbay.orbit.ui.calculators.retirement.cards.RetirementRunwayCard
 import app.overbay.orbit.ui.calculators.retirement.cards.WhatIfSandboxCard
 import app.overbay.orbit.ui.calculators.retirement.components.QuickAmountSheet
 import app.overbay.orbit.ui.calculators.retirement.dialogs.AssumptionsSheet
+import app.overbay.orbit.ui.calculators.retirement.dialogs.IncludedAccountsSheet
 import app.overbay.orbit.ui.components.CanopyIconButton
 import app.overbay.orbit.ui.components.CanopySurfacePill
 import app.overbay.orbit.ui.components.MorphingPageHero
@@ -71,6 +72,9 @@ fun RetirementCalculatorScreen(
             onSelectHorizon = viewModel::setSelectedHorizon,
             onOpenAssumptionsSheet = viewModel::openAssumptionsSheet,
             onDismissAssumptionsSheet = viewModel::dismissAssumptionsSheet,
+            onOpenIncludedAccountsSheet = viewModel::openIncludedAccountsSheet,
+            onDismissIncludedAccountsSheet = viewModel::dismissIncludedAccountsSheet,
+            onSetIncludedAccounts = viewModel::setIncludedAccounts,
             onOpenAmountEditor = viewModel::openAmountEditor,
             onDismissAmountEditor = viewModel::dismissAmountEditor,
             onCommitAmountEditor = viewModel::commitAmountEditor
@@ -231,7 +235,16 @@ fun RetirementCalculatorContent(
                 onSetCurrentBalance = actions.onSetCurrentBalance,
                 onResetCurrentBalance = actions.onResetCurrentBalance,
                 onSetRunwayEndAge = actions.onSetRunwayEndAge,
+                onOpenIncludedAccounts = actions.onOpenIncludedAccountsSheet,
                 onDismiss = actions.onDismissAssumptionsSheet
+            )
+        }
+
+        if (uiState.showIncludedAccountsSheet) {
+            IncludedAccountsSheet(
+                uiState = uiState,
+                onApply = actions.onSetIncludedAccounts,
+                onDismiss = actions.onDismissIncludedAccountsSheet
             )
         }
 
@@ -298,7 +311,9 @@ private fun LazyListScope.activeTabItems(
                 RetirementAccountsListCard(
                     uiState = uiState,
                     onEditStartingBalance = { actions.onOpenAmountEditor(RetirementAmountField.STARTING_BALANCE) },
-                    onResetCurrentBalance = actions.onResetCurrentBalance
+                    onResetCurrentBalance = actions.onResetCurrentBalance,
+                    onChooseIncludedAccounts = actions.onOpenIncludedAccountsSheet,
+                    onResetToAutoAccounts = { actions.onSetIncludedAccounts(null) }
                 )
             }
             item(key = "member_breakdown", contentType = "members") {
