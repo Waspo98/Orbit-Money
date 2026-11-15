@@ -74,6 +74,8 @@ data class AccountsUiState(
     val historyAccount: Account? = null,
     val showHistorySheet: Boolean = false,
     val historyBalanceRecords: List<BalanceRecord> = emptyList(),
+    val historyChangedBalanceRecords: List<BalanceRecord> = emptyList(),
+    val showAllBalanceSnapshots: Boolean = false,
     val showAddRecordDialog: Boolean = false,
     val addRecordAccount: Account? = null,
     val isPhoneViewingDetail: Boolean = false,
@@ -122,4 +124,10 @@ data class AccountsUiState(
 
     val cardProfileAccountId: Long?
         get() = cardEditorDraft?.accountId
+
+    val displayedBalanceRecords: List<BalanceRecord>
+        get() = if (showAllBalanceSnapshots) historyBalanceRecords else historyChangedBalanceRecords
+
+    val unchangedBalanceSnapshotCount: Int
+        get() = (historyBalanceRecords.size - historyChangedBalanceRecords.size).coerceAtLeast(0)
 }

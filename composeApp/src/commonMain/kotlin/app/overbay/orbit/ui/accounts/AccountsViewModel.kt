@@ -10,6 +10,7 @@ import app.overbay.orbit.data.engine.SyncResult
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.data.model.BalanceRecord
+import app.overbay.orbit.data.model.CardBenefit
 import app.overbay.orbit.data.model.CreditCardProfile
 import app.overbay.orbit.data.model.OrbitPreferences
 import app.overbay.orbit.data.model.OrbitWorkspaceSnapshot
@@ -20,6 +21,8 @@ import app.overbay.orbit.data.setCardBenefitUsage
 import app.overbay.orbit.data.setAccountArchived
 import app.overbay.orbit.data.unlinkSimpleFinAccount
 import app.overbay.orbit.domain.AccountClosureDetector
+import app.overbay.orbit.domain.BalanceHistoryEngine
+import app.overbay.orbit.domain.BenefitPeriod
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.CreditCardBenefitEngine
 import app.overbay.orbit.domain.CreditCardStrategyEngine
@@ -60,6 +63,7 @@ class AccountsViewModel(
     private val _showMergeDialog = MutableStateFlow(false)
     private val _historyAccount = MutableStateFlow<Account?>(null)
     private val _showHistorySheet = MutableStateFlow(false)
+    private val _showAllBalanceSnapshots = MutableStateFlow(false)
     private val _showAddRecordDialog = MutableStateFlow(false)
     private val _addRecordAccount = MutableStateFlow<Account?>(null)
     private val _activeDetailTab = MutableStateFlow(AccountDetailTab.TRANSACTIONS)
@@ -152,6 +156,7 @@ class AccountsViewModel(
             data.workspaceSnapshot.balanceRecords.filter { it.accountId == activeTxnsAccountId }
                 .sortedWith(compareByDescending<BalanceRecord> { it.recordDate }.thenByDescending { it.id })
         } else emptyList()
+        val changedHistoryRecords = BalanceHistoryEngine.filterBalanceChanges(historyRecords)
 
         val hasRewardsData = data.accounts.any { acct ->
             val strat = acct.creditCardProfile?.strategy
@@ -178,7 +183,9 @@ class AccountsViewModel(
             householdMembers = data.workspaceSnapshot.householdMembers,
             mergingAccount = action.mergingAccount, showMergeDialog = action.showMergeDialog,
             historyAccount = action.historyAccount, showHistorySheet = action.showHistorySheet,
-            historyBalanceRecords = historyRecords, showAddRecordDialog = addRecord.showAddRecordDialog,
+            historyBalanceRecords = historyRecords,
+            historyChangedBalanceRecords = changedHistoryRecords,
+            showAddRecordDialog = addRecord.showAddRecordDialog,
             addRecordAccount = addRecord.addRecordAccount, accountGroupWideSpans = data.preferences.accountGroupWideSpans,
             isSyncing = syncReorder.syncing, syncErrorMessage = syncReorder.err, isLoading = false,
             mhaEnabled = data.preferences.mhaTrackerEnabled,
@@ -187,6 +194,7 @@ class AccountsViewModel(
             closureCandidates = closureCandidates
         )
     }.combine(_isPhoneViewingDetail) { state, phoneDetail -> state.copy(isPhoneViewingDetail = phoneDetail)
+    }.combine(_showAllBalanceSnapshots) { state, showAll -> state.copy(showAllBalanceSnapshots = showAll)
     }.combine(_perkUsageTarget) { state, target -> state.copy(perkUsageTarget = target)
     }.combine(accountLogos.logoFinderAccount) { state, acct ->
         state.copy(logoFinderAccount = acct?.let { target -> state.accounts.find { it.id == target.id } ?: target })
@@ -266,15 +274,20 @@ class AccountsViewModel(
 
     fun getAccountTransactionCount(accountId: Long): Int = repository.accountTransactionCount(accountId)
 
-    fun openAccountDeepLink(accountId: Long) {
-        _selectedAccountId.value = accountId
+    private fun clearInspectorOverlays() {
         _activeDetailTab.value = AccountDetailTab.TRANSACTIONS
         _showEditorSheet.value = false
         _editingAccount.value = null
         cardEditor.clearDraft()
         _showHistorySheet.value = false
         _historyAccount.value = null
+        _showAllBalanceSnapshots.value = false
         _showAddRecordDialog.value = false
+    }
+
+    fun openAccountDeepLink(accountId: Long) {
+        _selectedAccountId.value = accountId
+        clearInspectorOverlays()
     }
 
     fun selectAccountForInspect(accountId: Long?) {
@@ -282,27 +295,16 @@ class AccountsViewModel(
             !_showEditorSheet.value && cardEditor.draft.value == null &&
             !_showHistorySheet.value && !_showAddRecordDialog.value) {
             _selectedAccountId.value = null
+            _showAllBalanceSnapshots.value = false
         } else {
             _selectedAccountId.value = accountId
-            _activeDetailTab.value = AccountDetailTab.TRANSACTIONS
-            _showEditorSheet.value = false
-            _editingAccount.value = null
-            cardEditor.clearDraft()
-            _showHistorySheet.value = false
-            _historyAccount.value = null
-            _showAddRecordDialog.value = false
+            clearInspectorOverlays()
         }
     }
 
     fun dismissInspectorPane() {
         _selectedAccountId.value = null
-        _activeDetailTab.value = AccountDetailTab.TRANSACTIONS
-        _showEditorSheet.value = false
-        _editingAccount.value = null
-        cardEditor.clearDraft()
-        _showHistorySheet.value = false
-        _historyAccount.value = null
-        _showAddRecordDialog.value = false
+        clearInspectorOverlays()
     }
 
     fun openAddAccount(defaultType: AccountType = AccountType.CHECKING) {
@@ -447,14 +449,20 @@ class AccountsViewModel(
         }
     }
 
-    fun setCardBenefitUsage(accountId: Long, benefitId: String, amountCents: Cents?) {
-        val account = uiState.value.accounts.find { it.id == accountId } ?: return
-        val rawProfile = account.creditCardProfile ?: return
+    private fun resolveCardBenefitContext(
+        accountId: Long,
+        benefitId: String
+    ): Triple<LocalDate, CardBenefit, BenefitPeriod>? {
+        val rawProfile = uiState.value.accounts.find { it.id == accountId }?.creditCardProfile ?: return null
         val today = LocalDateUtils.todayLocalDate()
         val profile = CreditCardBenefitEngine.upgradeProfile(rawProfile, today)
-        val benefit = profile.benefits.find { it.id == benefitId } ?: return
+        val benefit = profile.benefits.find { it.id == benefitId } ?: return null
         val opened = profile.strategy.openedDate?.let { LocalDateUtils.parseIsoDate(it) }
-        val period = CreditCardBenefitEngine.currentPeriod(benefit, opened, today)
+        return Triple(today, benefit, CreditCardBenefitEngine.currentPeriod(benefit, opened, today))
+    }
+
+    fun setCardBenefitUsage(accountId: Long, benefitId: String, amountCents: Cents?) {
+        val (today, _, period) = resolveCardBenefitContext(accountId, benefitId) ?: return
         viewModelScope.launch {
             repository.setCardBenefitUsage(
                 accountId = accountId,
@@ -469,13 +477,7 @@ class AccountsViewModel(
     }
 
     fun toggleCardBenefit(accountId: Long, benefitId: String) {
-        val account = uiState.value.accounts.find { it.id == accountId } ?: return
-        val rawProfile = account.creditCardProfile ?: return
-        val today = LocalDateUtils.todayLocalDate()
-        val profile = CreditCardBenefitEngine.upgradeProfile(rawProfile, today)
-        val benefit = profile.benefits.find { it.id == benefitId } ?: return
-        val opened = profile.strategy.openedDate?.let { LocalDateUtils.parseIsoDate(it) }
-        val period = CreditCardBenefitEngine.currentPeriod(benefit, opened, today)
+        val (_, benefit, period) = resolveCardBenefitContext(accountId, benefitId) ?: return
         val used = CreditCardBenefitEngine.usedCents(benefit, period)
         val periodValue = CreditCardBenefitEngine.periodValueCents(benefit)
         val targetAmount = if (used > 0L) null else if (periodValue > 0L) periodValue else 1L
@@ -483,27 +485,19 @@ class AccountsViewModel(
     }
 
     fun openPerkUsage(accountId: Long, benefitId: String) {
-        val account = uiState.value.accounts.find { it.id == accountId }
-        val rawProfile = account?.creditCardProfile
-        val today = LocalDateUtils.todayLocalDate()
-        val profile = rawProfile?.let { CreditCardBenefitEngine.upgradeProfile(it, today) }
-        val benefit = profile?.benefits?.find { it.id == benefitId }
-        if (benefit != null && CreditCardBenefitEngine.periodValueCents(benefit) <= 0L) {
+        val (_, benefit, period) = resolveCardBenefitContext(accountId, benefitId) ?: return
+        val periodValue = CreditCardBenefitEngine.periodValueCents(benefit)
+        if (periodValue <= 0L) {
             toggleCardBenefit(accountId, benefitId)
             return
         }
-        val (periodLabel, used, value) = if (benefit != null && profile != null) {
-            val opened = profile.strategy.openedDate?.let { LocalDateUtils.parseIsoDate(it) }
-            val p = CreditCardBenefitEngine.currentPeriod(benefit, opened, today)
-            Triple(p.label, CreditCardBenefitEngine.usedCents(benefit, p), CreditCardBenefitEngine.periodValueCents(benefit))
-        } else Triple("", 0L, 0L)
         _perkUsageTarget.value = PerkUsageTarget(
             accountId = accountId,
             benefitId = benefitId,
-            title = benefit?.title.orEmpty(),
-            periodLabel = periodLabel,
-            valueCents = value,
-            initialUsedCents = used
+            title = benefit.title,
+            periodLabel = period.label,
+            valueCents = periodValue,
+            initialUsedCents = CreditCardBenefitEngine.usedCents(benefit, period)
         )
     }
 
@@ -537,6 +531,9 @@ class AccountsViewModel(
     }
 
     fun openBalanceHistory(account: Account) {
+        if (_selectedAccountId.value != account.id && _historyAccount.value?.id != account.id) {
+            _showAllBalanceSnapshots.value = false
+        }
         _selectedAccountId.value = account.id
         _showEditorSheet.value = false
         cardEditor.clearDraft()
@@ -552,6 +549,10 @@ class AccountsViewModel(
             _showHistorySheet.value = false
             _historyAccount.value = null
         }
+    }
+
+    fun toggleShowAllBalanceSnapshots() {
+        _showAllBalanceSnapshots.value = !_showAllBalanceSnapshots.value
     }
 
     fun closeBalanceHistory() {

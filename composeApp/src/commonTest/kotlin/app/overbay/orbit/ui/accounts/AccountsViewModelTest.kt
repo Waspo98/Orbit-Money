@@ -1,6 +1,7 @@
 package app.overbay.orbit.ui.accounts
 
 import app.overbay.orbit.data.OrbitRepository
+import app.overbay.orbit.data.addBalanceRecord
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.data.model.CardBenefit
@@ -507,6 +508,51 @@ class AccountsViewModelTest {
         assertEquals(404L, viewModel.uiState.value.selectedAccountId)
         assertEquals(AccountDetailTab.TRANSACTIONS, viewModel.uiState.value.activeDetailTab)
         assertFalse(viewModel.uiState.value.showHistorySheet)
+
+        collectJob.cancel()
+    }
+
+    @Test
+    fun testBalanceHistory_defaultsToChangesOnlyAndTogglesAllSnapshots() = runTest(testDispatcher) {
+        val hysa = repository.saveAccount(
+            Account(id = 501L, name = "Betterment High Yield", type = AccountType.SAVINGS, currentBalanceCents = 0L)
+        )
+        val other = repository.saveAccount(
+            Account(id = 502L, name = "Checking", type = AccountType.CHECKING, currentBalanceCents = 100_000L)
+        )
+        repository.addBalanceRecord(hysa.id, "2026-10-01", 5_000_000L)
+        repository.addBalanceRecord(hysa.id, "2026-11-01", 5_040_377L)
+        repository.addBalanceRecord(hysa.id, "2026-11-03", 5_040_377L)
+        repository.addBalanceRecord(hysa.id, "2026-11-14", 5_040_377L)
+
+        val collectJob = launch(testDispatcher) {
+            viewModel.uiState.collect {}
+        }
+        testScheduler.advanceUntilIdle()
+
+        viewModel.openBalanceHistory(hysa)
+        testScheduler.advanceUntilIdle()
+
+        val initialState = viewModel.uiState.value
+        assertFalse(initialState.showAllBalanceSnapshots)
+        assertEquals(2, initialState.unchangedBalanceSnapshotCount)
+        assertEquals(listOf("2026-11-01", "2026-10-01"), initialState.displayedBalanceRecords.map { it.recordDate })
+
+        viewModel.toggleShowAllBalanceSnapshots()
+        testScheduler.advanceUntilIdle()
+
+        val expandedState = viewModel.uiState.value
+        assertTrue(expandedState.showAllBalanceSnapshots)
+        assertEquals(2, expandedState.unchangedBalanceSnapshotCount)
+        assertEquals(
+            listOf("2026-11-14", "2026-11-03", "2026-11-01", "2026-10-01"),
+            expandedState.displayedBalanceRecords.map { it.recordDate }
+        )
+
+        // Switching to another account resets the snapshot expansion toggle
+        viewModel.selectAccountForInspect(other.id)
+        testScheduler.advanceUntilIdle()
+        assertFalse(viewModel.uiState.value.showAllBalanceSnapshots)
 
         collectJob.cancel()
     }

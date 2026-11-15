@@ -192,4 +192,23 @@ object BalanceHistoryEngine {
         val merged = others + targetByDate.values
         return upsertAutoCheckpoint(merged, targetAccount, todayIso, targetAccount.currentBalanceCents)
     }
+
+    /**
+     * Filters a single account's snapshot list down to meaningful balance movements for display:
+     * keeps the oldest baseline record and each subsequent chronological record whose
+     * [BalanceRecord.balanceCents] differs from the previous kept balance.
+     * Returns the kept records sorted newest-first (`recordDate` descending, then `id` descending).
+     */
+    fun filterBalanceChanges(records: List<BalanceRecord>): List<BalanceRecord> {
+        if (records.size <= 1) return records
+        val chronological = records.sortedWith(compareBy<BalanceRecord> { it.recordDate }.thenBy { it.id })
+        val kept = ArrayList<BalanceRecord>(chronological.size)
+        for (record in chronological) {
+            val previous = kept.lastOrNull()
+            if (previous == null || record.balanceCents != previous.balanceCents) {
+                kept.add(record)
+            }
+        }
+        return kept.asReversed()
+    }
 }

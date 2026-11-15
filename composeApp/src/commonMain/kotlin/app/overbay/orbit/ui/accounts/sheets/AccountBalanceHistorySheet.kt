@@ -1,6 +1,7 @@
 package app.overbay.orbit.ui.accounts.sheets
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
@@ -39,6 +40,7 @@ import app.overbay.orbit.data.model.BalanceRecord
 import app.overbay.orbit.data.model.BalanceRecordSource
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.ui.components.EmptyStateCard
@@ -54,6 +56,9 @@ import app.overbay.orbit.ui.components.OrbitSheetHeader
 fun AccountBalanceHistoryContent(
     account: Account,
     balanceRecords: List<BalanceRecord> = emptyList(),
+    unchangedSnapshotCount: Int = 0,
+    showAllSnapshots: Boolean = false,
+    onToggleShowAllSnapshots: () -> Unit = {},
     onAddRecord: () -> Unit = {},
     onNavigateBack: (() -> Unit)? = null,
     onDismiss: () -> Unit,
@@ -87,7 +92,10 @@ fun AccountBalanceHistoryContent(
             AccountInlineBalanceHistorySection(
                 balanceRecords = balanceRecords,
                 onAddRecord = onAddRecord,
-                showHeaderAction = false
+                showHeaderAction = false,
+                unchangedSnapshotCount = unchangedSnapshotCount,
+                showAllSnapshots = showAllSnapshots,
+                onToggleShowAllSnapshots = onToggleShowAllSnapshots
             )
         }
     }
@@ -102,8 +110,27 @@ fun AccountInlineBalanceHistorySection(
     balanceRecords: List<BalanceRecord>,
     onAddRecord: () -> Unit,
     modifier: Modifier = Modifier,
-    showHeaderAction: Boolean = true
+    showHeaderAction: Boolean = true,
+    unchangedSnapshotCount: Int = 0,
+    showAllSnapshots: Boolean = false,
+    onToggleShowAllSnapshots: () -> Unit = {}
 ) {
+    val cardSubtitle = remember(balanceRecords.size, unchangedSnapshotCount, showAllSnapshots) {
+        when {
+            balanceRecords.isEmpty() -> null
+            showAllSnapshots && unchangedSnapshotCount > 0 ->
+                "${balanceRecords.size} snapshots ($unchangedSnapshotCount unchanged)"
+            unchangedSnapshotCount > 0 -> {
+                val entryWord = if (balanceRecords.size == 1) "entry" else "entries"
+                "${balanceRecords.size} $entryWord • $unchangedSnapshotCount unchanged hidden"
+            }
+            else -> {
+                val entryWord = if (balanceRecords.size == 1) "recorded entry" else "recorded entries"
+                "${balanceRecords.size} $entryWord"
+            }
+        }
+    }
+
     Column(modifier = modifier.fillMaxWidth()) {
         OrbitAccordionVisibility(visible = balanceRecords.size >= 2) {
             Column(modifier = Modifier.fillMaxWidth()) {
@@ -119,7 +146,7 @@ fun AccountInlineBalanceHistorySection(
 
         OrbitSectionCard(
             title = "Balance Snapshots",
-            subtitle = if (balanceRecords.isNotEmpty()) "${balanceRecords.size} recorded entries" else null,
+            subtitle = cardSubtitle,
             action = if (showHeaderAction) {
                 {
                     OrbitActionChip(
@@ -143,52 +170,77 @@ fun AccountInlineBalanceHistorySection(
                         description = "Snapshots are captured automatically as balances change, or tap \"Add Record\" above to log a past date."
                     )
                 } else {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    balanceRecords.forEachIndexed { index, record ->
-                        val older = balanceRecords.getOrNull(index + 1)
-                        val deltaCents = older?.let { record.balanceCents - it.balanceCents }
-                        val subtitleText = if (deltaCents != null) {
-                            "Change: ${MoneyUtils.formatCents(deltaCents, signed = true)}"
-                        } else {
-                            "Initial Record"
-                        }
-                        val friendlyDate = remember(record.recordDate) {
-                            LocalDateUtils.parseIsoDate(record.recordDate)
-                                ?.let { LocalDateUtils.formatDisplayDate(it) }
-                                ?: record.recordDate
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .animateContentSize(animationSpec = OrbitSprings.IntSizeSpatialDefault)
+                    ) {
+                        balanceRecords.forEachIndexed { index, record ->
+                            val older = balanceRecords.getOrNull(index + 1)
+                            val deltaCents = older?.let { record.balanceCents - it.balanceCents }
+                            val subtitleText = if (deltaCents != null) {
+                                "Change: ${MoneyUtils.formatCents(deltaCents, signed = true)}"
+                            } else {
+                                "Initial Record"
+                            }
+                            val friendlyDate = remember(record.recordDate) {
+                                LocalDateUtils.parseIsoDate(record.recordDate)
+                                    ?.let { LocalDateUtils.formatDisplayDate(it) }
+                                    ?: record.recordDate
+                            }
+
+                            OrbitCompactListRow(
+                                title = friendlyDate,
+                                subtitle = subtitleText,
+                                showTopDivider = index > 0,
+                                trailingContent = {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        OrbitBadge(
+                                            text = if (record.source == BalanceRecordSource.SIMPLEFIN) "SimpleFIN" else "Manual",
+                                            containerColor = if (record.source == BalanceRecordSource.SIMPLEFIN) {
+                                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+                                            } else {
+                                                MaterialTheme.colorScheme.surfaceContainerHighest
+                                            },
+                                            contentColor = if (record.source == BalanceRecordSource.SIMPLEFIN) {
+                                                MaterialTheme.colorScheme.onPrimaryContainer
+                                            } else {
+                                                MaterialTheme.colorScheme.onSurfaceVariant
+                                            }
+                                        )
+                                        Text(
+                                            text = MoneyUtils.formatCents(record.balanceCents),
+                                            style = TabularNumStyle.copy(fontSize = 14.sp, fontWeight = FontWeight.Bold),
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                }
+                            )
                         }
 
-                        OrbitCompactListRow(
-                            title = friendlyDate,
-                            subtitle = subtitleText,
-                            showTopDivider = index > 0,
-                            trailingContent = {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    OrbitBadge(
-                                        text = if (record.source == BalanceRecordSource.SIMPLEFIN) "SimpleFIN" else "Manual",
-                                        containerColor = if (record.source == BalanceRecordSource.SIMPLEFIN) {
-                                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
-                                        } else {
-                                            MaterialTheme.colorScheme.surfaceContainerHighest
-                                        },
-                                        contentColor = if (record.source == BalanceRecordSource.SIMPLEFIN) {
-                                            MaterialTheme.colorScheme.onPrimaryContainer
-                                        } else {
-                                            MaterialTheme.colorScheme.onSurfaceVariant
-                                        }
-                                    )
-                                    Text(
-                                        text = MoneyUtils.formatCents(record.balanceCents),
-                                        style = TabularNumStyle.copy(fontSize = 14.sp, fontWeight = FontWeight.Bold),
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                }
+                        if (unchangedSnapshotCount > 0) {
+                            HorizontalDivider(
+                                thickness = 1.dp,
+                                color = OrbitTheme.colors.cardBorder,
+                                modifier = Modifier.padding(top = 4.dp, bottom = 10.dp)
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                OrbitActionChip(
+                                    label = if (showAllSnapshots) {
+                                        "Show Changes Only"
+                                    } else {
+                                        "Show All ${balanceRecords.size + unchangedSnapshotCount} Snapshots"
+                                    },
+                                    onClick = onToggleShowAllSnapshots
+                                )
                             }
-                        )
-                    }
+                        }
                     }
                 }
             }

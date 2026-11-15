@@ -127,7 +127,10 @@ fun AccountDetailInspectorPane(
                 if (histAcct != null) {
                     AccountBalanceHistoryContent(
                         account = histAcct,
-                        balanceRecords = state.historyBalanceRecords,
+                        balanceRecords = state.displayedBalanceRecords,
+                        unchangedSnapshotCount = state.unchangedBalanceSnapshotCount,
+                        showAllSnapshots = state.showAllBalanceSnapshots,
+                        onToggleShowAllSnapshots = viewModel::toggleShowAllBalanceSnapshots,
                         onAddRecord = { viewModel.openAddBalanceRecord(histAcct) },
                         onNavigateBack = if (state.selectedAccount != null) {
                             { viewModel.closeBalanceHistory() }
@@ -172,7 +175,10 @@ fun AccountDetailInspectorPane(
                         AccountReadOnlyDetailContent(
                             account = inspecting,
                             transactions = state.selectedAccountTransactions,
-                            balanceRecords = state.historyBalanceRecords,
+                            balanceRecords = state.displayedBalanceRecords,
+                            unchangedSnapshotCount = state.unchangedBalanceSnapshotCount,
+                            showAllSnapshots = state.showAllBalanceSnapshots,
+                            onToggleShowAllSnapshots = viewModel::toggleShowAllBalanceSnapshots,
                             categoryMap = state.categoryMap,
                             activeTab = state.activeDetailTab,
                             onSelectTab = { viewModel.selectDetailTab(it) },
@@ -203,6 +209,9 @@ private fun AccountReadOnlyDetailContent(
     account: Account,
     transactions: List<Transaction>,
     balanceRecords: List<BalanceRecord>,
+    unchangedSnapshotCount: Int,
+    showAllSnapshots: Boolean,
+    onToggleShowAllSnapshots: () -> Unit,
     categoryMap: Map<Long, Category>,
     activeTab: AccountDetailTab,
     onSelectTab: (AccountDetailTab) -> Unit,
@@ -334,7 +343,10 @@ private fun AccountReadOnlyDetailContent(
                             AccountDetailTab.BALANCE_HISTORY -> {
                                 AccountInlineBalanceHistorySection(
                                     balanceRecords = balanceRecords,
-                                    onAddRecord = onAddBalanceRecord
+                                    onAddRecord = onAddBalanceRecord,
+                                    unchangedSnapshotCount = unchangedSnapshotCount,
+                                    showAllSnapshots = showAllSnapshots,
+                                    onToggleShowAllSnapshots = onToggleShowAllSnapshots
                                 )
                             }
                         }

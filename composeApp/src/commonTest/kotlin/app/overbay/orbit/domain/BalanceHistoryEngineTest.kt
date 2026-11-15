@@ -171,4 +171,35 @@ class BalanceHistoryEngineTest {
         repository.deleteAccount(checking.id)
         assertTrue(repository.snapshot.value.balanceRecords.isEmpty())
     }
+
+    @Test
+    fun testFilterBalanceChanges_hidesConsecutiveUnchangedAndPreservesReversals() {
+        assertTrue(BalanceHistoryEngine.filterBalanceChanges(emptyList()).isEmpty())
+
+        val single = listOf(
+            BalanceRecord(id = 1L, accountId = 7L, recordDate = "2026-11-03", balanceCents = 5_040_377L)
+        )
+        assertEquals(single, BalanceHistoryEngine.filterBalanceChanges(single))
+
+        val flatSeries = listOf(
+            BalanceRecord(id = 13L, accountId = 7L, recordDate = "2026-11-14", balanceCents = 5_040_377L),
+            BalanceRecord(id = 12L, accountId = 7L, recordDate = "2026-11-04", balanceCents = 5_040_377L),
+            BalanceRecord(id = 11L, accountId = 7L, recordDate = "2026-11-03", balanceCents = 5_040_377L)
+        )
+        assertEquals(
+            listOf("2026-11-03"),
+            BalanceHistoryEngine.filterBalanceChanges(flatSeries).map { it.recordDate }
+        )
+
+        val changingAndReverting = listOf(
+            BalanceRecord(id = 5L, accountId = 7L, recordDate = "2026-12-05", balanceCents = 4_950_000L),
+            BalanceRecord(id = 4L, accountId = 7L, recordDate = "2026-12-01", balanceCents = 5_040_377L),
+            BalanceRecord(id = 2L, accountId = 7L, recordDate = "2026-11-03", balanceCents = 5_040_377L),
+            BalanceRecord(id = 3L, accountId = 7L, recordDate = "2026-11-14", balanceCents = 5_040_377L),
+            BalanceRecord(id = 1L, accountId = 7L, recordDate = "2026-10-15", balanceCents = 4_950_000L)
+        )
+        val filtered = BalanceHistoryEngine.filterBalanceChanges(changingAndReverting)
+        assertEquals(listOf("2026-12-05", "2026-11-03", "2026-10-15"), filtered.map { it.recordDate })
+        assertEquals(listOf(4_950_000L, 5_040_377L, 4_950_000L), filtered.map { it.balanceCents })
+    }
 }
