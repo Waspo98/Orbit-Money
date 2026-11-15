@@ -208,7 +208,9 @@ fun MorphingPageHero(
                 val placeMetrics = Modifier.onPlaced { coords ->
                     metrics.titleTopInColumnPx = coords.positionInParent().y
                     metrics.titleHeightPx = coords.size.height.toFloat()
-                    metrics.rawTitleWidthPx = coords.size.width.toFloat()
+                    if ((scrollState?.collapseFraction ?: 0f) < 0.05f || metrics.rawTitleWidthPx <= 0f) {
+                        metrics.rawTitleWidthPx = coords.size.width.toFloat()
+                    }
                 }
                 if (heroContent != null) {
                     Box(modifier = placeMetrics.morphTransform { contentAlpha }) { heroContent() }
@@ -227,14 +229,16 @@ fun MorphingPageHero(
                         }
                     } else Modifier
 
-                    Box {
+                    // Measure position/height on the outer Box (direct child of Column) so kicker offset
+                    // isn't zeroed out when title + collapsedTitle share a Box.
+                    Box(modifier = placeMetrics) {
                         Text(
                             text = title,
                             style = titleStyle,
                             color = canopyColors.onCanopy,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = limitModifier.then(placeMetrics).morphTransform { f ->
+                            modifier = limitModifier.morphTransform { f ->
                                 if (hasSeparateCollapsed) (1f - f * 2.3f).coerceIn(0f, 1f) * contentAlpha else contentAlpha
                             }
                         )
