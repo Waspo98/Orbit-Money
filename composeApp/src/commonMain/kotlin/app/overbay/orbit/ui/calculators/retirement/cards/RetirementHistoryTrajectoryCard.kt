@@ -1,15 +1,24 @@
 package app.overbay.orbit.ui.calculators.retirement.cards
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -28,45 +37,38 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.RetirementHistoryPoint
 import app.overbay.orbit.domain.Cents
-import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MoneyUtils
-import app.overbay.orbit.ui.components.OrbitBarSegment
-import app.overbay.orbit.ui.components.OrbitStackedSegmentBar
 import app.overbay.orbit.theme.OrbitSprings
+import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.ui.calculators.retirement.LinkedRetirementAccountDetail
 import app.overbay.orbit.ui.components.EmptyStateCard
+import app.overbay.orbit.ui.components.OrbitBarSegment
 import app.overbay.orbit.ui.components.OrbitSectionCard
+import app.overbay.orbit.ui.components.OrbitSegmentedTabRow
+import app.overbay.orbit.ui.components.OrbitStackedSegmentBar
 import app.overbay.orbit.ui.components.orbitFadeContentTransform
 import app.overbay.orbit.ui.components.charts.chartHorizontalScrub
-import app.overbay.orbit.ui.components.charts.rememberSmoothScrubPosition
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlin.math.max
 import kotlin.math.roundToInt
 
 @Composable
 fun RetirementHistoryTrajectoryCard(
-    historyPoints: List<RetirementHistoryPoint>,
+    filteredPoints: List<RetirementHistoryPoint>,
     linkedAccounts: List<LinkedRetirementAccountDetail> = emptyList(),
     selectedHorizon: String,
     onSelectHorizon: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val haptics = LocalOrbitHaptics.current
     val horizons = listOf("YTD", "3Y", "5Y", "10Y", "All")
-    val currentYear = LocalDateUtils.todayLocalDate().year.toString()
-
-    val filteredPoints = when (selectedHorizon) {
-        "YTD" -> historyPoints.filter { it.month.startsWith(currentYear) }.ifEmpty { historyPoints.takeLast(12) }
-        "3Y" -> historyPoints.takeLast(36)
-        "5Y" -> historyPoints.takeLast(60)
-        "10Y" -> historyPoints.takeLast(120)
-        else -> historyPoints
-    }
-
     val palette = retirementAccountPalette()
     val accountColorMap = remember(linkedAccounts, filteredPoints, palette) {
         val allIds = linkedAccounts.map { it.accountId } + filteredPoints.flatMap { pt -> pt.accounts.map { it.accountId } }
@@ -74,30 +76,20 @@ fun RetirementHistoryTrajectoryCard(
     }
 
     OrbitSectionCard(
-        title = "Retirement Portfolio History",
-        subtitle = "Multi-account historical growth trajectory across connected accounts",
+        title = "Portfolio Balance History",
+        subtitle = "Historical balance snapshots across connected retirement accounts",
         modifier = modifier
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Horizon Selection Pills
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                horizons.forEach { horizon ->
-                    FilterChip(
-                        selected = selectedHorizon == horizon,
-                        onClick = {
-                            haptics.tick()
-                            onSelectHorizon(horizon)
-                        },
-                        label = { Text(horizon, style = MaterialTheme.typography.labelSmall) }
-                    )
-                }
-            }
+            OrbitSegmentedTabRow(
+                items = horizons,
+                selected = selectedHorizon,
+                onSelect = onSelectHorizon,
+                label = { it }
+            )
 
             var lastNonEmptyPoints by remember { mutableStateOf(filteredPoints) }
             if (filteredPoints.isNotEmpty()) {
@@ -119,7 +111,6 @@ fun RetirementHistoryTrajectoryCard(
                         modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        // Proportional Account Mix Stacked Bar above chart
                         val latestPoint = activePoints.last()
                         val accountBalances = latestPoint.accounts
                         val totalAccountBal = accountBalances.sumOf { it.balanceCents }
@@ -127,13 +118,18 @@ fun RetirementHistoryTrajectoryCard(
                         if (totalAccountBal > 0L && accountBalances.isNotEmpty()) {
                             OrbitStackedSegmentBar(
                                 segments = accountBalances.mapIndexed { index, acct ->
-                                    OrbitBarSegment(acct.accountId, max(0.02f, acct.balanceCents.toFloat() / totalAccountBal.toFloat()), accountColorMap[acct.accountId] ?: palette[index % palette.size])
+                                    OrbitBarSegment(
+                                        key = acct.accountId,
+                                        fraction = max(0.02f, acct.balanceCents.toFloat() / totalAccountBal.toFloat()),
+                                        color = accountColorMap[acct.accountId] ?: palette[index % palette.size]
+                                    )
                                 },
-                                height = 8.dp, cornerRadius = 4.dp, normalizeToFullWidth = true
+                                height = 8.dp,
+                                cornerRadius = 999.dp,
+                                normalizeToFullWidth = true
                             )
                         }
 
-                        // Interactive Multi-Series Canvas Line Chart
                         InteractiveHistoryChart(
                             points = activePoints,
                             accountColorMap = accountColorMap,
@@ -145,52 +141,76 @@ fun RetirementHistoryTrajectoryCard(
                         val startBalance = activePoints.first().balanceCents
                         val diffCents = latestBalance - startBalance
                         val diffPercent = if (startBalance > 0L) (diffCents.toDouble() / startBalance.toDouble()) * 100.0 else 0.0
-                        Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth()) {
-                            Row(modifier = Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                            border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                                 Column {
-                                    Text("Latest Total Balance", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
-                                    Text(MoneyUtils.formatCents(latestBalance, showCents = false), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                    Text("Latest Total Balance", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(
+                                        text = MoneyUtils.formatCents(latestBalance, showCents = false),
+                                        style = TabularNumStyle.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
                                 }
                                 Column(horizontalAlignment = Alignment.End) {
-                                    Text("$selectedHorizon Change", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                                    Text("$selectedHorizon Change", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     val isGain = diffCents >= 0L
                                     Text(
                                         text = "${if (isGain) "+" else ""}${MoneyUtils.formatCents(diffCents, showCents = false)} (${if (isGain) "+" else ""}${diffPercent.toInt()}%)",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (isGain) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                                        style = TabularNumStyle.copy(fontSize = 13.sp, fontWeight = FontWeight.Bold),
+                                        color = if (isGain) OrbitTheme.colors.income else OrbitTheme.colors.expense
                                     )
                                 }
                             }
                         }
 
-                        // Per-Account Change Over Selected Horizon
+                        // O(N) indexed per-account changes over selected horizon
                         if (linkedAccounts.isNotEmpty() && activePoints.size >= 2) {
-                            val firstPt = activePoints.first()
-                            val lastPt = activePoints.last()
+                            val firstById = remember(activePoints) { activePoints.first().accounts.associateBy { it.accountId } }
+                            val lastById = remember(activePoints) { activePoints.last().accounts.associateBy { it.accountId } }
 
                             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text(text = "Account Growth Over $selectedHorizon", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-
+                                Text(
+                                    text = "Account Growth Over $selectedHorizon",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                                 linkedAccounts.forEachIndexed { index, account ->
                                     val color = account.accountId?.let { accountColorMap[it] } ?: palette[index % palette.size]
-                                    val startBal = firstPt.accounts.find { it.accountId == account.accountId }?.balanceCents ?: 0L
-                                    val endBal = lastPt.accounts.find { it.accountId == account.accountId }?.balanceCents ?: account.balanceCents
+                                    val startBal = account.accountId?.let { firstById[it]?.balanceCents } ?: 0L
+                                    val endBal = account.accountId?.let { lastById[it]?.balanceCents } ?: account.balanceCents
                                     val changeCents = endBal - startBal
                                     val changePct = if (startBal > 0L) (changeCents.toDouble() / startBal.toDouble()) * 100.0 else 0.0
                                     val isGain = changeCents >= 0L
 
-                                    Surface(shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.surfaceContainerLow, modifier = Modifier.fillMaxWidth()) {
-                                        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 7.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                    Surface(
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                        border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
                                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                                Box(modifier = Modifier.height(10.dp).width(10.dp).background(color, RoundedCornerShape(2.dp)))
+                                                Box(modifier = Modifier.size(10.dp).background(color, RoundedCornerShape(3.dp)))
                                                 Text(account.name, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
                                             }
                                             Text(
                                                 text = "${if (isGain) "+" else ""}${MoneyUtils.formatCompactCents(changeCents)} (${if (isGain) "+" else ""}${changePct.toInt()}%)",
-                                                style = MaterialTheme.typography.bodySmall,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = if (isGain) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                                                style = TabularNumStyle.copy(fontSize = 12.sp, fontWeight = FontWeight.SemiBold),
+                                                color = if (isGain) OrbitTheme.colors.income else OrbitTheme.colors.expense
                                             )
                                         }
                                     }
@@ -212,72 +232,62 @@ private fun InteractiveHistoryChart(
 ) {
     val density = LocalDensity.current
     val haptics = LocalOrbitHaptics.current
-    var scrubIndex by remember { mutableStateOf<Int?>(null) }
-    var lastHapticIndex by remember { mutableStateOf<Int?>(null) }
+    val textMeasurer = rememberTextMeasurer()
 
-    LaunchedEffect(scrubIndex) {
-        val idx = scrubIndex
-        if (idx != null && idx != lastHapticIndex) {
-            haptics.tick()
-            lastHapticIndex = idx
-        } else if (idx == null) {
-            lastHapticIndex = null
-        }
-    }
+    var scrubIndex by remember { mutableStateOf<Int?>(null) }
 
     val maxVal = remember(points) {
         val peak = points.maxOfOrNull { it.balanceCents } ?: 100_000_00L
         (peak.toDouble() * 1.1).toLong().coerceAtLeast(1L)
     }
-    val animatedMaxVal by animateFloatAsState(
-        targetValue = maxVal.toFloat(),
-        animationSpec = OrbitSprings.FloatSpatialDefault,
-        label = "historyChartMaxScale"
-    )
+    val maxValAnim = remember { Animatable(maxVal.toFloat()) }
+    LaunchedEffect(maxVal) {
+        maxValAnim.animateTo(maxVal.toFloat().coerceAtLeast(1f), OrbitSprings.FloatSpatialDefault)
+    }
+    val maxValState = maxValAnim.asState()
 
     val primaryColor = MaterialTheme.colorScheme.primary
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
-    val totalStroke = remember(density) {
-        Stroke(width = with(density) { 2.5.dp.toPx() }, cap = StrokeCap.Round, join = StrokeJoin.Round)
-    }
-    val seriesStroke = remember(density) {
-        Stroke(width = with(density) { 1.5.dp.toPx() }, cap = StrokeCap.Round, join = StrokeJoin.Round)
-    }
+    val gridColor = OrbitTheme.colors.cardBorder
+    val tabularBase = TabularNumStyle
+    val axisStyle = remember(tabularBase, onSurfaceVariant) { tabularBase.copy(fontSize = 9.5.sp, color = onSurfaceVariant) }
+    val totalStroke = remember(density) { Stroke(width = with(density) { 2.5.dp.toPx() }, cap = StrokeCap.Round, join = StrokeJoin.Round) }
+    val seriesStroke = remember(density) { Stroke(width = with(density) { 1.5.dp.toPx() }, cap = StrokeCap.Round, join = StrokeJoin.Round) }
     val acctPath = remember { Path() }
     val totalPath = remember { Path() }
-    val allAccountIds = remember(points) { points.flatMap { it.accounts }.mapNotNull { it.accountId }.distinct() }
+
+    // Pre-index O(N) account balance arrays outside Canvas draw pass
+    val preindexedSeries = remember(points) {
+        val idSet = linkedSetOf<Long>()
+        points.forEach { pt -> pt.accounts.forEach { idSet.add(it.accountId) } }
+        idSet.map { acctId ->
+            val values = LongArray(points.size) { -1L }
+            points.forEachIndexed { idx, pt ->
+                pt.accounts.forEach { acct ->
+                    if (acct.accountId == acctId) values[idx] = acct.balanceCents
+                }
+            }
+            acctId to values
+        }
+    }
 
     val activePt = scrubIndex?.let { points.getOrNull(it) }
-    val scrubNormTarget = scrubIndex?.takeIf { it in points.indices && points.size >= 2 }?.let { idx ->
-        val xNorm = idx.toFloat() / (points.size - 1).toFloat()
-        val yNorm = (1f - (points[idx].balanceCents.toFloat() / animatedMaxVal.coerceAtLeast(1f))).coerceIn(0f, 1f)
-        Offset(xNorm, yNorm)
-    }
-    val smoothScrubNorm = rememberSmoothScrubPosition(scrubNormTarget)
-
     val readoutAlpha by animateFloatAsState(
-        targetValue = if (activePt != null) 1f else 0.5f,
+        targetValue = if (activePt != null) 0.96f else 0.55f,
         animationSpec = OrbitSprings.FloatEffectsFast,
         label = "retirementHistoryReadoutAlpha"
     )
 
     Column(modifier = modifier) {
-        // Constant-height readout bar (zero vertical layout shift on touch)
         Surface(
-            shape = RoundedCornerShape(8.dp),
+            shape = RoundedCornerShape(10.dp),
             color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = readoutAlpha),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 6.dp)
-                .height(30.dp)
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp).height(32.dp)
         ) {
             AnimatedContent(
                 targetState = activePt,
                 contentKey = { it != null },
-                transitionSpec = {
-                    fadeIn(OrbitSprings.FloatEffectsFast) togetherWith
-                        fadeOut(OrbitSprings.FloatEffectsFast)
-                },
+                transitionSpec = { fadeIn(OrbitSprings.FloatEffectsFast) togetherWith fadeOut(OrbitSprings.FloatEffectsFast) },
                 contentAlignment = Alignment.CenterStart,
                 label = "historyScrubReadout"
             ) { pt ->
@@ -287,17 +297,16 @@ private fun InteractiveHistoryChart(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(pt.month, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                        Text(pt.month, style = TabularNumStyle.copy(fontSize = 12.sp, fontWeight = FontWeight.Bold))
                         Text(
                             text = "Total: ${MoneyUtils.formatCents(pt.balanceCents, showCents = false)}",
-                            style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
-                            fontWeight = FontWeight.Bold,
+                            style = TabularNumStyle.copy(fontSize = 12.sp, fontWeight = FontWeight.Bold),
                             color = primaryColor
                         )
                     }
                 } else {
                     Text(
-                        text = "Drag horizontally to inspect monthly balances",
+                        text = "Drag horizontally to inspect snapshots",
                         style = MaterialTheme.typography.labelSmall,
                         color = onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = 10.dp)
@@ -309,72 +318,80 @@ private fun InteractiveHistoryChart(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(180.dp)
+                .height(170.dp)
                 .chartHorizontalScrub(
                     key = points,
                     clearOnRelease = true,
                     onFractionChanged = { fraction ->
-                        scrubIndex = if (fraction != null && points.isNotEmpty()) {
+                        val nextIdx = if (fraction != null && points.isNotEmpty()) {
                             (fraction * (points.size - 1)).roundToInt().coerceIn(0, points.lastIndex)
                         } else null
+                        if (nextIdx != null && nextIdx != scrubIndex) {
+                            haptics.tick()
+                        }
+                        scrubIndex = nextIdx
                     }
                 )
         ) {
             Canvas(modifier = Modifier.fillMaxSize()) {
-                val w = size.width
-                val h = size.height
                 val count = points.size
                 if (count < 2) return@Canvas
-                val denom = animatedMaxVal.toDouble().coerceAtLeast(1.0)
+                val axisGutterPx = 46.dp.toPx()
+                val topPadPx = 6.dp.toPx()
+                val bottomPadPx = 4.dp.toPx()
+                val plotW = (size.width - axisGutterPx).coerceAtLeast(1f)
+                val plotH = (size.height - topPadPx - bottomPadPx).coerceAtLeast(1f)
+                val denom = maxValState.value.toDouble().coerceAtLeast(1.0)
 
-                fun idxToX(idx: Int): Float = (idx.toFloat() / (count - 1).toFloat()) * w
-                fun balToY(bal: Cents): Float = (h - ((bal.toDouble() / denom) * h).toFloat()).coerceIn(0f, h)
+                fun idxToX(idx: Int): Float = (idx.toFloat() / (count - 1).toFloat()) * plotW
+                fun balToY(bal: Cents): Float = (topPadPx + plotH - ((bal.toDouble() / denom) * plotH).toFloat()).coerceIn(topPadPx, topPadPx + plotH)
 
-                // 1. Draw individual colored lines for each linked account
-                allAccountIds.forEach { acctId ->
+                listOf(1f to denom.toLong(), 0.5f to (denom.toLong() / 2L), 0f to 0L).forEach { (ratio, cents) ->
+                    val y = topPadPx + plotH * (1f - ratio)
+                    drawLine(color = gridColor.copy(alpha = 0.45f), start = Offset(0f, y), end = Offset(plotW, y), strokeWidth = 1.dp.toPx())
+                    val label = textMeasurer.measure(MoneyUtils.formatCompactCents(cents), style = axisStyle, maxLines = 1)
+                    drawText(label, topLeft = Offset(plotW + 6.dp.toPx(), (y - label.size.height / 2f).coerceIn(0f, size.height - label.size.height)))
+                }
+
+                preindexedSeries.forEach { (acctId, series) ->
                     val color = accountColorMap[acctId] ?: primaryColor
                     acctPath.rewind()
                     var started = false
-
-                    points.forEachIndexed { idx, pt ->
-                        val b = pt.accounts.find { it.accountId == acctId }?.balanceCents
-                        if (b != null) {
+                    for (idx in 0 until count) {
+                        val b = series[idx]
+                        if (b >= 0L) {
                             val x = idxToX(idx)
                             val y = balToY(b)
                             if (!started) { acctPath.moveTo(x, y); started = true } else acctPath.lineTo(x, y)
                         }
                     }
-                    if (started) {
-                        drawPath(acctPath, color = color.copy(alpha = 0.8f), style = seriesStroke)
-                    }
+                    if (started) drawPath(acctPath, color = color.copy(alpha = 0.78f), style = seriesStroke)
                 }
 
-                // 2. Draw Total Savings line (solid primary)
                 totalPath.rewind()
-                points.forEachIndexed { idx, pt ->
+                for (idx in 0 until count) {
                     val x = idxToX(idx)
-                    val y = balToY(pt.balanceCents)
+                    val y = balToY(points[idx].balanceCents)
                     if (idx == 0) totalPath.moveTo(x, y) else totalPath.lineTo(x, y)
                 }
                 drawPath(totalPath, color = primaryColor, style = totalStroke)
 
-                // 3. Smoothly gliding scrub line & circle
-                if (smoothScrubNorm != null) {
-                    val sx = smoothScrubNorm.x * w
-                    val sy = smoothScrubNorm.y * h
-                    drawLine(color = onSurfaceVariant.copy(alpha = 0.6f), start = Offset(sx, 0f), end = Offset(sx, h), strokeWidth = 1.5f)
+                val activeIdx = scrubIndex
+                if (activeIdx != null && activeIdx in points.indices) {
+                    val sx = idxToX(activeIdx)
+                    val sy = balToY(points[activeIdx].balanceCents)
+                    drawLine(color = onSurfaceVariant.copy(alpha = 0.7f), start = Offset(sx, topPadPx), end = Offset(sx, topPadPx + plotH), strokeWidth = 1.dp.toPx())
                     drawCircle(color = primaryColor, radius = 5.dp.toPx(), center = Offset(sx, sy))
                 }
             }
         }
 
-        // X-Axis bounds
         Row(
-            modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp, end = 46.dp),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(points.firstOrNull()?.month ?: "", style = MaterialTheme.typography.labelSmall, color = onSurfaceVariant)
-            Text(points.lastOrNull()?.month ?: "", style = MaterialTheme.typography.labelSmall, color = onSurfaceVariant)
+            Text(points.firstOrNull()?.month ?: "", style = TabularNumStyle.copy(fontSize = 11.sp), color = onSurfaceVariant)
+            Text(points.lastOrNull()?.month ?: "", style = TabularNumStyle.copy(fontSize = 11.sp), color = onSurfaceVariant)
         }
     }
 }

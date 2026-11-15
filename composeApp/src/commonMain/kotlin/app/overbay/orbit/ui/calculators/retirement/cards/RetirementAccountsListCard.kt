@@ -1,5 +1,6 @@
 package app.overbay.orbit.ui.calculators.retirement.cards
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -9,9 +10,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -19,19 +22,21 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.ui.calculators.retirement.RetirementUiState
-import app.overbay.orbit.ui.components.CurrencyTextField
+import app.overbay.orbit.ui.components.EmptyStateCard
 import app.overbay.orbit.ui.components.OrbitBadge
+import app.overbay.orbit.ui.components.OrbitBarSegment
 import app.overbay.orbit.ui.components.OrbitSectionCard
+import app.overbay.orbit.ui.components.OrbitStackedSegmentBar
+import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlin.math.max
-import kotlin.math.roundToLong
 
 @Composable
 fun retirementAccountPalette(): List<Color> = listOf(
@@ -49,220 +54,108 @@ fun retirementAccountColorMap(accountIds: List<Long?>, palette: List<Color>): Ma
 @Composable
 fun RetirementAccountsListCard(
     uiState: RetirementUiState,
-    onCurrentBalanceChange: (Cents) -> Unit,
+    onEditStartingBalance: () -> Unit,
     onResetCurrentBalance: () -> Unit,
-    onMonthlySavingsChange: (Cents) -> Unit,
-    onResetMonthlySavings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val scenario = uiState.scenario
+    val haptics = LocalOrbitHaptics.current
     val linkedAccounts = uiState.linkedAccounts
-    val totalLinkedBalance = linkedAccounts.sumOf { it.balanceCents }
+    val totalLinkedBalance = remember(linkedAccounts) { linkedAccounts.sumOf { it.balanceCents } }
     val palette = retirementAccountPalette()
     val accountColorMap = remember(linkedAccounts, palette) {
         retirementAccountColorMap(linkedAccounts.map { it.accountId }, palette)
     }
 
     OrbitSectionCard(
-        title = "Portfolio Balance & Savings",
-        subtitle = "Current retirement assets, monthly contributions, and required pace",
+        title = "Connected Portfolio Sources",
+        subtitle = "Linked investment accounts and starting balance override",
         modifier = modifier
     ) {
-        // 1. Current Portfolio Balance with Reset button
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Current Portfolio Balance",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
-            if (uiState.currentBalanceOverridden) {
-                TextButton(
-                    onClick = onResetCurrentBalance,
-                    modifier = Modifier.height(30.dp)
-                ) {
-                    Text("Reset to Linked (${MoneyUtils.formatCompactCents(uiState.connectedBalanceCents)})", style = MaterialTheme.typography.labelSmall)
-                }
-            }
-        }
-        CurrencyTextField(
-            cents = uiState.currentBalanceCents,
-            onCentsChange = onCurrentBalanceChange,
-            label = "Current Balance",
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(14.dp))
-
-        // 2. Monthly Savings with CurrencyTextField + Slider + Reset button
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Monthly Savings",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
-            if (uiState.monthlySavingsOverridden) {
-                TextButton(
-                    onClick = onResetMonthlySavings,
-                    modifier = Modifier.height(30.dp)
-                ) {
-                    Text("Household Pace (${MoneyUtils.formatCompactCents(uiState.plannedMonthlySavingsCents)}/mo)", style = MaterialTheme.typography.labelSmall)
-                }
-            }
-        }
-        CurrencyTextField(
-            cents = uiState.monthlySavingsCents,
-            onCentsChange = onMonthlySavingsChange,
-            label = "Monthly Savings Amount",
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        // Monthly Savings Slider ($0 to $10,000/mo, step $50)
-        Spacer(modifier = Modifier.height(4.dp))
-        val maxSavingsFloat = 10_000_00f
-        val currentSavingsFloat = uiState.monthlySavingsCents.toFloat().coerceIn(0f, maxSavingsFloat)
-        Slider(
-            value = currentSavingsFloat,
-            onValueChange = { raw ->
-                // Step $50 = 50_00 cents
-                val step = 50_00L
-                val stepped = ((raw.roundToLong() + step / 2) / step) * step
-                onMonthlySavingsChange(stepped)
-            },
-            valueRange = 0f..maxSavingsFloat,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text("$0/mo", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
-            Text(
-                text = "${MoneyUtils.formatCents(uiState.monthlySavingsCents, showCents = false)}/mo",
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
-            Text("$10,000/mo", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
-        }
-
-        Spacer(modifier = Modifier.height(14.dp))
-
-        // 3. Required Monthly Savings Callout Card
+        // Starting Portfolio Summary + Override Action
         Surface(
-            shape = MaterialTheme.shapes.small,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
             modifier = Modifier.fillMaxWidth()
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(12.dp),
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                     Text(
-                        text = "Required Monthly Savings",
-                        style = MaterialTheme.typography.bodySmall,
+                        text = if (uiState.currentBalanceOverridden) "Starting Balance (Override)" else "Connected Portfolio Total",
+                        style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = "${MoneyUtils.formatCents(scenario.requiredMonthlyContributionCents, showCents = false)} / mo",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
+                        text = MoneyUtils.formatCents(uiState.currentBalanceCents, showCents = false),
+                        style = TabularNumStyle.copy(fontWeight = FontWeight.Bold),
                         color = MaterialTheme.colorScheme.primary
                     )
                 }
-
-                if (scenario.monthlySavingsGapCents > 0L) {
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(
-                            text = "Monthly Gap",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error
-                        )
-                        Text(
-                            text = "-${MoneyUtils.formatCents(scenario.monthlySavingsGapCents, showCents = false)}",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.error
-                        )
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (uiState.currentBalanceOverridden) {
+                        TextButton(
+                            onClick = {
+                                haptics.tick()
+                                onResetCurrentBalance()
+                            },
+                            modifier = Modifier.height(34.dp)
+                        ) {
+                            Text("Reset", style = MaterialTheme.typography.labelSmall)
+                        }
                     }
-                } else {
-                    Text(
-                        text = "Pace on Track! 🎯",
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
+                    OutlinedButton(
+                        onClick = {
+                            haptics.tick()
+                            onEditStartingBalance()
+                        },
+                        border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
+                        contentPadding = ButtonDefaults.TextButtonContentPadding,
+                        modifier = Modifier.height(34.dp)
+                    ) {
+                        Text("Override", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
+                    }
                 }
             }
         }
 
-        // 4. Linked Accounts Breakdown with Proportional Color Mix Bar
-        if (linkedAccounts.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(16.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Connected Retirement Accounts (${linkedAccounts.size})",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = MoneyUtils.formatCents(totalLinkedBalance, showCents = false),
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
+        Spacer(modifier = Modifier.height(14.dp))
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Proportional horizontal account-mix stacked color bar
+        if (linkedAccounts.isEmpty()) {
+            EmptyStateCard(
+                title = "No Linked Retirement Accounts",
+                description = "Link investment accounts or assign a member retirement plan to track real balances automatically."
+            )
+        } else {
             if (totalLinkedBalance > 0L) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(10.dp)
-                        .clip(RoundedCornerShape(5.dp))
-                ) {
-                    linkedAccounts.forEachIndexed { index, account ->
-                        val weight = max(0.02f, account.balanceCents.toFloat() / totalLinkedBalance.toFloat())
+                OrbitStackedSegmentBar(
+                    segments = linkedAccounts.mapIndexed { index, account ->
                         val color = account.accountId?.let { accountColorMap[it] } ?: palette[index % palette.size]
-                        Box(
-                            modifier = Modifier
-                                .weight(weight)
-                                .height(10.dp)
-                                .background(color)
+                        OrbitBarSegment(
+                            key = account.id,
+                            fraction = max(0.02f, account.balanceCents.toFloat() / totalLinkedBalance.toFloat()),
+                            color = color
                         )
-                    }
-                }
-                Spacer(modifier = Modifier.height(10.dp))
+                    },
+                    height = 8.dp,
+                    cornerRadius = 999.dp,
+                    normalizeToFullWidth = true
+                )
+                Spacer(modifier = Modifier.height(12.dp))
             }
 
-            // Per-Account List Rows
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 linkedAccounts.forEachIndexed { index, account ->
                     val color = account.accountId?.let { accountColorMap[it] } ?: palette[index % palette.size]
                     Surface(
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(12.dp),
                         color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Row(
@@ -275,27 +168,31 @@ fun RetirementAccountsListCard(
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.weight(1f).padding(end = 8.dp)
                             ) {
                                 Box(
                                     modifier = Modifier
-                                        .height(28.dp)
-                                        .background(color, shape = RoundedCornerShape(2.dp))
-                                        .padding(horizontal = 2.dp)
+                                        .width(4.dp)
+                                        .height(32.dp)
+                                        .background(color, shape = RoundedCornerShape(999.dp))
                                 )
                                 Column {
                                     Text(
                                         text = account.name,
                                         style = MaterialTheme.typography.bodyMedium,
                                         fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onSurface
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                     val subtitleParts = listOfNotNull(account.ownerName, account.institution).filter { it.isNotBlank() }
                                     if (subtitleParts.isNotEmpty()) {
                                         Text(
                                             text = subtitleParts.joinToString(" • "),
                                             style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.outline
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
                                         )
                                     }
                                 }
@@ -312,8 +209,7 @@ fun RetirementAccountsListCard(
                                 )
                                 Text(
                                     text = MoneyUtils.formatCents(account.balanceCents, showCents = false),
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold,
+                                    style = TabularNumStyle.copy(fontWeight = FontWeight.Bold),
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
                             }

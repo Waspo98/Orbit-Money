@@ -3,6 +3,8 @@ package app.overbay.orbit.ui.calculators.retirement.cards
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,157 +20,123 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import app.overbay.orbit.data.model.Account
-import app.overbay.orbit.data.model.HouseholdMember
-import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.theme.TabularNumStyle
+import app.overbay.orbit.ui.calculators.retirement.MemberRetirementSummary
 import app.overbay.orbit.ui.components.EmptyStateCard
 import app.overbay.orbit.ui.components.OrbitBadge
 import app.overbay.orbit.ui.components.OrbitMiniStatRow
 import app.overbay.orbit.ui.components.OrbitSectionCard
-import kotlin.math.min
-import kotlin.math.roundToLong
 
 @Composable
 fun MemberRetirementBreakdownCard(
-    members: List<HouseholdMember>,
-    accounts: List<Account>,
+    memberSummaries: List<MemberRetirementSummary>,
     modifier: Modifier = Modifier
 ) {
-    val accountMap = accounts.associateBy { it.id }
-
     OrbitSectionCard(
-        title = "Household Member Retirement Contributions",
+        title = "Household Member Contributions",
         subtitle = "Annual & per-paycheck employee savings, employer match, and HSA",
         modifier = modifier
     ) {
-        if (members.isEmpty()) {
+        if (memberSummaries.isEmpty()) {
             EmptyStateCard(
                 title = "No Household Members",
                 description = "Add household members in the Household tab to see per-earner retirement contribution breakdowns."
             )
         } else {
             Column(
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                members.forEach { member ->
-                    MemberContributionItem(
-                        member = member,
-                        accountMap = accountMap
-                    )
+                memberSummaries.forEach { summary ->
+                    MemberContributionItem(summary = summary)
                 }
             }
         }
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun MemberContributionItem(
-    member: HouseholdMember,
-    accountMap: Map<Long, Account>
+    summary: MemberRetirementSummary
 ) {
-    // 1. Employee contribution
-    val gross = member.grossIncomeAnnualCents
-    val empPct = member.employeeContributionPercent ?: 0.0
-    val empContribCents = if (member.employeeContributionAnnualCents > 0L) {
-        member.employeeContributionAnnualCents
-    } else if (empPct > 0.0 && gross > 0L) {
-        ((gross.toDouble() * empPct) / 100.0).roundToLong()
-    } else 0L
-
-    // 2. Employer match calculation
-    val matchPct = member.employerMatchPercent
-    val matchLimitPct = member.employerMatchLimitPercent
-    val matchCap = member.employerMatchAnnualCapCents
-    val eligiblePct = if (matchLimitPct > 0.0) min(empPct, matchLimitPct) else empPct
-    val matchRate = if (matchPct > 0.0) matchPct / 100.0 else 0.0
-    val uncappedMatchCents = if (eligiblePct > 0.0 && gross > 0L) {
-        ((gross.toDouble() * eligiblePct / 100.0) * matchRate).roundToLong()
-    } else 0L
-    val matchCents = if (matchCap > 0L) min(matchCap, uncappedMatchCents) else uncappedMatchCents
-
-    // 3. HSA contribution
-    val hsaCents = member.hsaContributionAnnualCents
-
-    // 4. Totals
-    val totalAnnualCents = empContribCents + matchCents + hsaCents
-    val payPeriods = if (member.payPeriodsPerYear > 0.0) member.payPeriodsPerYear else 26.0
-    val perPaycheckCents = (totalAnnualCents.toDouble() / payPeriods).roundToLong()
-
     Surface(
         shape = RoundedCornerShape(14.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+        border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Member Header
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                     Text(
-                        text = member.name,
+                        text = summary.name,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "${member.employer ?: "Self-employed / Independent"} • ${member.payFrequency.replaceFirstChar { it.uppercase() }}",
+                        text = "${summary.employer ?: "Self-employed / Independent"} • ${summary.payFrequencyLabel}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
-                        text = "${MoneyUtils.formatCents(totalAnnualCents, showCents = false)} / yr",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
+                        text = "${MoneyUtils.formatCents(summary.annualTotalCents, showCents = false)} / yr",
+                        style = TabularNumStyle.copy(fontWeight = FontWeight.Bold),
                         color = MaterialTheme.colorScheme.primary
                     )
                     Text(
-                        text = "${MoneyUtils.formatCents(perPaycheckCents, showCents = false)} / paycheck",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline
+                        text = "${MoneyUtils.formatCents(summary.perPaycheckCents, showCents = false)} / paycheck",
+                        style = TabularNumStyle.copy(fontSize = MaterialTheme.typography.bodySmall.fontSize),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
 
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+            HorizontalDivider(color = OrbitTheme.colors.cardBorder)
 
-            // Breakdown Rows
-            OrbitMiniStatRow("Employee Savings", MoneyUtils.formatCents(empContribCents, showCents = false))
             OrbitMiniStatRow(
-                "Employer Match",
-                "${MoneyUtils.formatCents(matchCents, showCents = false)}${if (matchCap > 0L && uncappedMatchCents > matchCap) " (Cap Reached)" else ""}"
+                label = "Employee Savings",
+                value = MoneyUtils.formatCents(summary.annualEmployeeSavingsCents, showCents = false)
             )
-            if (hsaCents > 0L) {
-                OrbitMiniStatRow("HSA Annual Contribution", MoneyUtils.formatCents(hsaCents, showCents = false))
+            OrbitMiniStatRow(
+                label = "Employer Match",
+                value = "${MoneyUtils.formatCents(summary.annualEmployerMatchCents, showCents = false)}${if (summary.matchCapReached) " (Cap)" else ""}"
+            )
+            if (summary.annualHsaCents > 0L) {
+                OrbitMiniStatRow(
+                    label = "HSA Annual Contribution",
+                    value = MoneyUtils.formatCents(summary.annualHsaCents, showCents = false)
+                )
             }
 
-            // Linked Accounts Chips
-            if (member.retirementAccounts.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(4.dp))
+            if (summary.linkedAccounts.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = "Linked Accounts:",
+                    text = "Linked Accounts",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.outline
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Row(
+                FlowRow(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    member.retirementAccounts.forEach { link ->
-                        val acct = accountMap[link.accountId]
+                    summary.linkedAccounts.forEach { chip ->
                         OrbitBadge(
-                            text = "${link.accountKind.uppercase()}: ${acct?.name ?: "Account #${link.accountId}"}",
+                            text = "${chip.displayKind}: ${chip.name}",
                             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                             contentColor = MaterialTheme.colorScheme.onSurfaceVariant
                         )

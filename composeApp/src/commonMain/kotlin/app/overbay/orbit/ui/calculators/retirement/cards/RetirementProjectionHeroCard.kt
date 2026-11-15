@@ -7,19 +7,28 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import app.overbay.orbit.domain.Cents
+import androidx.compose.ui.unit.sp
+import app.overbay.orbit.data.model.RetirementScenarioPreset
 import app.overbay.orbit.domain.MoneyUtils
+import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.ui.calculators.retirement.RetirementUiState
-import app.overbay.orbit.ui.components.OrbitMiniStatRow
+import app.overbay.orbit.ui.calculators.retirement.dialogs.formatBasisRate
 import app.overbay.orbit.ui.components.OrbitSectionCard
+import app.overbay.orbit.ui.components.OrbitStatTile
 import app.overbay.orbit.ui.components.RollingTickerCents
 import app.overbay.orbit.ui.components.charts.RetirementProjectionChart
 import kotlin.math.abs
@@ -28,101 +37,73 @@ import kotlin.math.roundToInt
 @Composable
 fun RetirementProjectionHeroCard(
     uiState: RetirementUiState,
-    onAgeScrubbed: (Double?, Cents?) -> Unit,
+    onSelectPreset: (RetirementScenarioPreset) -> Unit,
+    isDraggingControl: Boolean = false,
+    chartHeightDp: Int = 196,
     modifier: Modifier = Modifier
 ) {
     val scenario = uiState.scenario
-    val isFunded = scenario.readinessPercent >= 100.0
+    var isScrubbingChart by remember { mutableStateOf(false) }
+
     val readinessColor = when {
-        scenario.readinessPercent >= 100.0 -> MaterialTheme.colorScheme.primary
-        scenario.readinessPercent >= 75.0 -> MaterialTheme.colorScheme.tertiary
-        else -> MaterialTheme.colorScheme.error
+        scenario.readinessPercent >= 100.0 -> OrbitTheme.colors.income
+        scenario.readinessPercent >= 75.0 -> OrbitTheme.colors.warning
+        else -> OrbitTheme.colors.expense
     }
 
     OrbitSectionCard(
-        title = "Retirement Trajectory & Nest Egg",
-        subtitle = "Live accumulation path across conservative, balanced, and aggressive scenarios",
+        title = "Projected Nest Egg",
+        subtitle = "Age ${uiState.retirementAge.roundToInt()} · ${uiState.preset.label} (${formatBasisRate(uiState.preset.nominalAnnualReturn)})",
         modifier = modifier
     ) {
-        // Hero Top Metrics
-        Surface(
-            shape = MaterialTheme.shapes.medium,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            modifier = Modifier.fillMaxWidth()
+        // 1. Headline Projection Verdict Row (Whole Dollars — zero .39 cents)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
+            Column(modifier = Modifier.weight(1f)) {
+                RollingTickerCents(
+                    cents = scenario.projectedBalanceCents,
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontSize = 30.sp,
+                        fontWeight = FontWeight.Bold
+                    ),
+                    color = MaterialTheme.colorScheme.primary,
+                    showCents = false,
+                    animate = !isScrubbingChart && !isDraggingControl
+                )
+
+                val gap = uiState.surplusOrGapCents
+                val targetCompact = MoneyUtils.formatCompactCents(scenario.targetNestEggCents)
+                val gapText = if (gap >= 0L) {
+                    "+${MoneyUtils.formatCompactCents(gap)} above $targetCompact target"
+                } else {
+                    "-${MoneyUtils.formatCompactCents(abs(gap))} below $targetCompact target"
+                }
+                Text(
+                    text = gapText,
+                    style = TabularNumStyle.copy(fontSize = 12.5.sp, fontWeight = FontWeight.Medium),
+                    color = if (gap >= 0L) OrbitTheme.colors.income else OrbitTheme.colors.expense
+                )
+            }
+
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = readinessColor.copy(alpha = 0.14f)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = if (uiState.scrubbedAge != null) {
-                                "SCRUBBED BALANCE (AGE ${uiState.scrubbedAge.roundToInt()})"
-                            } else {
-                                "AT AGE ${uiState.retirementAge.toInt()}"
-                            },
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        RollingTickerCents(
-                            cents = uiState.scrubbedBalanceCents ?: scenario.projectedBalanceCents,
-                            style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.primary,
-                            animate = uiState.scrubbedBalanceCents == null
-                        )
-                    }
-
-                    Surface(
-                        shape = MaterialTheme.shapes.small,
-                        color = readinessColor.copy(alpha = 0.15f)
-                    ) {
-                        Text(
-                            text = "${scenario.readinessPercent.roundToInt()}% FUNDED",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = readinessColor,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = "Target: ${MoneyUtils.formatCompactCents(scenario.targetNestEggCents)}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    val gap = uiState.surplusOrGapCents
-                    Text(
-                        text = if (gap >= 0L) {
-                            "+${MoneyUtils.formatCompactCents(gap)} ahead of target"
-                        } else {
-                            "-${MoneyUtils.formatCompactCents(abs(gap))} below target"
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (gap >= 0L) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
-                    )
-                }
+                Text(
+                    text = "${scenario.readinessPercent.roundToInt()}% FUNDED",
+                    style = TabularNumStyle.copy(fontSize = 11.5.sp, fontWeight = FontWeight.Bold),
+                    color = readinessColor,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                )
             }
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
-        // Interactive 3-Scenario Projection Chart with Scrubbing
+        // 2. Interactive 3-Scenario Accumulation Chart (isolated Draw-phase curves & scrub cursor)
         RetirementProjectionChart(
             currentAge = uiState.currentAge,
             retirementAge = uiState.retirementAge,
@@ -132,59 +113,61 @@ fun RetirementProjectionHeroCard(
             selectedPreset = uiState.preset,
             actualHistoryPoints = uiState.actualHistoryPoints,
             hsaBridge = scenario.hsaBridge,
-            onAgeScrubbed = onAgeScrubbed,
+            onSelectPreset = onSelectPreset,
+            onScrubActiveChanged = { isScrubbingChart = it },
+            isDraggingControl = isDraggingControl,
+            height = chartHeightDp.dp,
             modifier = Modifier.fillMaxWidth()
         )
 
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
-        // Exact Old-PWA Metrics List
-        Surface(
-            shape = MaterialTheme.shapes.medium,
-            color = MaterialTheme.colorScheme.surfaceContainerLow,
-            modifier = Modifier.fillMaxWidth()
+        // 3. 3-Tile Executive KPI Verdict Strip
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Column(
-                modifier = Modifier.padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                OrbitMiniStatRow(
-                    label = "Retirement Target",
-                    value = MoneyUtils.formatCents(scenario.targetNestEggCents, showCents = false)
-                )
-
-                val reqLabel = if (scenario.monthsToRetirement > 0) "Required Monthly Savings" else "Required Today"
-                val reqValue = if (scenario.monthsToRetirement > 0) {
-                    "${MoneyUtils.formatCents(scenario.requiredMonthlyContributionCents, showCents = false)} / mo"
-                } else {
-                    MoneyUtils.formatCents(scenario.fundingGapCents, showCents = false)
-                }
-                OrbitMiniStatRow(
-                    label = reqLabel,
-                    value = reqValue,
-                    valueColor = if (scenario.monthlySavingsGapCents > 0L) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-                )
-
-                val earliestText = if (scenario.earliestRetirementAge != null) {
-                    "Age ${scenario.earliestRetirementAge.roundToInt()}"
-                } else {
-                    "After Age ${uiState.runwayEndAge.toInt()}"
-                }
-                OrbitMiniStatRow(
-                    label = "Earliest Target Age",
-                    value = earliestText,
-                    valueColor = if (scenario.earliestRetirementAge != null && scenario.earliestRetirementAge <= uiState.retirementAge) {
-                        MaterialTheme.colorScheme.primary
-                    } else MaterialTheme.colorScheme.onSurface
-                )
-
-                val savingsRateVal = "${uiState.savingsRatePercent.roundToInt()}% of gross income"
-                OrbitMiniStatRow(
-                    label = "Savings Rate",
-                    value = savingsRateVal,
-                    valueColor = MaterialTheme.colorScheme.onSurface
-                )
+            val reqMonthly = if (scenario.monthsToRetirement > 0) {
+                MoneyUtils.formatCents(scenario.requiredMonthlyContributionCents, showCents = false)
+            } else {
+                MoneyUtils.formatCompactCents(scenario.fundingGapCents)
             }
+            val paceGapText = if (scenario.monthlySavingsGapCents > 0L) {
+                "-${MoneyUtils.formatCompactCents(scenario.monthlySavingsGapCents)}/mo"
+            } else {
+                "On track"
+            }
+            OrbitStatTile(
+                label = "Need / mo",
+                value = reqMonthly,
+                subText = paceGapText,
+                valueColor = if (scenario.monthlySavingsGapCents > 0L) MaterialTheme.colorScheme.onSurface else OrbitTheme.colors.income,
+                subTextColor = if (scenario.monthlySavingsGapCents > 0L) OrbitTheme.colors.expense else OrbitTheme.colors.income,
+                modifier = Modifier.weight(1f)
+            )
+
+            val earliestVal = scenario.earliestRetirementAge?.let { "Age ${it.roundToInt()}" } ?: "Age ${uiState.runwayEndAge.roundToInt()}+"
+            OrbitStatTile(
+                label = "FI Readiness",
+                value = earliestVal,
+                subText = "${uiState.savingsRatePercent.roundToInt()}% gross saved",
+                valueColor = if (scenario.earliestRetirementAge != null && scenario.earliestRetirementAge <= uiState.retirementAge) {
+                    OrbitTheme.colors.income
+                } else MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f)
+            )
+
+            val depletionAge = scenario.depletionAge
+            val runwayVal = if (depletionAge != null) "Age ${depletionAge.roundToInt()}" else "Age ${uiState.runwayEndAge.roundToInt()}+"
+            val runwaySub = if (depletionAge != null) "Depletes early" else "Lasts plan"
+            OrbitStatTile(
+                label = "Runway",
+                value = runwayVal,
+                subText = runwaySub,
+                valueColor = if (depletionAge != null) OrbitTheme.colors.expense else OrbitTheme.colors.income,
+                subTextColor = if (depletionAge != null) OrbitTheme.colors.expense else OrbitTheme.colors.income,
+                modifier = Modifier.weight(1f)
+            )
         }
     }
 }

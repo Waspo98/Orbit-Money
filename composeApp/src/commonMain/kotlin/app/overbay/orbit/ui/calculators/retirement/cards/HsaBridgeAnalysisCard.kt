@@ -10,7 +10,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -24,10 +28,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.HsaBridgeAnalysis
-import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitSprings
-import app.overbay.orbit.ui.components.EmptyStateCard
+import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.OrbitBadge
 import app.overbay.orbit.ui.components.OrbitMiniStatRow
 import app.overbay.orbit.ui.components.OrbitSectionCard
@@ -37,31 +40,63 @@ import app.overbay.orbit.ui.components.orbitMorphContentTransform
 fun HsaBridgeAnalysisCard(
     hsaBridge: HsaBridgeAnalysis?,
     retirementAge: Double,
-    annualSpendingCents: Cents,
     modifier: Modifier = Modifier
 ) {
-    OrbitSectionCard(
-        title = "HSA Early-Retirement Bridge",
-        subtitle = "Pre-age 65 distribution penalty guardrails",
-        modifier = modifier
-    ) {
-        var lastActiveBridge by remember { mutableStateOf(hsaBridge) }
-        if (hsaBridge != null && hsaBridge.bridgeYears > 0) {
-            lastActiveBridge = hsaBridge
-        }
-        AnimatedContent(
-            targetState = hsaBridge == null || hsaBridge.bridgeYears <= 0,
-            transitionSpec = { orbitMorphContentTransform(clip = false) },
-            label = "hsaBridgeContent"
-        ) { isNoBridge ->
-            val activeBridge = lastActiveBridge
-            if (isNoBridge || activeBridge == null) {
-                EmptyStateCard(
-                    title = "No Early-Retirement Bridge Required",
-                    description = "Your target retirement age (${retirementAge.toInt()}) is at or above 65. All HSA distributions for any purpose can be taken penalty-free starting at age 65.",
-                    modifier = Modifier.padding(top = 8.dp)
-                )
-            } else {
+    var lastActiveBridge by remember { mutableStateOf(hsaBridge) }
+    if (hsaBridge != null && hsaBridge.bridgeYears > 0) {
+        lastActiveBridge = hsaBridge
+    }
+
+    val isNoBridgeNeeded = retirementAge >= 65.0 || hsaBridge == null || hsaBridge.bridgeYears <= 0
+
+    AnimatedContent(
+        targetState = isNoBridgeNeeded,
+        transitionSpec = { orbitMorphContentTransform(clip = false) },
+        modifier = modifier,
+        label = "hsaBridgeMode"
+    ) { noBridge ->
+        if (noBridge) {
+            // Compact info banner instead of an oversized empty illustration card
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CheckCircle,
+                        contentDescription = null,
+                        tint = OrbitTheme.colors.income,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "No Pre-65 HSA Bridge Needed",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Retiring at ${retirementAge.toInt()} avoids early non-medical HSA distribution penalties.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        } else {
+            val activeBridge = lastActiveBridge ?: return@AnimatedContent
+            OrbitSectionCard(
+                title = "HSA Early-Retirement Bridge",
+                subtitle = "Pre-age 65 distribution penalty guardrails"
+            ) {
                 val bannerContainerColor by animateColorAsState(
                     targetValue = if (activeBridge.isBridgeCovered) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer,
                     animationSpec = OrbitSprings.ColorEffectsFast,
@@ -73,16 +108,15 @@ fun HsaBridgeAnalysisCard(
                     label = "hsaBannerTitle"
                 )
                 val badgeContainerColor by animateColorAsState(
-                    targetValue = if (activeBridge.isBridgeCovered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                    targetValue = if (activeBridge.isBridgeCovered) OrbitTheme.colors.income else OrbitTheme.colors.expense,
                     animationSpec = OrbitSprings.ColorEffectsFast,
                     label = "hsaBadgeContainer"
                 )
 
                 Column(
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // Status Header Badge Banner
                     Surface(
                         shape = RoundedCornerShape(12.dp),
                         color = bannerContainerColor,
@@ -103,28 +137,27 @@ fun HsaBridgeAnalysisCard(
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
                                     text = if (activeBridge.isBridgeCovered) {
-                                        "Non-HSA portfolio covers ${activeBridge.bridgeYears} bridge years before age 65 without incurring HSA non-medical withdrawal penalties."
+                                        "Non-HSA portfolio covers ${activeBridge.bridgeYears} bridge years before age 65."
                                     } else {
-                                        "Non-HSA funds fall short of living expenses during the ${activeBridge.bridgeYears}-year window before penalty-free HSA access at 65."
+                                        "Non-HSA funds fall short during the ${activeBridge.bridgeYears}-year pre-65 window."
                                     },
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = bannerTitleColor.copy(alpha = 0.8f)
+                                    color = bannerTitleColor.copy(alpha = 0.85f)
                                 )
                             }
 
                             OrbitBadge(
-                                text = if (activeBridge.isBridgeCovered) "Covered" else "-${MoneyUtils.formatCents(activeBridge.shortfallCents, showCents = false)} Short",
+                                text = if (activeBridge.isBridgeCovered) "Covered" else "-${MoneyUtils.formatCompactCents(activeBridge.shortfallCents)} Short",
                                 containerColor = badgeContainerColor,
                                 contentColor = MaterialTheme.colorScheme.surface
                             )
                         }
                     }
 
-                    // Key Metrics Breakdown
                     Surface(
                         shape = RoundedCornerShape(12.dp),
                         color = MaterialTheme.colorScheme.surfaceContainerLow,
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                        border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(
@@ -132,30 +165,32 @@ fun HsaBridgeAnalysisCard(
                             verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             OrbitMiniStatRow(
-                                label = "Bridge Duration",
-                                value = "${activeBridge.bridgeYears} Years (Age ${retirementAge.toInt()} -> 65)"
+                                label = "Bridge Window",
+                                value = "${activeBridge.bridgeYears} Yrs (${retirementAge.toInt()} -> 65)"
                             )
                             OrbitMiniStatRow(
                                 label = "Total Bridge Need",
-                                value = MoneyUtils.formatCents(activeBridge.bridgeNeedCents, showCents = false)
+                                value = MoneyUtils.formatCents(activeBridge.bridgeNeedCents, showCents = false),
+                                showTopDivider = true
                             )
                             OrbitMiniStatRow(
-                                label = "Projected Non-HSA at Retirement",
+                                label = "Projected Non-HSA",
                                 value = MoneyUtils.formatCents(activeBridge.projectedNonHsaAtRetirementCents, showCents = false),
-                                valueColor = MaterialTheme.colorScheme.primary
+                                valueColor = OrbitTheme.colors.income,
+                                showTopDivider = true
                             )
                             OrbitMiniStatRow(
-                                label = "Projected HSA at Retirement (Preserved)",
-                                value = MoneyUtils.formatCents(activeBridge.projectedHsaAtRetirementCents, showCents = false)
+                                label = "Preserved HSA",
+                                value = MoneyUtils.formatCents(activeBridge.projectedHsaAtRetirementCents, showCents = false),
+                                showTopDivider = true
                             )
                         }
                     }
 
-                    // Rule Explainer
                     Text(
-                        text = "Note: Under IRC Section 223, non-medical HSA distributions before age 65 incur ordinary income tax plus a 20% penalty. At age 65, the 20% penalty is eliminated, allowing penalty-free withdrawals for any purpose.",
+                        text = "Under IRC Section 223, non-medical HSA withdrawals before age 65 incur ordinary tax plus a 20% penalty.",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
