@@ -47,11 +47,7 @@ internal fun PortfolioRoiSummaryStrip(
     modifier: Modifier = Modifier
 ) {
     val summary = uiState.cardPortfolioSummary
-    val scopedCredit = if (uiState.playerScopedHub.walletAccountIds.isNotEmpty() || uiState.playerScopedHub.cardCycles.isNotEmpty()) {
-        uiState.playerScopedHub.householdCredit
-    } else {
-        uiState.householdCredit
-    }
+    val scopedCredit = uiState.effectiveHouseholdCredit
     val totalOwed = scopedCredit?.totalOwedCents ?: 0L
     val totalLimit = scopedCredit?.totalLimitCents ?: 0L
     val utilBps = scopedCredit?.utilizationBps

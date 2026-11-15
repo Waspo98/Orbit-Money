@@ -17,6 +17,7 @@ import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.theme.OrbitSprings
+import app.overbay.orbit.ui.accounts.cards.PerkUndoSnackbarEffect
 import app.overbay.orbit.ui.accounts.cards.PerkUsageDialog
 import app.overbay.orbit.ui.accounts.components.AccountDetailInspectorPane
 import app.overbay.orbit.ui.accounts.components.AccountGroupSection
@@ -57,6 +58,14 @@ fun AccountsScreen(
             viewModel.clearSyncError()
         }
     }
+
+    PerkUndoSnackbarEffect(
+        event = state.lastPerkUndoEvent,
+        origin = PerkToggleOrigin.ACCOUNTS,
+        snackbarHostState = snackbarHostState,
+        onUndo = viewModel::undoLastPerkToggle,
+        onDismissOrigin = viewModel::dismissPerkUndo
+    )
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val isTwoPane = maxWidth >= 600.dp || posture.supportsTwoPane

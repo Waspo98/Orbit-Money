@@ -7,6 +7,7 @@ import app.overbay.orbit.data.model.GoalAllocationType
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MoneyUtils
+import kotlinx.datetime.LocalDate
 
 internal fun Goal.linkedAccountIds(): List<Long> {
     val ids = allocations.map { it.accountId }.distinct()
@@ -32,16 +33,12 @@ internal fun Goal.sourceSummaryLabel(accountMap: Map<Long, Account>): String {
     }
 }
 
-internal fun Goal.monthsUntilTargetDate(): Int? {
-    val iso = targetDate ?: return null
-    val today = LocalDateUtils.parseIsoDate(LocalDateUtils.todayIsoDate()) ?: return null
-    val target = LocalDateUtils.parseIsoDate(iso) ?: return null
-    return (target.year - today.year) * 12 + (target.monthNumber - today.monthNumber)
-}
+internal fun Goal.monthsUntilTargetDate(today: LocalDate = LocalDateUtils.todayLocalDate()): Int? =
+    LocalDateUtils.calendarMonthsUntil(targetDate, today)
 
-internal fun Goal.isProjectedPastTargetDate(): Boolean {
+internal fun Goal.isProjectedPastTargetDate(today: LocalDate = LocalDateUtils.todayLocalDate()): Boolean {
     val projectedMonths = eta?.months ?: return false
-    val targetMonths = monthsUntilTargetDate() ?: return false
+    val targetMonths = monthsUntilTargetDate(today) ?: return false
     return projectedMonths > targetMonths
 }
 

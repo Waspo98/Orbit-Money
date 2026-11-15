@@ -51,6 +51,8 @@ class AccountsViewModel(
     val closurePrompts = AccountClosureController(repository, viewModelScope)
     private val _selectedAccountId = MutableStateFlow<Long?>(null)
     internal val currentSelectedAccountId: Long? get() = _selectedAccountId.value
+    internal val currentPerkUndoEvent: PerkToggleUndoEvent?
+        get() = cardActions.currentPerkUndoEvent
     private val _editingAccount = MutableStateFlow<Account?>(null)
     private val _showEditorSheet = MutableStateFlow(false)
     private val _mergingAccount = MutableStateFlow<Account?>(null)
@@ -189,11 +191,10 @@ class AccountsViewModel(
         state.copy(
             todayDate = hub.today,
             showUsedPerks = ctrl.showUsedPerks,
-            showWhichCardWhere = ctrl.showWhichCardWhere,
-            selectedRewardCategory = ctrl.selectedRewardCategory,
             showCardPerksCustomize = ctrl.showCardPerksCustomize,
             perkPeriodFilter = ctrl.perkPeriodFilter,
             whichCardQuery = ctrl.whichCardQuery,
+            chase524SelectedHolderKey = ctrl.chase524SelectedHolderKey,
             lastPerkUndoEvent = ctrl.lastPerkUndoEvent,
             selectedCardPlayer = hub.portfolio.selectedPlayer,
             cardPortfolioSummary = hub.portfolio,
@@ -231,8 +232,7 @@ class AccountsViewModel(
     fun setPhoneViewingDetail(viewing: Boolean) { _isPhoneViewingDetail.value = viewing }
     fun selectCardPlayer(player: String) { _selectedCardPlayer.value = player }
     fun toggleShowUsedPerks() = cardActions.toggleShowUsedPerks()
-    fun toggleShowWhichCardWhere() = cardActions.toggleShowWhichCardWhere()
-    fun selectRewardCategory(category: String?) = cardActions.selectRewardCategory(category)
+    fun dismissPerkUndo(origin: PerkToggleOrigin? = null) = cardActions.dismissPerkUndo(origin)
 
     fun requestDeleteAccount(accountId: Long) {
         val count = repository.accountTransactionCount(accountId)
@@ -456,13 +456,21 @@ class AccountsViewModel(
     fun setCardBenefitUsage(accountId: Long, benefitId: String, amountCents: Cents?) =
         cardActions.setCardBenefitUsage(findCreditAccount(accountId), benefitId, amountCents, uiState.value.todayDate)
 
+    fun selectChase524Holder(holderKey: String) = cardActions.selectChase524Holder(holderKey)
+
     fun toggleCardBenefit(accountId: Long, benefitId: String) =
-        cardActions.toggleCardBenefit(findCreditAccount(accountId), benefitId, uiState.value.todayDate)
+        toggleCardBenefit(accountId, benefitId, PerkToggleOrigin.CARD_PERKS)
+
+    fun toggleCardBenefit(accountId: Long, benefitId: String, origin: PerkToggleOrigin) =
+        cardActions.toggleCardBenefit(findCreditAccount(accountId), benefitId, uiState.value.todayDate, origin)
 
     fun undoLastPerkToggle(event: PerkToggleUndoEvent) =
         cardActions.undoLastPerkToggle(findCreditAccount(event.accountId), event, uiState.value.todayDate)
 
-    fun openPerkUsage(accountId: Long, benefitId: String) {
+    fun openPerkUsage(accountId: Long, benefitId: String) =
+        openPerkUsage(accountId, benefitId, PerkToggleOrigin.CARD_PERKS)
+
+    fun openPerkUsage(accountId: Long, benefitId: String, origin: PerkToggleOrigin) {
         val rawProfile = findCreditAccount(accountId)?.creditCardProfile ?: return
         val today = uiState.value.todayDate
         val profile = CreditCardBenefitEngine.upgradeProfile(rawProfile, today)
@@ -471,7 +479,7 @@ class AccountsViewModel(
         val period = CreditCardBenefitEngine.currentPeriod(benefit, opened, today)
         val periodValue = CreditCardBenefitEngine.periodValueCents(benefit)
         if (periodValue <= 0L) {
-            toggleCardBenefit(accountId, benefitId)
+            toggleCardBenefit(accountId, benefitId, origin)
             return
         }
         _perkUsageTarget.value = PerkUsageTarget(

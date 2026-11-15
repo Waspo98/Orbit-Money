@@ -1,6 +1,12 @@
 package app.overbay.orbit
 
 import app.overbay.orbit.data.OrbitRepository
+import app.overbay.orbit.data.model.Account
+import app.overbay.orbit.data.model.AccountType
+import app.overbay.orbit.data.model.BenefitCadence
+import app.overbay.orbit.data.model.CardBenefit
+import app.overbay.orbit.data.model.CreditCardProfile
+import app.overbay.orbit.ui.accounts.PerkToggleOrigin
 import app.overbay.orbit.ui.components.CanopyTransitionCoordinator
 import app.overbay.orbit.ui.components.TransactionFilterDraft
 import app.overbay.orbit.ui.components.canopyBackdropFillSize
@@ -16,6 +22,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -349,6 +356,59 @@ class NavigationTransitionTest {
             coordinator.navigate(OrbitNavKey.Dashboard, fromTab = true)
             coordinator.navigate(OrbitNavKey.Accounts(), fromTab = true)
             assertNull(viewModels.accountsViewModel.currentSelectedAccountId)
+        } finally {
+            Dispatchers.resetMain()
+            storage.clear()
+        }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `leaving accounts or card perks dismisses pending perk undo event across navigation`() = runTest {
+        val testDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(testDispatcher)
+        val storage = PlatformStorage()
+        storage.clear()
+        try {
+            val repo = OrbitRepository(storage)
+            repo.initialize()
+            val savedCard = repo.saveAccount(
+                Account(
+                    id = 88L,
+                    name = "Gold Card",
+                    type = AccountType.CREDIT,
+                    creditCardProfile = CreditCardProfile(
+                        accountId = 88L,
+                        benefits = listOf(
+                            CardBenefit(
+                                id = "dining",
+                                title = "Dining Credit",
+                                periodValueCents = 10_00L,
+                                cadence = BenefitCadence.MONTHLY
+                            )
+                        )
+                    )
+                )
+            )
+            val controller = OrbitBackStackController(OrbitNavKey.Accounts())
+            val viewModels = OrbitViewModelHolder(repo)
+            val coordinator = OrbitNavigationCoordinator(controller, viewModels)
+
+            viewModels.accountsViewModel.toggleCardBenefit(savedCard.id, "dining", PerkToggleOrigin.ACCOUNTS)
+            testScheduler.advanceUntilIdle()
+            assertNotNull(viewModels.accountsViewModel.currentPerkUndoEvent)
+
+            // Navigating from Accounts -> CardPerks dismisses pending undo before entering CardPerks
+            coordinator.navigate(OrbitNavKey.CardPerks(), fromTab = false)
+            assertNull(viewModels.accountsViewModel.currentPerkUndoEvent)
+
+            // Toggling in CardPerks then popping back dismisses pending undo too
+            viewModels.accountsViewModel.toggleCardBenefit(savedCard.id, "dining", PerkToggleOrigin.CARD_PERKS)
+            testScheduler.advanceUntilIdle()
+            assertNotNull(viewModels.accountsViewModel.currentPerkUndoEvent)
+
+            assertTrue(coordinator.popBack())
+            assertNull(viewModels.accountsViewModel.currentPerkUndoEvent)
         } finally {
             Dispatchers.resetMain()
             storage.clear()

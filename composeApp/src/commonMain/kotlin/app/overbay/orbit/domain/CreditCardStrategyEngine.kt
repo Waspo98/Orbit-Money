@@ -105,6 +105,28 @@ object CreditCardStrategyEngine {
 
     const val ALL_PLAYERS = "ALL"
 
+    /**
+     * Returns whether [account] belongs to [selectedPlayer], matching primary cardholders,
+     * authorized users, and case-insensitive legacy cardholder labels identically across
+     * domain portfolio aggregation and UI filtering.
+     */
+    fun matchesPlayer(
+        account: Account,
+        selectedPlayer: String,
+        householdMembers: List<HouseholdMember>
+    ): Boolean {
+        if (selectedPlayer == ALL_PLAYERS) return true
+        val strat = account.creditCardProfile?.strategy ?: return false
+        if (selectedPlayer.startsWith("m:")) {
+            val mId = selectedPlayer.removePrefix("m:").toLongOrNull() ?: return false
+            val memberName = householdMembers.firstOrNull { it.id == mId }?.name
+            return strat.cardholderMemberId == mId ||
+                strat.authorizedUserMemberIds.contains(mId) ||
+                (memberName != null && strat.cardholder.equals(memberName, ignoreCase = true))
+        }
+        return strat.cardholder?.trim()?.lowercase() == selectedPlayer
+    }
+
     internal fun resolveCardholderName(
         strategy: CreditCardStrategy,
         memberMap: Map<Long, HouseholdMember>
@@ -154,9 +176,7 @@ object CreditCardStrategyEngine {
         val playerFiltered = if (effectivePlayer == ALL_PLAYERS) {
             creditAccounts
         } else {
-            creditAccounts.filter {
-                it.creditCardProfile?.let { p -> holderKey(p.strategy) } == effectivePlayer
-            }
+            creditAccounts.filter { matchesPlayer(it, effectivePlayer, householdMembers) }
         }
 
         val activeCards = playerFiltered.filter { !it.isArchived && it.creditCardProfile?.strategy?.closedDate.isNullOrBlank() }

@@ -112,16 +112,9 @@ class GoalsViewModel(
         val activeSaved = activeGoals.sumOf { it.currentAmountCents }
         val activeTarget = activeGoals.sumOf { it.targetAmountCents }
         val combinedPace = activeGoals.sumOf { it.monthlyPaceCents.coerceAtLeast(0L) }
-        val combinedRequired = activeGoals.sumOf { calculateMonthlyRequiredCents(it) ?: 0L }
+        val today = LocalDateUtils.todayLocalDate()
+        val combinedRequired = activeGoals.sumOf { calculateMonthlyRequiredCents(it, today) ?: 0L }
         val totalUnallocated = accountSummaries.sumOf { it.remainingAmountCents }
-        val onTrackCount = activeGoals.count { goal ->
-            val pace = goal.monthlyPaceCents
-            if (pace <= 0L) false
-            else {
-                val req = calculateMonthlyRequiredCents(goal)
-                req == null || pace >= req
-            }
-        }
 
         GoalsUiState(
             goals = sortedGoals,
@@ -135,7 +128,7 @@ class GoalsViewModel(
             combinedMonthlyPaceCents = combinedPace,
             combinedMonthlyRequiredCents = combinedRequired,
             totalUnallocatedCashCents = totalUnallocated,
-            onTrackActiveCount = onTrackCount,
+            todayDate = today,
             activeTab = control.prefs.activeTab,
             showCompletedGoals = control.prefs.showCompletedGoals,
             showUnallocatedAccounts = control.prefs.showUnallocatedAccounts,
@@ -278,17 +271,16 @@ class GoalsViewModel(
         }
     }
 
-    fun calculateMonthlyRequiredCents(goal: Goal): Cents? {
-        val targetDateIso = goal.targetDate ?: return null
+    fun calculateMonthlyRequiredCents(goal: Goal): Cents? =
+        calculateMonthlyRequiredCents(goal, LocalDateUtils.todayLocalDate())
+
+    fun calculateMonthlyRequiredCents(
+        goal: Goal,
+        today: kotlinx.datetime.LocalDate
+    ): Cents? {
         if (goal.isCompleted) return 0L
-
-        val todayIso = LocalDateUtils.todayIsoDate()
-        val today = LocalDateUtils.parseIsoDate(todayIso) ?: return null
-        val target = LocalDateUtils.parseIsoDate(targetDateIso) ?: return null
-
-        val months = (target.year - today.year) * 12 + (target.monthNumber - today.monthNumber)
+        val months = LocalDateUtils.calendarMonthsUntil(goal.targetDate, today) ?: return null
         if (months <= 0) return goal.remainingAmountCents
-
         return goal.remainingAmountCents / months
     }
 

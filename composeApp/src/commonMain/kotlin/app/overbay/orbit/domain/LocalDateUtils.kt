@@ -117,6 +117,11 @@ object LocalDateUtils {
         return daysBetween(s, e)
     }
 
+    fun calendarMonthsUntil(targetIso: String?, today: LocalDate = todayLocalDate()): Int? {
+        val target = parseIsoDate(targetIso) ?: return null
+        return (target.year - today.year) * 12 + (target.monthNumber - today.monthNumber)
+    }
+
     fun isToday(date: LocalDate, timeZone: TimeZone = TimeZone.currentSystemDefault()): Boolean {
         return date == todayLocalDate(timeZone)
     }

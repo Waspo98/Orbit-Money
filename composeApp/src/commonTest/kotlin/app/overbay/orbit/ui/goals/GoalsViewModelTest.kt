@@ -7,8 +7,12 @@ import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.data.model.Goal
 import app.overbay.orbit.data.model.GoalAllocation
 import app.overbay.orbit.data.model.GoalAllocationType
+import app.overbay.orbit.data.model.GoalEtaInfo
 import app.overbay.orbit.domain.LocalDateUtils
+import app.overbay.orbit.ui.goals.components.isProjectedPastTargetDate
+import app.overbay.orbit.ui.goals.components.monthsUntilTargetDate
 import app.overbay.orbit.util.PlatformStorage
+import kotlinx.datetime.LocalDate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -345,6 +349,59 @@ class GoalsViewModelTest {
 
         val overSummary = fullSummary.copy(allocatedAmountCents = 210000L, allocatedPercent = 102.3)
         assertTrue(overSummary.isOverAllocated)
+
+        collectJob.cancel()
+    }
+
+    @Test
+    fun testGoalDisplayHelpers_monthsUntilAndPastTargetProjection() {
+        val today = LocalDate(2026, 11, 14)
+        val goalAhead = Goal(
+            id = 1L,
+            name = "Vacation",
+            targetAmountCents = 500_000L,
+            targetDate = "2027-05-01",
+            eta = GoalEtaInfo(months = 4, date = "Mar 2027")
+        )
+        val goalBehind = goalAhead.copy(
+            eta = GoalEtaInfo(months = 8, date = "Jul 2027")
+        )
+
+        assertEquals(6, goalAhead.monthsUntilTargetDate(today))
+        assertFalse(goalAhead.isProjectedPastTargetDate(today))
+        assertTrue(goalBehind.isProjectedPastTargetDate(today))
+    }
+
+    @Test
+    fun testGoalEditorDeleteCancelPreservesEditingState() = runTest(testDispatcher) {
+        val goal = Goal(id = 21L, name = "Emergency", targetAmountCents = 1_000_000L, currentAmountCents = 200_000L)
+        repository.saveGoal(goal)
+        val collectJob = launch { viewModel.uiState.collect {} }
+        testScheduler.advanceUntilIdle()
+
+        val saved = viewModel.uiState.value.goals.first { it.name == "Emergency" }
+        viewModel.openEditGoal(saved)
+        testScheduler.advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.showEditorSheet)
+
+        // Requesting delete then canceling keeps the editor open and intact
+        viewModel.requestDeleteGoal(saved.id)
+        testScheduler.advanceUntilIdle()
+        assertEquals(saved.id, viewModel.uiState.value.deleteConfirmGoalId)
+        assertTrue(viewModel.uiState.value.showEditorSheet)
+
+        viewModel.dismissDeleteGoal()
+        testScheduler.advanceUntilIdle()
+        assertNull(viewModel.uiState.value.deleteConfirmGoalId)
+        assertTrue(viewModel.uiState.value.showEditorSheet)
+        assertEquals(saved.id, viewModel.uiState.value.editingGoal?.id)
+
+        // Confirming delete closes the editor and removes the goal
+        viewModel.deleteGoal(saved.id)
+        testScheduler.advanceUntilIdle()
+        assertFalse(viewModel.uiState.value.showEditorSheet)
+        assertNull(viewModel.uiState.value.editingGoal)
+        assertTrue(viewModel.uiState.value.goals.none { it.id == saved.id })
 
         collectJob.cancel()
     }

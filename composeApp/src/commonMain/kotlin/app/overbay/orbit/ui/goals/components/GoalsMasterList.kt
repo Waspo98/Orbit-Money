@@ -37,6 +37,7 @@ import app.overbay.orbit.ui.components.rememberDragReorderState
 import app.overbay.orbit.ui.components.rememberOrbitLazyListState
 import app.overbay.orbit.ui.goals.GoalsTab
 import app.overbay.orbit.ui.goals.GoalsUiState
+import kotlinx.datetime.LocalDate
 
 /**
  * Scrollable master list for Savings Goals featuring the active-target summary hero,
@@ -146,6 +147,7 @@ fun GoalsMasterList(
                             accountMap = state.accountMap,
                             inspectingGoalId = state.inspectingGoalId,
                             isReorderMode = state.isReorderMode,
+                            today = state.todayDate,
                             reorderState = activeReorderState,
                             calculateMonthlyNeeded = calculateMonthlyNeeded,
                             onGoalClick = onGoalClick
@@ -179,6 +181,7 @@ fun GoalsMasterList(
                                 accountMap = state.accountMap,
                                 inspectingGoalId = state.inspectingGoalId,
                                 isReorderMode = state.isReorderMode,
+                                today = state.todayDate,
                                 reorderState = completedReorderState,
                                 calculateMonthlyNeeded = { 0L },
                                 onGoalClick = onGoalClick
@@ -215,6 +218,7 @@ private fun LazyListScope.goalCardItems(
     accountMap: Map<Long, Account>,
     inspectingGoalId: Long?,
     isReorderMode: Boolean,
+    today: LocalDate,
     reorderState: OrbitDragReorderState<Long>,
     calculateMonthlyNeeded: (Goal) -> Cents?,
     onGoalClick: (Goal) -> Unit
@@ -225,6 +229,7 @@ private fun LazyListScope.goalCardItems(
             accountMap = accountMap,
             monthlyNeededCents = calculateMonthlyNeeded(goal),
             isInspected = inspectingGoalId == goal.id,
+            today = today,
             onClick = { onGoalClick(goal) },
             dragHandle = if (isReorderMode) {
                 { OrbitDragHandle(state = reorderState, key = goal.id) }

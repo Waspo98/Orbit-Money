@@ -4,6 +4,8 @@ import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.AccountAllocationSummary
 import app.overbay.orbit.data.model.Goal
 import app.overbay.orbit.domain.Cents
+import app.overbay.orbit.domain.LocalDateUtils
+import kotlinx.datetime.LocalDate
 
 enum class GoalsTab(val label: String) {
     GOALS("Goals"),
@@ -22,7 +24,7 @@ data class GoalsUiState(
     val combinedMonthlyPaceCents: Cents = 0L,
     val combinedMonthlyRequiredCents: Cents = 0L,
     val totalUnallocatedCashCents: Cents = 0L,
-    val onTrackActiveCount: Int = 0,
+    val todayDate: LocalDate = LocalDateUtils.todayLocalDate(),
     val activeTab: GoalsTab = GoalsTab.GOALS,
     val showCompletedGoals: Boolean = true,
     val showUnallocatedAccounts: Boolean = false,

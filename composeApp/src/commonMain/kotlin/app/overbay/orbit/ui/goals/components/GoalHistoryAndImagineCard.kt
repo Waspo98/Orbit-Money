@@ -37,6 +37,7 @@ import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.ui.components.OrbitSegmentedTabRow
 import app.overbay.orbit.ui.components.orbitMorphContentTransform
 import app.overbay.orbit.util.LocalOrbitHaptics
+import kotlinx.datetime.LocalDate
 import kotlin.math.roundToInt
 
 /**
@@ -50,13 +51,14 @@ fun GoalHistoryAndImagineCard(
     onTimeframeChanged: (Int) -> Unit,
     whatIfBoostCents: Cents,
     onWhatIfBoostChanged: (Cents) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    today: LocalDate = LocalDateUtils.todayLocalDate()
 ) {
     val colors = OrbitTheme.colors
     val haptics = LocalOrbitHaptics.current
-    val baselinePace = goal.monthlyPaceCents ?: 0L
+    val baselinePace = goal.monthlyPaceCents
     val isStalled = !goal.isCompleted && baselinePace <= 0L
-    val isPastTarget = !goal.isCompleted && goal.isProjectedPastTargetDate()
+    val isPastTarget = !goal.isCompleted && goal.isProjectedPastTargetDate(today)
 
     val (badgeLabel, badgeColor) = when {
         goal.isCompleted -> "Reached" to colors.income
@@ -127,7 +129,8 @@ fun GoalHistoryAndImagineCard(
                 goal = goal,
                 baselinePace = baselinePace,
                 whatIfBoostCents = whatIfBoostCents,
-                onWhatIfBoostChanged = onWhatIfBoostChanged
+                onWhatIfBoostChanged = onWhatIfBoostChanged,
+                today = today
             )
         }
     }
@@ -139,12 +142,13 @@ private fun GoalWhatIfPlannerSection(
     goal: Goal,
     baselinePace: Cents,
     whatIfBoostCents: Cents,
-    onWhatIfBoostChanged: (Cents) -> Unit
+    onWhatIfBoostChanged: (Cents) -> Unit,
+    today: LocalDate
 ) {
     val colors = OrbitTheme.colors
     val haptics = LocalOrbitHaptics.current
     val remainingCents = (goal.targetAmountCents - goal.currentAmountCents).coerceAtLeast(0L)
-    val targetMonths = remember(goal.targetDate) { goal.monthsUntilTargetDate() }
+    val targetMonths = remember(goal.targetDate, today) { goal.monthsUntilTargetDate(today) }
     val requiredMonthlyCents = if (targetMonths != null && targetMonths > 0 && remainingCents > 0L) {
         (remainingCents + targetMonths - 1) / targetMonths
     } else {

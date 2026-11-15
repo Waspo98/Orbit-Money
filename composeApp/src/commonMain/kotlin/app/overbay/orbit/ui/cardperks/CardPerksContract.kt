@@ -6,6 +6,7 @@ import app.overbay.orbit.data.model.OrbitPreferences
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.ui.accounts.AccountsViewModel
 import app.overbay.orbit.ui.accounts.PerkPeriodFilter
+import app.overbay.orbit.ui.accounts.PerkToggleOrigin
 import app.overbay.orbit.ui.accounts.PerkToggleUndoEvent
 import app.overbay.orbit.ui.accounts.cards.CardEditorController
 import app.overbay.orbit.ui.accounts.cards.CardEditorTab
@@ -95,7 +96,8 @@ data class CardPerksBentoActions(
     val onOpenPerkUsage: (accountId: Long, benefitId: String) -> Unit,
     val onToggleShowUsedPerks: () -> Unit,
     val onSelectPerkFilter: (PerkPeriodFilter) -> Unit,
-    val onWhichCardQueryChange: (String) -> Unit
+    val onWhichCardQueryChange: (String) -> Unit,
+    val onSelectChase524Holder: (String) -> Unit = {}
 )
 
 data class CardPerksActions(
@@ -111,7 +113,7 @@ data class CardPerksActions(
     val onSavePerkUsage: (accountId: Long, benefitId: String, amountCents: Cents?) -> Unit,
     val onClosePerkUsage: () -> Unit,
     val onUndoPerkToggle: (PerkToggleUndoEvent) -> Unit,
-    val onDismissPerkUndo: () -> Unit,
+    val onDismissPerkUndo: (PerkToggleOrigin) -> Unit,
     val onClearSyncError: () -> Unit
 )
 
@@ -123,7 +125,8 @@ fun AccountsViewModel.toCardPerksActions(): CardPerksActions = CardPerksActions(
         onOpenPerkUsage = ::openPerkUsage,
         onToggleShowUsedPerks = ::toggleShowUsedPerks,
         onSelectPerkFilter = cardActions::selectPerkFilter,
-        onWhichCardQueryChange = cardActions::setWhichCardQuery
+        onWhichCardQueryChange = cardActions::setWhichCardQuery,
+        onSelectChase524Holder = ::selectChase524Holder
     ),
     cardEditor = cardEditor,
     onSelectPlayer = ::selectCardPlayer,
@@ -136,7 +139,7 @@ fun AccountsViewModel.toCardPerksActions(): CardPerksActions = CardPerksActions(
     onSavePerkUsage = ::setCardBenefitUsage,
     onClosePerkUsage = ::closePerkUsage,
     onUndoPerkToggle = ::undoLastPerkToggle,
-    onDismissPerkUndo = cardActions::dismissPerkUndo,
+    onDismissPerkUndo = ::dismissPerkUndo,
     onClearSyncError = ::clearSyncError
 )
 
@@ -204,3 +207,56 @@ fun List<OrbitBentoCustomizeItem<CardPerksCardType>>.toWidgetConfigs(): List<Das
             wideSpan = item.wideSpan
         )
     }
+
+/**
+ * Toggles [targetType] visibility across the full normalized widget list so hidden strategy
+ * widgets retain their saved order, visibility, and span even when Strategy Tools are disabled.
+ */
+fun toggleCardPerksWidgetVisibility(
+    savedWidgets: List<DashboardWidgetConfig>,
+    targetType: CardPerksCardType
+): List<DashboardWidgetConfig> =
+    resolveCardPerksItems(savedWidgets, rewardsToolsEnabled = true)
+        .map { if (it.key == targetType) it.copy(isVisible = !it.isVisible) else it }
+        .toWidgetConfigs()
+
+/**
+ * Updates [targetType]'s wide span across the full normalized widget list without dropping
+ * hidden strategy widget configurations.
+ */
+fun setCardPerksWidgetWideSpan(
+    savedWidgets: List<DashboardWidgetConfig>,
+    targetType: CardPerksCardType,
+    span: Int
+): List<DashboardWidgetConfig> =
+    resolveCardPerksItems(savedWidgets, rewardsToolsEnabled = true)
+        .map { if (it.key == targetType) it.copy(wideSpan = span.coerceIn(1, 2)) else it }
+        .toWidgetConfigs()
+
+/**
+ * Reorders customizable Bento items using [fromVisibleIndex] / [toVisibleIndex] within the
+ * currently shown subset while preserving the relative order and state of hidden strategy cards.
+ */
+fun moveVisibleCardPerksWidget(
+    savedWidgets: List<DashboardWidgetConfig>,
+    rewardsToolsEnabled: Boolean,
+    fromVisibleIndex: Int,
+    toVisibleIndex: Int
+): List<DashboardWidgetConfig> {
+    val allResolved = resolveCardPerksItems(savedWidgets, rewardsToolsEnabled = true)
+    val visibleSlots = allResolved.indices.filter { idx ->
+        rewardsToolsEnabled || !allResolved[idx].key.isStrategyTool
+    }
+    if (fromVisibleIndex !in visibleSlots.indices || toVisibleIndex !in visibleSlots.indices || fromVisibleIndex == toVisibleIndex) {
+        return allResolved.toWidgetConfigs()
+    }
+    val reorderedVisible = visibleSlots.map { allResolved[it] }.toMutableList()
+    val moved = reorderedVisible.removeAt(fromVisibleIndex)
+    reorderedVisible.add(toVisibleIndex, moved)
+
+    val merged = allResolved.toMutableList()
+    visibleSlots.forEachIndexed { pos, fullIdx ->
+        merged[fullIdx] = reorderedVisible[pos]
+    }
+    return merged.toWidgetConfigs()
+}

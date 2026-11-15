@@ -433,7 +433,7 @@ class AccountsViewModelTest {
     }
 
     @Test
-    fun testCreditCardsHub_togglesAndCategorySelection() = runTest(testDispatcher) {
+    fun testCreditCardsHub_controlsAndChase524HolderSelection() = runTest(testDispatcher) {
         val collectJob = launch(testDispatcher) {
             viewModel.uiState.collect {}
         }
@@ -444,15 +444,25 @@ class AccountsViewModelTest {
         testScheduler.advanceUntilIdle()
         assertTrue(viewModel.uiState.value.showUsedPerks)
 
-        assertFalse(viewModel.uiState.value.showWhichCardWhere)
-        viewModel.toggleShowWhichCardWhere()
+        assertEquals("", viewModel.uiState.value.whichCardQuery)
+        viewModel.cardActions.setWhichCardQuery("Dining")
         testScheduler.advanceUntilIdle()
-        assertTrue(viewModel.uiState.value.showWhichCardWhere)
+        assertEquals("Dining", viewModel.uiState.value.whichCardQuery)
 
-        assertNull(viewModel.uiState.value.selectedRewardCategory)
-        viewModel.selectRewardCategory("Dining")
+        assertEquals(PerkPeriodFilter.ALL, viewModel.uiState.value.perkPeriodFilter)
+        viewModel.cardActions.selectPerkFilter(PerkPeriodFilter.EXPIRING_SOON)
         testScheduler.advanceUntilIdle()
-        assertEquals("Dining", viewModel.uiState.value.selectedRewardCategory)
+        assertEquals(PerkPeriodFilter.EXPIRING_SOON, viewModel.uiState.value.perkPeriodFilter)
+
+        assertFalse(viewModel.uiState.value.showCardPerksCustomize)
+        viewModel.cardActions.setCardPerksCustomize(true)
+        testScheduler.advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.showCardPerksCustomize)
+
+        assertNull(viewModel.uiState.value.chase524SelectedHolderKey)
+        viewModel.selectChase524Holder("m:20")
+        testScheduler.advanceUntilIdle()
+        assertEquals("m:20", viewModel.uiState.value.chase524SelectedHolderKey)
 
         collectJob.cancel()
     }
@@ -594,6 +604,7 @@ class AccountsViewModelTest {
         assertNotNull(firstUndo)
         assertEquals(null, firstUndo.previousAmountCents)
         assertEquals(2_500L, firstUndo.newAmountCents)
+        assertEquals("Marked Dining Credit used ($25)", formatPerkToggleUndoMessage(firstUndo))
 
         // Undo 2500L -> null (0L)
         viewModel.undoLastPerkToggle(firstUndo)
@@ -664,6 +675,63 @@ class AccountsViewModelTest {
         assertEquals(602L, draft.accountId)
         assertEquals(app.overbay.orbit.ui.accounts.cards.CardEditorTab.BILLING, draft.activeTab)
         assertEquals(app.overbay.orbit.ui.accounts.cards.CardEditorStep.PICK_TEMPLATE, draft.step)
+
+        collectJob.cancel()
+    }
+
+    @Test
+    fun testToggleCardBenefit_nonMonetaryPerkOmitsPennyCopyAndRespectsOriginDismissal() = runTest(testDispatcher) {
+        val card = repository.saveAccount(
+            Account(
+                id = 603L,
+                name = "Airline Card",
+                type = AccountType.CREDIT,
+                creditCardProfile = CreditCardProfile(
+                    accountId = 603L,
+                    cardName = "Airline Card",
+                    benefits = listOf(
+                        CardBenefit(
+                            id = "companion_pass",
+                            title = "Companion Certificate",
+                            periodValueCents = 0L,
+                            cadence = app.overbay.orbit.data.model.BenefitCadence.ANNUAL
+                        )
+                    )
+                )
+            )
+        )
+
+        val collectJob = launch(testDispatcher) {
+            viewModel.uiState.collect {}
+        }
+        testScheduler.advanceUntilIdle()
+
+        viewModel.toggleCardBenefit(card.id, "companion_pass", PerkToggleOrigin.ACCOUNTS)
+        testScheduler.advanceUntilIdle()
+
+        val usedEvent = viewModel.uiState.value.lastPerkUndoEvent
+        assertNotNull(usedEvent)
+        assertFalse(usedEvent.isMonetaryValue)
+        assertEquals(1L, usedEvent.newAmountCents)
+        assertEquals(PerkToggleOrigin.ACCOUNTS, usedEvent.origin)
+        assertEquals("Marked Companion Certificate used", formatPerkToggleUndoMessage(usedEvent))
+
+        // Dismissing CARD_PERKS origin must NOT clear an ACCOUNTS event, whereas ACCOUNTS dismissal clears it
+        viewModel.dismissPerkUndo(PerkToggleOrigin.CARD_PERKS)
+        testScheduler.advanceUntilIdle()
+        assertNotNull(viewModel.uiState.value.lastPerkUndoEvent)
+
+        viewModel.dismissPerkUndo(PerkToggleOrigin.ACCOUNTS)
+        testScheduler.advanceUntilIdle()
+        assertNull(viewModel.uiState.value.lastPerkUndoEvent)
+
+        // Toggling again clears back to null and formats clear copy cleanly
+        viewModel.toggleCardBenefit(card.id, "companion_pass", PerkToggleOrigin.CARD_PERKS)
+        testScheduler.advanceUntilIdle()
+        val clearedEvent = viewModel.uiState.value.lastPerkUndoEvent
+        assertNotNull(clearedEvent)
+        assertNull(clearedEvent.newAmountCents)
+        assertEquals("Cleared Companion Certificate", formatPerkToggleUndoMessage(clearedEvent))
 
         collectJob.cancel()
     }

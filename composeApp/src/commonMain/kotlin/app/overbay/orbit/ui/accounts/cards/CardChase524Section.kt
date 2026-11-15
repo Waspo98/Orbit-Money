@@ -23,10 +23,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,6 +42,8 @@ import app.overbay.orbit.util.LocalOrbitHaptics
 @Composable
 fun Chase524SectionCard(
     people: List<Chase524PersonSummary>,
+    selectedHolderKey: String? = null,
+    onSelectHolder: (String) -> Unit = {},
     onInspectAccount: (Long) -> Unit,
     onFixMissingOpenDate: (Long) -> Unit,
     modifier: Modifier = Modifier
@@ -62,9 +60,6 @@ fun Chase524SectionCard(
         return
     }
 
-    var selectedHolderKey by rememberSaveable(people.map { it.holderKey }.joinToString(",")) {
-        mutableStateOf(people.first().holderKey)
-    }
     val activePerson = people.firstOrNull { it.holderKey == selectedHolderKey } ?: people.first()
     val count = activePerson.summary.count
     val missing = activePerson.summary.missingOpenDateCount
@@ -97,7 +92,7 @@ fun Chase524SectionCard(
                                 .clip(RoundedCornerShape(50))
                                 .clickable {
                                     haptics.tick()
-                                    selectedHolderKey = person.holderKey
+                                    onSelectHolder(person.holderKey)
                                 }
                         ) {
                             Text(

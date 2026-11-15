@@ -11,16 +11,17 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.ui.components.CanopyMenuAction
 import app.overbay.orbit.ui.components.CanopyMoreMenuButton
+import app.overbay.orbit.ui.components.CanopySettingsButton
 import app.overbay.orbit.ui.components.CanopySurfacePill
 import app.overbay.orbit.ui.components.HeroScrollState
 import app.overbay.orbit.ui.components.MorphingPageHero
@@ -46,7 +47,7 @@ fun GoalsScreen(
     onNavigate: (OrbitNavKey) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     val posture = LocalDevicePosture.current
     val haptics = LocalOrbitHaptics.current
     val heroScrollState = rememberHeroScrollState()
@@ -77,7 +78,8 @@ fun GoalsScreen(
                         state = state,
                         heroScrollState = heroScrollState,
                         onToggleReorder = viewModel::toggleReorderMode,
-                        onToggleCompleted = viewModel::toggleCompletedGoals
+                        onToggleCompleted = viewModel::toggleCompletedGoals,
+                        onOpenSettings = { onNavigate(OrbitNavKey.Settings) }
                     )
 
                     val startPad = if (isTwoPane) 20.dp else 16.dp
@@ -161,7 +163,8 @@ private fun GoalsScreenCanopy(
     state: GoalsUiState,
     heroScrollState: HeroScrollState,
     onToggleReorder: () -> Unit,
-    onToggleCompleted: () -> Unit
+    onToggleCompleted: () -> Unit,
+    onOpenSettings: () -> Unit
 ) {
     MorphingPageHero(
         kicker = "SAVING TARGETS",
@@ -206,6 +209,11 @@ private fun GoalsScreenCanopy(
                         onClick = onToggleCompleted
                     )
                 )
+            )
+
+            CanopySettingsButton(
+                buttonSize = barHeight,
+                onClick = onOpenSettings
             )
         }
     )

@@ -53,6 +53,7 @@ import app.overbay.orbit.ui.goals.GoalsViewModel
 import app.overbay.orbit.ui.goals.dialogs.GoalEditorContent
 import app.overbay.orbit.util.BackHandler
 import app.overbay.orbit.util.LocalOrbitHaptics
+import kotlinx.datetime.LocalDate
 import kotlin.math.roundToInt
 
 private enum class GoalInspectorSubMode { DETAIL, EDIT }
@@ -96,10 +97,7 @@ fun GoalDetailInspectorPane(
                     accounts = state.accounts,
                     existingGoals = state.goals,
                     onSave = { updated, steal -> viewModel.saveGoalWithAllocations(updated, steal) },
-                    onDelete = { id ->
-                        viewModel.closeEditorSheet()
-                        viewModel.requestDeleteGoal(id)
-                    },
+                    onDelete = { id -> viewModel.requestDeleteGoal(id) },
                     onDismiss = onClosePane,
                     onNavigateBack = if (canBackToDetail) {
                         {
@@ -120,7 +118,8 @@ fun GoalDetailInspectorPane(
                     GoalReadOnlyDetailContent(
                         goal = inspecting,
                         accountMap = state.accountMap,
-                        monthlyNeededCents = viewModel.calculateMonthlyRequiredCents(inspecting),
+                        monthlyNeededCents = viewModel.calculateMonthlyRequiredCents(inspecting, state.todayDate),
+                        today = state.todayDate,
                         historyMonths = state.historyMonths,
                         whatIfBoostCents = state.whatIfBoostCents,
                         onTimeframeChanged = viewModel::setHistoryMonths,
@@ -151,6 +150,7 @@ private fun GoalReadOnlyDetailContent(
     goal: Goal,
     accountMap: Map<Long, Account>,
     monthlyNeededCents: Cents?,
+    today: LocalDate,
     historyMonths: Int,
     whatIfBoostCents: Cents,
     onTimeframeChanged: (Int) -> Unit,
@@ -167,7 +167,7 @@ private fun GoalReadOnlyDetailContent(
     val progressColor = if (goal.isCompleted) colors.income else MaterialTheme.colorScheme.primary
     val projectedLabel = goal.projectedLandingLabel()
     val isStalled = !goal.isCompleted && projectedLabel == "Stalled"
-    val isPastTarget = !goal.isCompleted && !isStalled && goal.isProjectedPastTargetDate()
+    val isPastTarget = !goal.isCompleted && !isStalled && goal.isProjectedPastTargetDate(today)
 
     Column(
         modifier = (if (isInsideSheet) Modifier.fillMaxWidth() else Modifier.fillMaxSize())
@@ -360,7 +360,8 @@ private fun GoalReadOnlyDetailContent(
             selectedMonths = historyMonths,
             onTimeframeChanged = onTimeframeChanged,
             whatIfBoostCents = whatIfBoostCents,
-            onWhatIfBoostChanged = onWhatIfBoostChanged
+            onWhatIfBoostChanged = onWhatIfBoostChanged,
+            today = today
         )
 
         Row(

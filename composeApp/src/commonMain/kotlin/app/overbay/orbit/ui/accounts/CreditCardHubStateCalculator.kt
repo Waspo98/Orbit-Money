@@ -121,12 +121,13 @@ object CreditCardHubStateCalculator {
             val p = acct.creditCardProfile
             p == null || p.statementClosingDay == null || p.paymentDueDay == null
         }
-        val firstMissingOpenDateId = portfolio.chase524ByPerson
-            .firstOrNull { person ->
-                (selectedPlayer == CreditCardStrategyEngine.ALL_PLAYERS || person.holderKey == selectedPlayer) &&
-                    person.summary.missingOpenDateAccountIds.isNotEmpty()
-            }?.summary?.missingOpenDateAccountIds?.firstOrNull()
-            ?: portfolio.chase524ByPerson.firstNotNullOfOrNull { it.summary.missingOpenDateAccountIds.firstOrNull() }
+        val firstMissingOpenDateId = if (selectedPlayer == CreditCardStrategyEngine.ALL_PLAYERS) {
+            portfolio.chase524ByPerson.firstNotNullOfOrNull { it.summary.missingOpenDateAccountIds.firstOrNull() }
+        } else {
+            portfolio.chase524ByPerson
+                .firstOrNull { it.holderKey == selectedPlayer }
+                ?.summary?.missingOpenDateAccountIds?.firstOrNull()
+        }
 
         return PlayerScopedCreditHub(
             walletAccountIds = walletIds,

@@ -102,11 +102,10 @@ data class AccountsUiState(
     val missingBillingDatesCount: Int = 0,
     val playerScopedHub: PlayerScopedCreditHub = PlayerScopedCreditHub(),
     val showUsedPerks: Boolean = false,
-    val showWhichCardWhere: Boolean = false,
-    val selectedRewardCategory: String? = null,
     val showCardPerksCustomize: Boolean = false,
     val perkPeriodFilter: PerkPeriodFilter = PerkPeriodFilter.ALL,
     val whichCardQuery: String = "",
+    val chase524SelectedHolderKey: String? = null,
     val lastPerkUndoEvent: PerkToggleUndoEvent? = null,
     val logoFinderAccount: Account? = null,
     val cardPerksWidgets: List<DashboardWidgetConfig> = OrbitPreferences.defaultCardPerksWidgets(),
@@ -139,4 +138,21 @@ data class AccountsUiState(
 
     val unchangedBalanceSnapshotCount: Int
         get() = (historyBalanceRecords.size - historyChangedBalanceRecords.size).coerceAtLeast(0)
+
+    val isCardPlayerScoped: Boolean
+        get() = selectedCardPlayer != CreditCardStrategyEngine.ALL_PLAYERS
+
+    val usePlayerScopedHub: Boolean
+        get() = isCardPlayerScoped ||
+            playerScopedHub.walletAccountIds.isNotEmpty() ||
+            playerScopedHub.cardCycles.isNotEmpty()
+
+    val effectiveHouseholdCredit: HouseholdCreditSummary?
+        get() = if (usePlayerScopedHub) playerScopedHub.householdCredit else householdCredit
+
+    val effectiveCardCycles: List<CardCycleStatus>
+        get() = if (usePlayerScopedHub) playerScopedHub.cardCycles else cardCycles
+
+    val effectiveFeesAhead: List<AnnualFeeCardItem>
+        get() = if (usePlayerScopedHub) playerScopedHub.feesAhead else feesAhead
 }

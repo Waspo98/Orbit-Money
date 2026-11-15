@@ -38,6 +38,7 @@ import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.ui.components.OrbitPillProgressBar
 import app.overbay.orbit.ui.components.orbitTactilePress
+import kotlinx.datetime.LocalDate
 import kotlin.math.roundToInt
 
 /**
@@ -51,6 +52,7 @@ fun GoalProgressCard(
     monthlyNeededCents: Cents?,
     onClick: () -> Unit,
     isInspected: Boolean = false,
+    today: LocalDate = LocalDateUtils.todayLocalDate(),
     dragHandle: (@Composable () -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
@@ -62,7 +64,7 @@ fun GoalProgressCard(
     val desiredEta = goal.targetDate?.let { LocalDateUtils.formatMonthShortLabel(it.take(7)) } ?: "ASAP"
     val projectedEta = goal.projectedLandingLabel()
     val isStalled = !isDone && projectedEta == "Stalled"
-    val isBehindTarget = !isDone && !isStalled && goal.isProjectedPastTargetDate()
+    val isBehindTarget = !isDone && !isStalled && goal.isProjectedPastTargetDate(today)
 
     val projectedColor = when {
         isDone -> colors.income

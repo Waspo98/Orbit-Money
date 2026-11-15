@@ -208,6 +208,8 @@ private fun Chase524BentoSection(
 ) {
     Chase524SectionCard(
         people = uiState.cardPortfolioSummary.chase524ByPerson,
+        selectedHolderKey = uiState.chase524SelectedHolderKey,
+        onSelectHolder = actions.onSelectChase524Holder,
         onInspectAccount = actions.onInspectAccount,
         onFixMissingOpenDate = { accountId ->
             actions.onOpenCardSetup(accountId, CardEditorTab.STRATEGY, false)

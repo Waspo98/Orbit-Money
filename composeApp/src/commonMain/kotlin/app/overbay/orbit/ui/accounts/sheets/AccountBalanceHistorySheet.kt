@@ -253,7 +253,9 @@ private fun BalanceTrendSparkline(
     records: List<BalanceRecord>,
     modifier: Modifier = Modifier
 ) {
-    val chronological = remember(records) { records.sortedBy { it.recordDate } }
+    val chronological = remember(records) {
+        records.sortedWith(compareBy<BalanceRecord> { it.recordDate }.thenBy { it.id })
+    }
     val primaryColor = MaterialTheme.colorScheme.primary
 
     Surface(
@@ -269,13 +271,25 @@ private fun BalanceTrendSparkline(
             val maxVal = chronological.maxOf { it.balanceCents }
             val range = if (maxVal == minVal) 1L else (maxVal - minVal)
 
+            val parsedDates = chronological.map { LocalDateUtils.parseIsoDate(it.recordDate) }
+            val validSpanDays = if (parsedDates.all { it != null }) {
+                LocalDateUtils.daysBetween(parsedDates.first()!!, parsedDates.last()!!).coerceAtLeast(0)
+            } else {
+                0
+            }
+
             val w = size.width
             val h = size.height
             val padY = 6f
             val usableH = h - (padY * 2f)
 
             val points = chronological.mapIndexed { idx, rec ->
-                val x = idx.toFloat() / (chronological.size - 1).toFloat() * w
+                val xRatio = if (validSpanDays > 0) {
+                    LocalDateUtils.daysBetween(parsedDates.first()!!, parsedDates[idx]!!).toFloat() / validSpanDays.toFloat()
+                } else {
+                    idx.toFloat() / (chronological.size - 1).toFloat()
+                }
+                val x = xRatio * w
                 val normY = (rec.balanceCents - minVal).toFloat() / range.toFloat()
                 val y = h - padY - (normY * usableH)
                 x to y

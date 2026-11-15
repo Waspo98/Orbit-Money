@@ -9,10 +9,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -27,7 +25,9 @@ import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.domain.CreditCardStrategyEngine
 import app.overbay.orbit.ui.accounts.AccountsUiState
 import app.overbay.orbit.ui.accounts.AccountsViewModel
+import app.overbay.orbit.ui.accounts.PerkToggleOrigin
 import app.overbay.orbit.ui.accounts.cards.CardFormat
+import app.overbay.orbit.ui.accounts.cards.PerkUndoSnackbarEffect
 import app.overbay.orbit.ui.accounts.cards.PerkUsageDialog
 import app.overbay.orbit.ui.components.CanopyIconButton
 import app.overbay.orbit.ui.components.CanopySettingsButton
@@ -89,28 +89,17 @@ fun CardPerksScreen(
 
     LaunchedEffect(uiState.syncErrorMessage) {
         val err = uiState.syncErrorMessage ?: return@LaunchedEffect
-        snackbarHostState.showSnackbar(err, duration = SnackbarDuration.Short)
+        snackbarHostState.showSnackbar(err)
         actions.onClearSyncError()
     }
 
-    LaunchedEffect(uiState.lastPerkUndoEvent?.eventId) {
-        val event = uiState.lastPerkUndoEvent ?: return@LaunchedEffect
-        val message = if ((event.newAmountCents ?: 0L) > 0L) {
-            "Marked ${event.benefitTitle} used (${CardFormat.formatAdaptiveCents(event.newAmountCents ?: 0L)})"
-        } else {
-            "Cleared ${event.benefitTitle}"
-        }
-        val result = snackbarHostState.showSnackbar(
-            message = message,
-            actionLabel = "Undo",
-            duration = SnackbarDuration.Short
-        )
-        if (result == SnackbarResult.ActionPerformed) {
-            actions.onUndoPerkToggle(event)
-        } else {
-            actions.onDismissPerkUndo()
-        }
-    }
+    PerkUndoSnackbarEffect(
+        event = uiState.lastPerkUndoEvent,
+        origin = PerkToggleOrigin.CARD_PERKS,
+        snackbarHostState = snackbarHostState,
+        onUndo = actions.onUndoPerkToggle,
+        onDismissOrigin = actions.onDismissPerkUndo
+    )
 
     val creditAccounts = remember(uiState.accounts) {
         uiState.accounts.filter { it.type == AccountType.CREDIT && !it.isArchived }
@@ -132,11 +121,7 @@ fun CardPerksScreen(
         uiState.cardPortfolioSummary.currentPeriodPerks.filter { !it.isFullyUsed }.sumOf { it.remainingCents }
     }
     val unusedFormatted = CardFormat.formatAdaptiveCents(unusedPerksCents)
-    val scopedOwedCents = if (uiState.playerScopedHub.walletAccountIds.isNotEmpty()) {
-        uiState.playerScopedHub.householdCredit.totalOwedCents
-    } else {
-        uiState.householdCredit?.totalOwedCents ?: 0L
-    }
+    val scopedOwedCents = uiState.effectiveHouseholdCredit?.totalOwedCents ?: 0L
     val heroSubtitle = remember(
         filteredCardCount,
         creditAccounts.size,

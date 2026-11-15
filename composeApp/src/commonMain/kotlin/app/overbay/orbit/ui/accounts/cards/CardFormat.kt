@@ -114,16 +114,5 @@ object CardFormat {
         account: Account,
         selectedPlayer: String,
         householdMembers: List<HouseholdMember>
-    ): Boolean {
-        if (selectedPlayer == CreditCardStrategyEngine.ALL_PLAYERS) return true
-        val strat = account.creditCardProfile?.strategy ?: return false
-        if (selectedPlayer.startsWith("m:")) {
-            val mId = selectedPlayer.removePrefix("m:").toLongOrNull() ?: return false
-            val memberName = householdMembers.firstOrNull { it.id == mId }?.name
-            return strat.cardholderMemberId == mId ||
-                strat.authorizedUserMemberIds.contains(mId) ||
-                (memberName != null && strat.cardholder.equals(memberName, ignoreCase = true))
-        }
-        return strat.cardholder?.trim()?.lowercase() == selectedPlayer
-    }
+    ): Boolean = CreditCardStrategyEngine.matchesPlayer(account, selectedPlayer, householdMembers)
 }

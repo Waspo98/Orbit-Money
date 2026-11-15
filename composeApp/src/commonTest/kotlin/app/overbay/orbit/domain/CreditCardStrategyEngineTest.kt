@@ -588,4 +588,123 @@ class CreditCardStrategyEngineTest {
         assertEquals(1L, alexBundle.playerScopedHub.firstMissingBillingAccountId)
         assertEquals(1L, alexBundle.playerScopedHub.firstMissingOpenDateAccountId)
     }
+
+    @Test
+    fun summarizePortfolio_playerFilterIncludesAuthorizedUsersForPerksFeesSubsAndBestCards() {
+        val alex = HouseholdMember(id = 10L, name = "Alex")
+        val sam = HouseholdMember(id = 20L, name = "Sam")
+        val cardWithSamAu = Account(
+            id = 1L,
+            name = "Alex Gold",
+            type = AccountType.CREDIT,
+            creditCardProfile = CreditCardProfile(
+                accountId = 1L,
+                cardName = "Alex Gold",
+                annualFeeCents = 250_00L,
+                benefits = listOf(
+                    CardBenefit(id = "dining", title = "Dining Credit", periodValueCents = 20_00L, cadence = BenefitCadence.MONTHLY)
+                ),
+                rewardCategories = listOf(
+                    RewardCategory(category = "Dining", multiplier = 4.0, rateType = "points")
+                ),
+                strategy = CreditCardStrategy(
+                    cardholderMemberId = 10L,
+                    authorizedUserMemberIds = listOf(20L),
+                    openedDate = "2026-10-01",
+                    subTargetSpendCents = 4000_00L,
+                    subDeadlineDate = "2027-01-01"
+                )
+            )
+        )
+        val samPrimary = Account(
+            id = 2L,
+            name = "Sam Preferred",
+            type = AccountType.CREDIT,
+            creditCardProfile = CreditCardProfile(
+                accountId = 2L,
+                cardName = "Sam Preferred",
+                annualFeeCents = 95_00L,
+                benefits = listOf(
+                    CardBenefit(id = "hotel", title = "Hotel Credit", periodValueCents = 50_00L, cadence = BenefitCadence.ANNUAL)
+                ),
+                rewardCategories = listOf(
+                    RewardCategory(category = "Travel", multiplier = 3.0, rateType = "points")
+                ),
+                strategy = CreditCardStrategy(cardholderMemberId = 20L, openedDate = "2025-05-01")
+            )
+        )
+
+        val samPortfolio = CreditCardStrategyEngine.summarizePortfolio(
+            accounts = listOf(cardWithSamAu, samPrimary),
+            transactions = emptyList(),
+            selectedPlayer = "m:20",
+            today = refToday,
+            householdMembers = listOf(alex, sam)
+        )
+
+        assertEquals(2, samPortfolio.totalCardsCount)
+        assertEquals(345_00L, samPortfolio.totalAnnualFeesCents)
+        assertEquals(setOf("dining", "hotel"), samPortfolio.currentPeriodPerks.map { it.benefitId }.toSet())
+        assertEquals(listOf(1L), samPortfolio.activeSubs.map { it.accountId })
+        assertEquals(setOf("Dining & Restaurants", "Travel & Flights"), samPortfolio.bestCardsByCategory.map { it.categoryName }.toSet())
+    }
+
+    @Test
+    fun creditCardHubStateCalculator_zeroActiveCardsForPlayerDoesNotLeakHouseholdTotals() {
+        val alex = HouseholdMember(id = 10L, name = "Alex")
+        val sam = HouseholdMember(id = 20L, name = "Sam")
+        val feeDueSoon = LocalDateUtils.formatIsoDate(LocalDateUtils.addDays(refToday, 15))
+        val alexActive = Account(
+            id = 1L,
+            name = "Alex Active",
+            type = AccountType.CREDIT,
+            currentBalanceCents = -150_000L,
+            creditCardProfile = CreditCardProfile(
+                accountId = 1L,
+                cardName = "Alex Active",
+                creditLimitCents = 1_000_000L,
+                annualFeeCents = 95_00L,
+                annualFeePostDate = feeDueSoon,
+                statementClosingDay = 12,
+                paymentDueDay = 5,
+                strategy = CreditCardStrategy(cardholderMemberId = 10L, openedDate = null)
+            )
+        )
+        val samArchived = Account(
+            id = 2L,
+            name = "Sam Closed",
+            type = AccountType.CREDIT,
+            isArchived = true,
+            currentBalanceCents = -50_000L,
+            creditCardProfile = CreditCardProfile(
+                accountId = 2L,
+                cardName = "Sam Closed",
+                creditLimitCents = 500_000L,
+                strategy = CreditCardStrategy(cardholderMemberId = 20L, openedDate = "2025-11-01")
+            )
+        )
+
+        val bundle = app.overbay.orbit.ui.accounts.CreditCardHubStateCalculator.calculate(
+            accounts = listOf(alexActive, samArchived),
+            transactions = emptyList(),
+            selectedPlayer = "m:20",
+            today = refToday,
+            householdMembers = listOf(alex, sam)
+        )
+        val uiState = app.overbay.orbit.ui.accounts.AccountsUiState(
+            selectedCardPlayer = bundle.portfolio.selectedPlayer,
+            cardPortfolioSummary = bundle.portfolio,
+            householdCredit = bundle.householdCredit,
+            cardCycles = bundle.cardCycles,
+            feesAhead = bundle.feesAhead,
+            playerScopedHub = bundle.playerScopedHub
+        )
+
+        assertTrue(uiState.playerScopedHub.walletAccountIds.isEmpty())
+        assertEquals(0L, uiState.effectiveHouseholdCredit?.totalOwedCents)
+        assertEquals(0L, uiState.effectiveHouseholdCredit?.totalLimitCents)
+        assertTrue(uiState.effectiveFeesAhead.isEmpty())
+        assertTrue(uiState.effectiveCardCycles.isEmpty())
+        assertNull(uiState.playerScopedHub.firstMissingOpenDateAccountId)
+    }
 }

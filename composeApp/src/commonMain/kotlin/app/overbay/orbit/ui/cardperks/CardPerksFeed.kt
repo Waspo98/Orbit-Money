@@ -198,21 +198,14 @@ internal fun CardPerksCustomizeModal(
             )
         },
         onToggleVisibility = { targetType ->
-            actions.onUpdateWidgets {
-                allItems.map { if (it.key == targetType) it.copy(isVisible = !it.isVisible) else it }.toWidgetConfigs()
-            }
+            actions.onUpdateWidgets { existing -> toggleCardPerksWidgetVisibility(existing, targetType) }
         },
         onSetWideSpan = { targetType, span ->
-            actions.onUpdateWidgets {
-                allItems.map { if (it.key == targetType) it.copy(wideSpan = span.coerceIn(1, 2)) else it }.toWidgetConfigs()
-            }
+            actions.onUpdateWidgets { existing -> setCardPerksWidgetWideSpan(existing, targetType, span) }
         },
         onMoveItem = { fromIndex, toIndex ->
-            if (fromIndex in allItems.indices && toIndex in allItems.indices && fromIndex != toIndex) {
-                val mutable = allItems.toMutableList()
-                val moved = mutable.removeAt(fromIndex)
-                mutable.add(toIndex, moved)
-                actions.onUpdateWidgets { mutable.toWidgetConfigs() }
+            actions.onUpdateWidgets { existing ->
+                moveVisibleCardPerksWidget(existing, rewardsToolsEnabled, fromIndex, toIndex)
             }
         },
         onReset = {

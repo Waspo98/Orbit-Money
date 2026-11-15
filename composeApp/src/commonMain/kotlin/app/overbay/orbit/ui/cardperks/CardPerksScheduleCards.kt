@@ -45,11 +45,7 @@ internal fun AnnualFeesAheadBentoCard(
     actions: CardPerksBentoActions,
     modifier: Modifier = Modifier
 ) {
-    val scopedFees = if (uiState.playerScopedHub.walletAccountIds.isNotEmpty()) {
-        uiState.playerScopedHub.feesAhead
-    } else {
-        uiState.feesAhead
-    }
+    val scopedFees = uiState.effectiveFeesAhead
 
     OrbitSectionCard(title = "Annual Fees Ahead", modifier = modifier) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -144,11 +140,7 @@ internal fun PaymentsDueBentoCard(
     actions: CardPerksBentoActions,
     modifier: Modifier = Modifier
 ) {
-    val scopedCycles = if (uiState.playerScopedHub.walletAccountIds.isNotEmpty() || uiState.playerScopedHub.cardCycles.isNotEmpty()) {
-        uiState.playerScopedHub.cardCycles
-    } else {
-        uiState.cardCycles
-    }
+    val scopedCycles = uiState.effectiveCardCycles
     val dueCycles = remember(scopedCycles) {
         scopedCycles.filter { it.daysUntilDue != null && it.daysUntilDue in -7..35 }.sortedBy { it.daysUntilDue }
     }

@@ -68,8 +68,8 @@ internal fun CardWalletRoiBentoCard(
                 (if (walletIds.isNotEmpty()) acct.id in walletIds else CardFormat.matchesSelectedPlayer(acct, uiState.selectedCardPlayer, uiState.householdMembers))
         }
     }
-    val cycleByAccount = remember(uiState.playerScopedHub.cardCycles, uiState.cardCycles) {
-        uiState.playerScopedHub.cardCycles.ifEmpty { uiState.cardCycles }.associateBy { it.accountId }
+    val cycleByAccount = remember(uiState.effectiveCardCycles) {
+        uiState.effectiveCardCycles.associateBy { it.accountId }
     }
     val unusedPerksByAccount = remember(uiState.cardPortfolioSummary.currentPeriodPerks) {
         uiState.cardPortfolioSummary.currentPeriodPerks.filter { !it.isFullyUsed }.groupBy { it.accountId }

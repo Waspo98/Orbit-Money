@@ -31,12 +31,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.GOAL_PRESETS
@@ -126,7 +126,7 @@ fun GoalEditorContent(
         )
     }
 
-    var showEmojiPicker by remember(goal?.id) { mutableStateOf(false) }
+    var showEmojiPicker by rememberSaveable(goal?.id) { mutableStateOf(false) }
 
     OrbitModalScaffold(
         title = if (isEditing) "Edit Savings Goal" else "New Savings Goal",

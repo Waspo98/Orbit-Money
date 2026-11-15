@@ -7,10 +7,12 @@ import app.overbay.orbit.data.setCardBenefitUsage
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.CreditCardBenefitEngine
 import app.overbay.orbit.domain.LocalDateUtils
+import app.overbay.orbit.ui.accounts.cards.CardFormat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
 
@@ -21,22 +23,41 @@ enum class PerkPeriodFilter(val label: String) {
     ANNUAL_PLUS("Annual+")
 }
 
+enum class PerkToggleOrigin {
+    CARD_PERKS,
+    ACCOUNTS
+}
+
 data class PerkToggleUndoEvent(
     val eventId: Long,
     val accountId: Long,
     val benefitId: String,
     val benefitTitle: String,
     val previousAmountCents: Cents?,
-    val newAmountCents: Cents?
+    val newAmountCents: Cents?,
+    val isMonetaryValue: Boolean = true,
+    val origin: PerkToggleOrigin = PerkToggleOrigin.CARD_PERKS
 )
+
+/**
+ * Formats the snackbar confirmation copy for [event], omitting dollar amounts for
+ * `$0` / non-monetary benefits that store `1L` cent solely as a boolean usage flag.
+ */
+fun formatPerkToggleUndoMessage(event: PerkToggleUndoEvent): String {
+    val amount = event.newAmountCents ?: 0L
+    return when {
+        amount <= 0L -> "Cleared ${event.benefitTitle}"
+        event.isMonetaryValue -> "Marked ${event.benefitTitle} used (${CardFormat.formatAdaptiveCents(amount)})"
+        else -> "Marked ${event.benefitTitle} used"
+    }
+}
 
 data class CardPerksUiOptionsState(
     val showUsedPerks: Boolean = false,
-    val showWhichCardWhere: Boolean = false,
-    val selectedRewardCategory: String? = null,
     val showCardPerksCustomize: Boolean = false,
     val perkPeriodFilter: PerkPeriodFilter = PerkPeriodFilter.ALL,
     val whichCardQuery: String = "",
+    val chase524SelectedHolderKey: String? = null,
     val lastPerkUndoEvent: PerkToggleUndoEvent? = null
 )
 
@@ -50,51 +71,54 @@ class CreditCardActionDelegate(
     private val onSyncError: (String) -> Unit
 ) {
     private val _showUsedPerks = MutableStateFlow(false)
-    private val _showWhichCardWhere = MutableStateFlow(false)
-    private val _selectedRewardCategory = MutableStateFlow<String?>(null)
     private val _showCardPerksCustomize = MutableStateFlow(false)
     private val _perkPeriodFilter = MutableStateFlow(PerkPeriodFilter.ALL)
     private val _whichCardQuery = MutableStateFlow("")
+    private val _chase524SelectedHolderKey = MutableStateFlow<String?>(null)
     private val _lastPerkUndoEvent = MutableStateFlow<PerkToggleUndoEvent?>(null)
+    internal val currentPerkUndoEvent: PerkToggleUndoEvent? get() = _lastPerkUndoEvent.value
     private var nextUndoEventId = 1L
 
     private val coreControlsFlow = combine(
         _showUsedPerks,
-        _showWhichCardWhere,
-        _selectedRewardCategory
-    ) { used, which, cat -> Triple(used, which, cat) }
+        _showCardPerksCustomize,
+        _perkPeriodFilter
+    ) { used, customize, filter -> Triple(used, customize, filter) }
 
     private val screenControlsFlow = combine(
-        _showCardPerksCustomize,
-        _perkPeriodFilter,
         _whichCardQuery,
+        _chase524SelectedHolderKey,
         _lastPerkUndoEvent
-    ) { customize, filter, query, undo ->
-        ScreenControlsBundle(customize, filter, query, undo)
+    ) { query, holderKey, undo ->
+        ScreenControlsBundle(query, holderKey, undo)
     }
 
     val uiOptionsFlow: Flow<CardPerksUiOptionsState> = combine(
         coreControlsFlow,
         screenControlsFlow
-    ) { (used, which, cat), screen ->
+    ) { (used, customize, filter), screen ->
         CardPerksUiOptionsState(
             showUsedPerks = used,
-            showWhichCardWhere = which,
-            selectedRewardCategory = cat,
-            showCardPerksCustomize = screen.customize,
-            perkPeriodFilter = screen.filter,
+            showCardPerksCustomize = customize,
+            perkPeriodFilter = filter,
             whichCardQuery = screen.query,
+            chase524SelectedHolderKey = screen.holderKey,
             lastPerkUndoEvent = screen.undo
         )
     }
 
     fun toggleShowUsedPerks() { _showUsedPerks.value = !_showUsedPerks.value }
-    fun toggleShowWhichCardWhere() { _showWhichCardWhere.value = !_showWhichCardWhere.value }
-    fun selectRewardCategory(category: String?) { _selectedRewardCategory.value = category }
     fun setCardPerksCustomize(visible: Boolean) { _showCardPerksCustomize.value = visible }
     fun selectPerkFilter(filter: PerkPeriodFilter) { _perkPeriodFilter.value = filter }
     fun setWhichCardQuery(query: String) { _whichCardQuery.value = query }
-    fun dismissPerkUndo() { _lastPerkUndoEvent.value = null }
+    fun selectChase524Holder(holderKey: String) { _chase524SelectedHolderKey.value = holderKey }
+    fun dismissPerkUndo(origin: PerkToggleOrigin? = null) {
+        if (origin == null) {
+            _lastPerkUndoEvent.value = null
+        } else {
+            _lastPerkUndoEvent.update { current -> if (current?.origin == origin) null else current }
+        }
+    }
 
     fun updateCardPerksWidgets(transform: (List<DashboardWidgetConfig>) -> List<DashboardWidgetConfig>) {
         scope.launch {
@@ -134,7 +158,12 @@ class CreditCardActionDelegate(
         }
     }
 
-    fun toggleCardBenefit(account: Account?, benefitId: String, today: LocalDate) {
+    fun toggleCardBenefit(
+        account: Account?,
+        benefitId: String,
+        today: LocalDate,
+        origin: PerkToggleOrigin = PerkToggleOrigin.CARD_PERKS
+    ) {
         val rawProfile = account?.creditCardProfile ?: return
         val profile = CreditCardBenefitEngine.upgradeProfile(rawProfile, today)
         val benefit = profile.benefits.find { it.id == benefitId } ?: return
@@ -158,7 +187,9 @@ class CreditCardActionDelegate(
                     benefitId = benefitId,
                     benefitTitle = benefit.title,
                     previousAmountCents = previousAmount,
-                    newAmountCents = targetAmount
+                    newAmountCents = targetAmount,
+                    isMonetaryValue = periodValue > 0L,
+                    origin = origin
                 )
             }.onFailure { e ->
                 onSyncError("Couldn't update perk: ${e.message ?: "unknown error"}")
@@ -172,9 +203,8 @@ class CreditCardActionDelegate(
     }
 
     private data class ScreenControlsBundle(
-        val customize: Boolean,
-        val filter: PerkPeriodFilter,
         val query: String,
+        val holderKey: String?,
         val undo: PerkToggleUndoEvent?
     )
 

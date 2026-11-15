@@ -29,6 +29,7 @@ import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.accounts.AccountDetailTab
 import app.overbay.orbit.ui.accounts.AccountsUiState
 import app.overbay.orbit.ui.accounts.AccountsViewModel
+import app.overbay.orbit.ui.accounts.PerkToggleOrigin
 import app.overbay.orbit.ui.accounts.cards.CardEditorSheetContent
 import app.overbay.orbit.ui.accounts.cards.CreditCardInspectorDetailContent
 import app.overbay.orbit.ui.accounts.sheets.AccountBalanceHistoryContent
@@ -159,8 +160,8 @@ fun AccountDetailInspectorPane(
                             hasClosureAlert = hasClosureAlert,
                             onReviewClosure = { viewModel.closurePrompts.openForAccount(inspecting.id) },
                             onEditCard = { viewModel.openCreditCardProfile(inspecting) },
-                            onToggleBenefit = { bId -> viewModel.toggleCardBenefit(inspecting.id, bId) },
-                            onOpenPerkUsage = { bId -> viewModel.openPerkUsage(inspecting.id, bId) },
+                            onToggleBenefit = { bId -> viewModel.toggleCardBenefit(inspecting.id, bId, PerkToggleOrigin.ACCOUNTS) },
+                            onOpenPerkUsage = { bId -> viewModel.openPerkUsage(inspecting.id, bId, PerkToggleOrigin.ACCOUNTS) },
                             onSeeFullTransactions = { onNavigate(OrbitNavKey.Transactions(accountId = inspecting.id)) },
                             onHistory = { viewModel.openBalanceHistory(inspecting) },
                             onAddBalanceRecord = { viewModel.openAddBalanceRecord(inspecting) },

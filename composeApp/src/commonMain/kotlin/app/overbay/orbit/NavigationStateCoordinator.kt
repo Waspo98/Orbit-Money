@@ -24,6 +24,12 @@ internal class OrbitNavigationCoordinator(
         val samePrimaryTab = destination.primaryTabIndex != null &&
             destination.primaryTabIndex == leavingEntry.key.primaryTabIndex
 
+        if (destination != leavingEntry.key &&
+            (leavingEntry.key is OrbitNavKey.Accounts || leavingEntry.key is OrbitNavKey.CardPerks)
+        ) {
+            viewModels.accountsViewModel.dismissPerkUndo()
+        }
+
         if (samePrimaryTab) {
             if (destination != leavingEntry.key) {
                 backStackController.clearEntryState(leavingEntry.id)
@@ -37,7 +43,11 @@ internal class OrbitNavigationCoordinator(
     }
 
     fun popBack(): Boolean {
+        val leavingKey = backStackController.currentEntry.key
         if (!backStackController.popBack()) return false
+        if (leavingKey is OrbitNavKey.Accounts || leavingKey is OrbitNavKey.CardPerks) {
+            viewModels.accountsViewModel.dismissPerkUndo()
+        }
         restoreEntry(backStackController.currentEntry)
         return true
     }
