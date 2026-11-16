@@ -1,6 +1,7 @@
 package app.overbay.orbit.domain
 
 import app.overbay.orbit.data.model.MhaTaxProfile
+import app.overbay.orbit.data.model.MhaYearTaxRecord
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -86,6 +87,52 @@ class MhaAndCalculatorsTest {
         assertEquals(5390_00L, result.totalSavingsCents)
         // SECA estimate: $20,000 * 15.3% = $3,060
         assertEquals(3060_00L, result.secaEstimateCents)
+    }
+
+    @Test
+    fun testMhaTaxEngine_calculateMhaSavingsForYear_usesSavedHistoricalRateAndCaps() {
+        val profile = MhaTaxProfile(
+            mode = "simple",
+            simpleFederalRatePercent = 22.0,
+            simpleStateRatePercent = 4.95,
+            designatedCapCents = 50_000_00L,
+            yearlyRecords = mapOf(
+                "2025" to MhaYearTaxRecord(
+                    year = 2025,
+                    effectiveRatePercent = 18.5,
+                    federalRatePercent = 13.55,
+                    stateRatePercent = 4.95,
+                    designatedCapCents = 25_000_00L,
+                    fairMarketRentalValueCents = null,
+                    capsConfigured = true,
+                    isLocked = true
+                )
+            )
+        )
+
+        val result2025 = MhaTaxEngine.calculateMhaSavingsForYear(
+            year = 2025,
+            currentYear = 2026,
+            actualEligibleCents = 30_000_00L,
+            profile = profile
+        )
+
+        // Excludable capped by 2025's $25,000 cap, not 2026's $50,000 cap
+        assertEquals(25_000_00L, result2025.excludableAllowanceCents)
+        // 18.5% of $25,000 = $4,625.00
+        assertEquals(4625_00L, result2025.totalSavingsCents)
+        // State: 4.95% of $25,000 = $1,237.50
+        assertEquals(1237_50L, result2025.stateSavingsCents)
+        assertEquals(3387_50L, result2025.federalSavingsCents)
+
+        // Unsaved historical year (2024) falls back to active profile (26.95%)
+        val result2024 = MhaTaxEngine.calculateMhaSavingsForYear(
+            year = 2024,
+            currentYear = 2026,
+            actualEligibleCents = 20_000_00L,
+            profile = profile
+        )
+        assertEquals(5390_00L, result2024.totalSavingsCents)
     }
 
     // -------------------------------------------------------------------------

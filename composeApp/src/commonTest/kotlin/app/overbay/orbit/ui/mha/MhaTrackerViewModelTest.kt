@@ -374,4 +374,131 @@ class MhaTrackerViewModelTest {
 
         collectJob.cancel()
     }
+
+    @Test
+    fun testYearConfig_storesPerYearEffectiveRateWithoutMutatingOtherYears() = runTest(testDispatcher) {
+        val cat = Category(id = 10L, name = "Housing", isIncome = false, isTransfer = false, mhaDefaultEligible = true)
+        repository.saveCategory(cat)
+        repository.saveTransaction(Transaction(id = 1L, accountId = 1L, originalDate = "2026-04-01", originalMerchant = "Rent 2026", originalAmountCents = -20_000_00L, originalCategoryId = 10L))
+        repository.saveTransaction(Transaction(id = 2L, accountId = 1L, originalDate = "2025-04-01", originalMerchant = "Rent 2025", originalAmountCents = -25_000_00L, originalCategoryId = 10L))
+
+        val collectJob = launch(testDispatcher) { viewModel.uiState.collect {} }
+
+        // Configure 2026 live (26.95%, $30k cap)
+        viewModel.setYear(2026)
+        viewModel.saveYearConfig(
+            year = 2026,
+            updatedProfile = MhaTaxProfile(mode = "simple", simpleFederalRatePercent = 22.0, simpleStateRatePercent = 4.95),
+            designationCapCents = 30_000_00L,
+            fairMarketRentalValueCents = null,
+            customEffectiveRatePercent = null,
+            lockYearRate = false
+        )
+        testScheduler.advanceUntilIdle()
+        assertEquals(5390_00L, viewModel.uiState.value.taxCalculationResult?.totalSavingsCents)
+
+        // Switch to 2025 and save a custom 18.0% effective rate and $20k cap
+        viewModel.setYear(2025)
+        testScheduler.advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.isHistoricalYearWithoutSavedRate)
+
+        viewModel.saveYearConfig(
+            year = 2025,
+            updatedProfile = viewModel.uiState.value.taxProfile,
+            designationCapCents = 20_000_00L,
+            fairMarketRentalValueCents = null,
+            customEffectiveRatePercent = 18.0,
+            lockYearRate = true
+        )
+        testScheduler.advanceUntilIdle()
+
+        val state2025 = viewModel.uiState.value
+        assertTrue(state2025.isUsingStoredYearRate)
+        assertFalse(state2025.isHistoricalYearWithoutSavedRate)
+        assertEquals(20_000_00L, state2025.excludableAllowanceCents)
+        assertEquals(3600_00L, state2025.taxCalculationResult?.totalSavingsCents)
+
+        // Verify 2026 retained its own cap and live rate
+        viewModel.setYear(2026)
+        testScheduler.advanceUntilIdle()
+        val state2026 = viewModel.uiState.value
+        assertEquals(30_000_00L, state2026.designatedCapCents)
+        assertEquals(5390_00L, state2026.taxCalculationResult?.totalSavingsCents)
+
+        collectJob.cancel()
+    }
+
+    @Test
+    fun testRecordCurrentYearRateIfChanged_persistsYearRecordAutomatically() = runTest(testDispatcher) {
+        val cat = Category(id = 10L, name = "Housing", isIncome = false, isTransfer = false, mhaDefaultEligible = true)
+        repository.saveCategory(cat)
+        val currentYr = app.overbay.orbit.domain.LocalDateUtils.todayLocalDate().year
+        repository.saveTransaction(
+            Transaction(
+                id = 1L,
+                accountId = 1L,
+                originalDate = "$currentYr-05-01",
+                originalMerchant = "Mortgage",
+                originalAmountCents = -10_000_00L,
+                originalCategoryId = 10L
+            )
+        )
+
+        val collectJob = launch(testDispatcher) { viewModel.uiState.collect {} }
+        viewModel.setYear(currentYr)
+        testScheduler.advanceUntilIdle()
+
+        viewModel.recordCurrentYearRateIfChanged()
+        testScheduler.advanceUntilIdle()
+
+        val savedRecord = repository.snapshot.value.mhaTaxProfile.yearlyRecords[currentYr.toString()]
+        assertNotNull(savedRecord)
+        assertEquals(26.95, savedRecord.effectiveRatePercent)
+        assertFalse(savedRecord.isLocked)
+
+        collectJob.cancel()
+    }
+
+    @Test
+    fun testCategoryFilterMonthGrouping_andShowExcludedToggle() = runTest(testDispatcher) {
+        val catMortgage = Category(id = 10L, name = "Mortgage", icon = "🏠", mhaDefaultEligible = true)
+        val catUtil = Category(id = 11L, name = "Utilities", icon = "💡", mhaDefaultEligible = true)
+        val catFood = Category(id = 12L, name = "Dining", icon = "🍽️", mhaDefaultEligible = false)
+        repository.saveCategory(catMortgage)
+        repository.saveCategory(catUtil)
+        repository.saveCategory(catFood)
+
+        repository.saveTransaction(Transaction(id = 1L, accountId = 1L, originalDate = "2026-11-05", originalMerchant = "Lender", originalAmountCents = -2000_00L, originalCategoryId = 10L))
+        repository.saveTransaction(Transaction(id = 2L, accountId = 1L, originalDate = "2026-10-12", originalMerchant = "Electric Co", originalAmountCents = -300_00L, originalCategoryId = 11L))
+        repository.saveTransaction(Transaction(id = 3L, accountId = 1L, originalDate = "2026-11-10", originalMerchant = "Coffee Shop", originalAmountCents = -15_00L, originalCategoryId = 12L))
+
+        val collectJob = launch(testDispatcher) { viewModel.uiState.collect {} }
+        viewModel.setYear(2026)
+        testScheduler.advanceUntilIdle()
+
+        val defaultState = viewModel.uiState.value
+        // Only counted transactions are visible by default
+        assertEquals(2, defaultState.visibleTransactions.size)
+        assertEquals(2, defaultState.groupedVisibleMonths.size)
+        assertEquals("2026-11", defaultState.groupedVisibleMonths[0].yearMonth)
+        assertEquals("2026-10", defaultState.groupedVisibleMonths[1].yearMonth)
+        assertEquals(listOf(10L, 11L), defaultState.categoryBreakdown.map { it.categoryId })
+
+        // Filter by Utilities category
+        viewModel.setSelectedCategory(11L)
+        testScheduler.advanceUntilIdle()
+        assertEquals(1, viewModel.uiState.value.visibleTransactions.size)
+        assertEquals(300_00L, viewModel.uiState.value.visibleTotalCents)
+
+        // Clear category and toggle Show Excluded
+        viewModel.setSelectedCategory(null)
+        viewModel.setShowExcludedInList(true)
+        testScheduler.advanceUntilIdle()
+        assertEquals(3, viewModel.uiState.value.visibleTransactions.size)
+        val excluded = viewModel.uiState.value.visibleTransactions.first { it.id == 3L }
+        assertFalse(excluded.isEligible)
+        assertTrue(excluded.eligibilityReason.isNotBlank())
+
+        collectJob.cancel()
+    }
 }

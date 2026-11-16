@@ -3,6 +3,7 @@ package app.overbay.orbit.domain
 import app.overbay.orbit.data.model.FilingStatus
 import app.overbay.orbit.data.model.HouseholdMember
 import app.overbay.orbit.data.model.MhaTaxProfile
+import app.overbay.orbit.data.model.MhaYearTaxRecord
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToLong
@@ -305,6 +306,94 @@ object MhaTaxEngine {
         householdMembers = emptyList(),
         designatedCapCents = designatedCapCents,
         fairMarketRentalValueCents = fairMarketRentalValueCents
+    )
+
+    /**
+     * Resolves year-specific MHA tax savings, honoring stored per-year effective tax rates
+     * and year-scoped designation/FMRV caps when present for historical or locked years.
+     */
+    fun calculateMhaSavingsForYear(
+        year: Int,
+        currentYear: Int,
+        actualEligibleCents: Cents,
+        profile: MhaTaxProfile,
+        householdMembers: List<HouseholdMember> = emptyList(),
+        designatedCapCents: Cents? = profile.designatedCapCents,
+        fairMarketRentalValueCents: Cents? = profile.fairMarketRentalValueCents
+    ): MhaTaxCalculationResult {
+        val yearRecord = profile.yearlyRecords[year.toString()]
+        val resolvedCap = if (yearRecord?.capsConfigured == true) yearRecord.designatedCapCents else designatedCapCents
+        val resolvedFmrv = if (yearRecord?.capsConfigured == true) yearRecord.fairMarketRentalValueCents else fairMarketRentalValueCents
+
+        val useStoredRate = yearRecord != null && (year < currentYear || yearRecord.isLocked)
+        if (!useStoredRate) {
+            return calculateMhaSavings(
+                actualEligibleCents = actualEligibleCents,
+                profile = profile,
+                householdMembers = householdMembers,
+                designatedCapCents = resolvedCap,
+                fairMarketRentalValueCents = resolvedFmrv
+            )
+        }
+
+        val record = yearRecord!!
+        val excludableCents = calculateParsonageCap(actualEligibleCents, resolvedCap, resolvedFmrv)
+        val clampedEffRate = record.effectiveRatePercent.coerceIn(0.0, 100.0)
+        val totalSavings = MoneyUtils.multiplyPercent(excludableCents, clampedEffRate)
+        val stRatePct = record.stateRatePercent?.coerceIn(0.0, 100.0)
+        val fedRatePct = record.federalRatePercent?.coerceIn(0.0, 100.0)
+
+        val stateSavings = if (stRatePct != null) {
+            MoneyUtils.multiplyPercent(excludableCents, stRatePct).coerceIn(0L, totalSavings)
+        } else {
+            0L
+        }
+        val fedSavings = (totalSavings - stateSavings).coerceAtLeast(0L)
+        val secaEstimate = (excludableCents.toDouble() * SECA_TAX_RATE).roundToLong()
+
+        return MhaTaxCalculationResult(
+            eligibleTotalCents = actualEligibleCents,
+            excludableAllowanceCents = excludableCents,
+            totalSavingsCents = totalSavings,
+            effectiveSavingsRate = clampedEffRate / 100.0,
+            federalSavingsCents = fedSavings,
+            federalMarginalRate = (fedRatePct ?: clampedEffRate) / 100.0,
+            stateSavingsCents = stateSavings,
+            stateRate = (stRatePct ?: 0.0) / 100.0,
+            taxableIncomeBeforeMhaCents = 0L,
+            taxableIncomeAfterMhaCents = 0L,
+            secaSubjectCents = excludableCents,
+            secaTaxEstimateCents = secaEstimate,
+            assumptions = listOf("Using saved $year effective tax rate (${roundPercentTwoDecimals(clampedEffRate)}%)."),
+            grossIncomeCents = 0L,
+            reductionCents = 0L,
+            isHouseholdMode = record.mode.equals("household", ignoreCase = true)
+        )
+    }
+
+    fun roundPercentTwoDecimals(percent: Double): Double =
+        (percent * 100.0).roundToLong() / 100.0
+
+    fun toYearRecord(
+        year: Int,
+        result: MhaTaxCalculationResult,
+        profile: MhaTaxProfile,
+        designatedCapCents: Cents?,
+        fairMarketRentalValueCents: Cents?,
+        capsConfigured: Boolean,
+        isLocked: Boolean,
+        updatedAt: String = ""
+    ): MhaYearTaxRecord = MhaYearTaxRecord(
+        year = year,
+        effectiveRatePercent = roundPercentTwoDecimals(result.effectiveSavingsRate * 100.0),
+        federalRatePercent = roundPercentTwoDecimals(result.federalMarginalRate * 100.0),
+        stateRatePercent = roundPercentTwoDecimals(result.stateRate * 100.0),
+        mode = profile.mode,
+        designatedCapCents = designatedCapCents,
+        fairMarketRentalValueCents = fairMarketRentalValueCents,
+        capsConfigured = capsConfigured,
+        isLocked = isLocked,
+        updatedAt = updatedAt
     )
 
     fun computeFederalTax(taxableCents: Cents, status: FilingStatus): Cents {

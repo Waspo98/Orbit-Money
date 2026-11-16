@@ -3,6 +3,7 @@ package app.overbay.orbit.ui.mha
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.MhaTaxProfile
+import app.overbay.orbit.data.model.MhaYearTaxRecord
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.MhaTaxCalculationResult
@@ -45,7 +46,8 @@ data class MhaTransactionItem(
     val account: Account?,
     val isEligible: Boolean,
     val isExplicitOverride: Boolean,
-    val isOverriddenByUser: Boolean
+    val isOverriddenByUser: Boolean,
+    val eligibilityReason: String = ""
 ) {
     val id: Long get() = transaction.id
     val effectiveDate: String get() = transaction.effectiveDate
@@ -56,8 +58,26 @@ data class MhaTransactionItem(
     val amountCents: Cents get() = effectiveAmountCents
 }
 
+data class MhaCategoryTotal(
+    val categoryId: Long, // -1L represents Uncategorized
+    val name: String,
+    val emoji: String,
+    val colorHex: String?,
+    val totalCents: Cents,
+    val count: Int
+)
+
+data class MhaMonthGroup(
+    val yearMonth: String,
+    val monthLabel: String,
+    val countedTotalCents: Cents,
+    val countedCount: Int,
+    val items: List<MhaTransactionItem>
+)
+
 data class MhaTrackerUiState(
     val selectedYear: Int = 2026,
+    val currentYear: Int = 2026,
     val availableYears: List<Int> = listOf(2026, 2025, 2024),
     val actualEligibleHousingSpentCents: Cents = 0L,
     val designatedCapCents: Cents? = null,
@@ -67,10 +87,21 @@ data class MhaTrackerUiState(
     val taxCalculationResult: MhaTaxCalculationResult? = null,
     val projectedAnnualSavingsCents: Cents = 0L,
     val taxProfile: MhaTaxProfile = MhaTaxProfile(),
+    val activeYearTaxRecord: MhaYearTaxRecord? = null,
+    val isUsingStoredYearRate: Boolean = false,
+    val isHistoricalYearWithoutSavedRate: Boolean = false,
+    val taxRateSourceLabel: String = "",
     val eligibleTransactions: List<MhaTransactionItem> = emptyList(),
     val reviewQueueTransactions: List<MhaTransactionItem> = emptyList(),
     val allYearOutflows: List<MhaTransactionItem> = emptyList(),
+    val visibleTransactions: List<MhaTransactionItem> = emptyList(),
+    val groupedVisibleMonths: List<MhaMonthGroup> = emptyList(),
+    val visibleTotalCents: Cents = 0L,
+    val categoryBreakdown: List<MhaCategoryTotal> = emptyList(),
     val selectedTabFilter: MhaTransactionTabFilter = MhaTransactionTabFilter.ELIGIBLE,
+    val selectedCategoryId: Long? = null,
+    val showExcludedInList: Boolean = false,
+    val inspectingTransaction: MhaTransactionItem? = null,
     val accounts: List<Account> = emptyList(),
     val categories: List<Category> = emptyList(),
     val searchQuery: String = "",
@@ -78,27 +109,11 @@ data class MhaTrackerUiState(
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
     val mhaEnabled: Boolean = true,
+    val isReadOnlySession: Boolean = false,
     val activeScreenTab: MhaScreenTab = MhaScreenTab.TRACKER
 ) {
     val mhaDesignationCapCents: Cents? get() = designatedCapCents
     val bindingLimit: MhaBindingLimit get() = limitingFactor
     val taxSavingsResult: MhaTaxCalculationResult? get() = taxCalculationResult
     val actualEligibleExpensesCents: Cents get() = actualEligibleHousingSpentCents
-
-    val visibleTransactions: List<MhaTransactionItem>
-        get() {
-            val list = when (selectedTabFilter) {
-                MhaTransactionTabFilter.ELIGIBLE -> eligibleTransactions
-                MhaTransactionTabFilter.REVIEW_QUEUE -> reviewQueueTransactions
-                MhaTransactionTabFilter.ALL -> allYearOutflows
-            }
-            if (searchQuery.isBlank()) return list
-            val query = searchQuery.trim().lowercase()
-            return list.filter { item ->
-                item.merchant.lowercase().contains(query) ||
-                    (item.category?.name?.lowercase()?.contains(query) == true) ||
-                    (item.account?.name?.lowercase()?.contains(query) == true) ||
-                    (item.transaction.notes?.lowercase()?.contains(query) == true)
-            }
-        }
 }

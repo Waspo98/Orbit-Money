@@ -7,26 +7,50 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.theme.OrbitSprings
-import app.overbay.orbit.ui.components.*
+import app.overbay.orbit.ui.components.MorphingPageHero
+import app.overbay.orbit.ui.components.OrbitSegmentedTabRow
+import app.overbay.orbit.ui.components.rememberHeroScrollState
+import app.overbay.orbit.ui.components.rememberOrbitLazyListState
 import app.overbay.orbit.ui.mha.components.MhaAutoDefaultsSection
+import app.overbay.orbit.ui.mha.components.MhaCanopyBar
 import app.overbay.orbit.ui.mha.components.MhaTaxSavingsCard
-import app.overbay.orbit.ui.mha.components.MhaTransactionsTab
+import app.overbay.orbit.ui.mha.components.MhaTransactionsHeaderAndFilters
+import app.overbay.orbit.ui.mha.components.mhaCountedTransactionsItems
 import app.overbay.orbit.ui.mha.dialogs.MhaConfigContent
 import app.overbay.orbit.ui.mha.dialogs.MhaConfigSheet
+import app.overbay.orbit.ui.mha.dialogs.MhaTransactionActionSheet
 import app.overbay.orbit.util.DevicePosture
 import app.overbay.orbit.util.LocalDevicePosture
 
@@ -53,6 +77,18 @@ fun MhaTrackerScreen(
         }
     }
 
+    LaunchedEffect(
+        state.isLoading,
+        state.selectedYear,
+        state.taxCalculationResult?.effectiveSavingsRatePercent,
+        state.designatedCapCents,
+        state.fairMarketRentalValueCents
+    ) {
+        if (!state.isLoading) {
+            viewModel.recordCurrentYearRateIfChanged()
+        }
+    }
+
     if (state.isLoading) {
         Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
@@ -62,6 +98,19 @@ fun MhaTrackerScreen(
 
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val isTwoPane = maxWidth >= 600.dp || posture.supportsTwoPane
+        val computedEffectivePct = state.taxCalculationResult?.effectiveSavingsRatePercent
+            ?: (state.taxProfile.simpleFederalRatePercent + state.taxProfile.simpleStateRatePercent)
+        val onSaveYearConfig: (app.overbay.orbit.data.model.MhaTaxProfile, Long?, Long?, Double?, Boolean) -> Unit =
+            { updatedProfile, cap, fmrv, customRate, lockRate ->
+                viewModel.saveYearConfig(
+                    year = state.selectedYear,
+                    updatedProfile = updatedProfile,
+                    designationCapCents = cap,
+                    fairMarketRentalValueCents = fmrv,
+                    customEffectiveRatePercent = customRate,
+                    lockYearRate = lockRate
+                )
+            }
 
         Scaffold(
             modifier = Modifier.fillMaxSize(),
@@ -77,59 +126,24 @@ fun MhaTrackerScreen(
                 MorphingPageHero(
                     kicker = "MINISTERIAL HOUSING ALLOWANCE",
                     title = "MHA Tracker",
-                    subtitle = "Calculate projected MHA tax savings and track eligible housing expenses",
+                    collapsedTitle = "MHA",
+                    subtitle = "Track counted housing expenses and projected tax savings",
                     scrollState = heroScrollState,
                     canopyBar = { _, isCompact, barHeight ->
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxHeight()
-                        ) {
-                            PeriodNavigatorPill(
-                                label = "Tax Year ${state.selectedYear}",
-                                compactLabel = "${state.selectedYear}",
-                                isCompact = isCompact,
-                                onPrevious = { viewModel.setYear(state.selectedYear - 1) },
-                                onNext = { viewModel.setYear(state.selectedYear + 1) },
-                                canGoNext = canGoNext,
-                                onClickLabel = { showYearMenu = true },
-                                modifier = Modifier.fillMaxSize()
-                            )
-
-                            DropdownMenu(
-                                expanded = showYearMenu,
-                                onDismissRequest = { showYearMenu = false }
-                            ) {
-                                state.availableYears.forEach { yr ->
-                                    DropdownMenuItem(
-                                        text = {
-                                            Text(
-                                                text = "$yr",
-                                                fontWeight = if (yr == state.selectedYear) FontWeight.Bold else FontWeight.Normal
-                                            )
-                                        },
-                                        onClick = {
-                                            viewModel.setYear(yr)
-                                            showYearMenu = false
-                                        }
-                                    )
-                                }
-                            }
-                        }
-
-                        CanopyIconButton(
-                            icon = OrbitIcons.ViewSliders,
-                            contentDescription = "Configure MHA Limits",
-                            onClick = {
+                        MhaCanopyBar(
+                            selectedYear = state.selectedYear,
+                            availableYears = state.availableYears,
+                            canGoNext = canGoNext,
+                            isCompact = isCompact,
+                            barHeight = barHeight,
+                            showYearMenu = showYearMenu,
+                            onToggleYearMenu = { showYearMenu = it },
+                            onSelectYear = { viewModel.setYear(it) },
+                            showConfigSheet = state.showConfigSheet,
+                            onToggleConfigSheet = {
                                 if (state.showConfigSheet) viewModel.closeConfigSheet() else viewModel.openConfigSheet()
                             },
-                            buttonSize = barHeight,
-                            isActive = state.showConfigSheet
-                        )
-
-                        CanopySettingsButton(
-                            buttonSize = barHeight,
-                            onClick = { onNavigate(OrbitNavKey.Settings) }
+                            onOpenSettings = { onNavigate(OrbitNavKey.Settings) }
                         )
                     }
                 )
@@ -144,19 +158,60 @@ fun MhaTrackerScreen(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
                 )
 
-                val summaryCards: LazyListScope.() -> Unit = {
-                    item {
+                val summaryCard: LazyListScope.() -> Unit = {
+                    item(key = "mha_summary_hero") {
                         MhaTaxSavingsCard(
                             taxResult = state.taxCalculationResult,
                             eligibleExpensesCents = state.actualEligibleExpensesCents,
                             eligibleTransactionCount = state.eligibleTransactions.size,
+                            excludableAllowanceCents = state.excludableAllowanceCents,
+                            designatedCapCents = state.designatedCapCents,
+                            fairMarketRentalValueCents = state.fairMarketRentalValueCents,
                             selectedYear = state.selectedYear,
+                            currentYear = state.currentYear,
                             taxProfile = state.taxProfile,
+                            activeYearTaxRecord = state.activeYearTaxRecord,
+                            taxRateSourceLabel = state.taxRateSourceLabel,
+                            isUsingStoredYearRate = state.isUsingStoredYearRate,
+                            isHistoricalYearWithoutSavedRate = state.isHistoricalYearWithoutSavedRate,
                             onEditSettings = {
                                 if (isTwoPane && state.showConfigSheet) viewModel.closeConfigSheet() else viewModel.openConfigSheet()
                             }
                         )
                     }
+                }
+
+                val transactionHeaderItem: LazyListScope.() -> Unit = {
+                    item(key = "mha_txns_header") {
+                        MhaTransactionsHeaderAndFilters(
+                            visibleCount = state.visibleTransactions.size,
+                            visibleTotalCents = state.visibleTotalCents,
+                            actualEligibleTotalCents = state.actualEligibleExpensesCents,
+                            categoryBreakdown = state.categoryBreakdown,
+                            selectedCategoryId = state.selectedCategoryId,
+                            showExcludedInList = state.showExcludedInList,
+                            searchQuery = viewModel.searchQueryInput,
+                            onSelectCategory = viewModel::setSelectedCategory,
+                            onToggleShowExcluded = viewModel::setShowExcludedInList,
+                            onSearchChange = viewModel::setSearchQuery
+                        )
+                    }
+                }
+
+                val transactionRows: LazyListScope.() -> Unit = {
+                    mhaCountedTransactionsItems(
+                        groupedMonths = state.groupedVisibleMonths,
+                        selectedYear = state.selectedYear,
+                        showExcludedInList = state.showExcludedInList,
+                        searchQuery = state.searchQuery,
+                        selectedCategoryId = state.selectedCategoryId,
+                        onInspectItem = { item -> viewModel.openTransactionActionSheet(item) },
+                        onShowExcluded = { viewModel.setShowExcludedInList(true) },
+                        onClearFilters = {
+                            viewModel.setSelectedCategory(null)
+                            viewModel.setSearchQuery("")
+                        }
+                    )
                 }
 
                 AnimatedContent(
@@ -190,14 +245,12 @@ fun MhaTrackerScreen(
                             }
                         }
                     } else if (isTwoPane) {
-                        // Foldable / Tablet / Wide Two-Pane Split
                         Row(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .padding(horizontal = 16.dp, vertical = 12.dp),
                             horizontalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
-                            // Left Pane: Summary Card + Auto Defaults
                             val leftListState = rememberOrbitLazyListState("two_pane_left")
                             LazyColumn(
                                 state = leftListState,
@@ -205,7 +258,7 @@ fun MhaTrackerScreen(
                                 contentPadding = PaddingValues(bottom = 32.dp),
                                 verticalArrangement = Arrangement.spacedBy(16.dp)
                             ) {
-                                summaryCards()
+                                summaryCard()
                                 item {
                                     MhaAutoDefaultsSection(
                                         accounts = state.accounts,
@@ -217,7 +270,6 @@ fun MhaTrackerScreen(
                                 }
                             }
 
-                            // Right Pane: Morphs between Transaction Review Queue and MHA Settings Content
                             AnimatedContent(
                                 targetState = state.showConfigSheet,
                                 transitionSpec = {
@@ -236,83 +288,74 @@ fun MhaTrackerScreen(
                                     ) {
                                         MhaConfigContent(
                                             taxProfile = state.taxProfile,
+                                            selectedYear = state.selectedYear,
+                                            currentYear = state.currentYear,
+                                            activeYearRecord = state.activeYearTaxRecord,
+                                            computedEffectiveRatePercent = computedEffectivePct,
                                             designatedCapCents = state.designatedCapCents,
                                             fairMarketRentalValueCents = state.fairMarketRentalValueCents,
                                             mhaEnabled = state.mhaEnabled,
                                             onToggleMhaEnabled = { viewModel.setMhaEnabled(it) },
                                             onDismiss = { viewModel.closeConfigSheet() },
-                                            onSave = { updatedProfile, cap, fmrv ->
-                                                viewModel.updateMhaConfig(cap, fmrv, updatedProfile)
-                                            }
+                                            onSave = onSaveYearConfig
                                         )
                                     }
                                 } else {
-                                    Column(
+                                    val rightListState = rememberOrbitLazyListState("two_pane_right_${state.selectedYear}")
+                                    LazyColumn(
+                                        state = rightListState,
                                         modifier = Modifier.fillMaxSize(),
-                                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                                        contentPadding = PaddingValues(bottom = 32.dp),
+                                        verticalArrangement = Arrangement.spacedBy(10.dp)
                                     ) {
-                                        MhaTransactionsTab(
-                                            transactions = state.visibleTransactions,
-                                            selectedTab = state.selectedTabFilter,
-                                            eligibleCount = state.eligibleTransactions.size,
-                                            reviewQueueCount = state.reviewQueueTransactions.size,
-                                            allCount = state.allYearOutflows.size,
-                                            searchQuery = viewModel.searchQueryInput,
-                                            onTabChange = { viewModel.setTabFilter(it) },
-                                            onSearchChange = { viewModel.setSearchQuery(it) },
-                                            onToggleEligible = { id, current -> viewModel.toggleTransactionEligibility(id, current) },
-                                            onResetEligible = { id -> viewModel.resetTransactionMhaOverride(id) },
-                                            onIgnoreFromBudget = { id, ignored -> viewModel.setTransactionIgnored(id, ignored) },
-                                            onInspectTransaction = { id -> onNavigate(OrbitNavKey.Transactions(transactionId = id)) }
-                                        )
+                                        transactionHeaderItem()
+                                        transactionRows()
                                     }
                                 }
                             }
                         }
                     } else {
-                        // Compact Mobile Single-Column Scroll
-                        val compactListState = rememberOrbitLazyListState("compact")
+                        val compactListState = rememberOrbitLazyListState("compact_${state.selectedYear}")
                         LazyColumn(
                             state = compactListState,
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 88.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            summaryCards()
-
-                            item {
-                                MhaTransactionsTab(
-                                    transactions = state.visibleTransactions,
-                                    selectedTab = state.selectedTabFilter,
-                                    eligibleCount = state.eligibleTransactions.size,
-                                    reviewQueueCount = state.reviewQueueTransactions.size,
-                                    allCount = state.allYearOutflows.size,
-                                    searchQuery = viewModel.searchQueryInput,
-                                    onTabChange = { viewModel.setTabFilter(it) },
-                                    onSearchChange = { viewModel.setSearchQuery(it) },
-                                    onToggleEligible = { id, current -> viewModel.toggleTransactionEligibility(id, current) },
-                                    onResetEligible = { id -> viewModel.resetTransactionMhaOverride(id) },
-                                    onIgnoreFromBudget = { id, ignored -> viewModel.setTransactionIgnored(id, ignored) },
-                                    onInspectTransaction = { id -> onNavigate(OrbitNavKey.Transactions(transactionId = id)) }
-                                )
-                            }
+                            summaryCard()
+                            transactionHeaderItem()
+                            transactionRows()
                         }
                     }
                 }
             }
         }
 
+        val inspecting = state.inspectingTransaction
+        if (inspecting != null) {
+            MhaTransactionActionSheet(
+                item = inspecting,
+                onDismiss = { viewModel.openTransactionActionSheet(null) },
+                onToggleEligible = { viewModel.toggleTransactionEligibility(inspecting.id, inspecting.isEligible) },
+                onResetOverride = { viewModel.resetTransactionMhaOverride(inspecting.id) },
+                onToggleIgnore = { viewModel.setTransactionIgnored(inspecting.id, !inspecting.transaction.effectiveIsIgnored) },
+                onOpenTransaction = { onNavigate(OrbitNavKey.Transactions(transactionId = inspecting.id)) }
+            )
+        }
+
         if (!isTwoPane && state.showConfigSheet) {
             MhaConfigSheet(
                 taxProfile = state.taxProfile,
+                selectedYear = state.selectedYear,
+                currentYear = state.currentYear,
+                activeYearRecord = state.activeYearTaxRecord,
+                computedEffectiveRatePercent = computedEffectivePct,
                 designatedCapCents = state.designatedCapCents,
                 fairMarketRentalValueCents = state.fairMarketRentalValueCents,
                 mhaEnabled = state.mhaEnabled,
                 onToggleMhaEnabled = { viewModel.setMhaEnabled(it) },
                 onDismiss = { viewModel.closeConfigSheet() },
-                onSave = { updatedProfile, cap, fmrv ->
-                    viewModel.updateMhaConfig(cap, fmrv, updatedProfile)
-                }
+                onSave = onSaveYearConfig
             )
         }
     }

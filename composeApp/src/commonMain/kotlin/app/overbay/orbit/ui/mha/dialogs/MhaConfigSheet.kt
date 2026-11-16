@@ -26,7 +26,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.FilingStatus
 import app.overbay.orbit.data.model.MhaTaxProfile
+import app.overbay.orbit.data.model.MhaYearTaxRecord
 import app.overbay.orbit.domain.Cents
+import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MhaTaxEngine
 import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.OrbitAccordionVisibility
@@ -42,12 +44,16 @@ import kotlin.math.max
 @Composable
 fun MhaConfigSheet(
     taxProfile: MhaTaxProfile,
+    selectedYear: Int = LocalDateUtils.todayLocalDate().year,
+    currentYear: Int = LocalDateUtils.todayLocalDate().year,
+    activeYearRecord: MhaYearTaxRecord? = null,
+    computedEffectiveRatePercent: Double = taxProfile.simpleFederalRatePercent + taxProfile.simpleStateRatePercent,
     designatedCapCents: Cents? = null,
     fairMarketRentalValueCents: Cents? = null,
     mhaEnabled: Boolean = true,
     onToggleMhaEnabled: ((Boolean) -> Unit)? = null,
     onDismiss: () -> Unit,
-    onSave: (MhaTaxProfile, Cents?, Cents?) -> Unit,
+    onSave: (MhaTaxProfile, Cents?, Cents?, Double?, Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     OrbitModalSheet(
@@ -56,6 +62,10 @@ fun MhaConfigSheet(
     ) {
         MhaConfigContent(
             taxProfile = taxProfile,
+            selectedYear = selectedYear,
+            currentYear = currentYear,
+            activeYearRecord = activeYearRecord,
+            computedEffectiveRatePercent = computedEffectiveRatePercent,
             designatedCapCents = designatedCapCents,
             fairMarketRentalValueCents = fairMarketRentalValueCents,
             mhaEnabled = mhaEnabled,
@@ -70,23 +80,34 @@ fun MhaConfigSheet(
 @Composable
 fun MhaConfigContent(
     taxProfile: MhaTaxProfile,
+    selectedYear: Int = LocalDateUtils.todayLocalDate().year,
+    currentYear: Int = LocalDateUtils.todayLocalDate().year,
+    activeYearRecord: MhaYearTaxRecord? = null,
+    computedEffectiveRatePercent: Double = taxProfile.simpleFederalRatePercent + taxProfile.simpleStateRatePercent,
     designatedCapCents: Cents? = null,
     fairMarketRentalValueCents: Cents? = null,
     mhaEnabled: Boolean = true,
     onToggleMhaEnabled: ((Boolean) -> Unit)? = null,
     onDismiss: () -> Unit,
-    onSave: (MhaTaxProfile, Cents?, Cents?) -> Unit,
+    onSave: (MhaTaxProfile, Cents?, Cents?, Double?, Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
-    val initialCap = designatedCapCents ?: taxProfile.designatedCapCents
-    val initialFmrv = fairMarketRentalValueCents ?: taxProfile.fairMarketRentalValueCents
+    val initialCap = if (activeYearRecord?.capsConfigured == true) activeYearRecord.designatedCapCents else (designatedCapCents ?: taxProfile.designatedCapCents)
+    val initialFmrv = if (activeYearRecord?.capsConfigured == true) activeYearRecord.fairMarketRentalValueCents else (fairMarketRentalValueCents ?: taxProfile.fairMarketRentalValueCents)
+    val isHistorical = selectedYear < currentYear
+    val defaultPin = if (isHistorical) activeYearRecord != null else activeYearRecord?.isLocked == true
+    val initialCustomRate = activeYearRecord?.effectiveRatePercent ?: computedEffectiveRatePercent
 
     var currentMhaEnabled by remember(mhaEnabled) { mutableStateOf(mhaEnabled) }
-    var enableDesignatedCap by remember(initialCap) { mutableStateOf(initialCap != null) }
-    var inputDesignatedCapCents by remember(initialCap) { mutableStateOf(initialCap ?: 0L) }
-    var enableFmrv by remember(initialFmrv) { mutableStateOf(initialFmrv != null) }
-    var inputFmrvCents by remember(initialFmrv) { mutableStateOf(initialFmrv ?: 0L) }
+    var pinCustomYearRate by remember(selectedYear, activeYearRecord) { mutableStateOf(defaultPin) }
+    var customEffectiveRateText by remember(selectedYear, activeYearRecord, computedEffectiveRatePercent) {
+        mutableStateOf(formatTwoDecimals(initialCustomRate))
+    }
+    var enableDesignatedCap by remember(selectedYear, initialCap) { mutableStateOf(initialCap != null) }
+    var inputDesignatedCapCents by remember(selectedYear, initialCap) { mutableStateOf(initialCap ?: 0L) }
+    var enableFmrv by remember(selectedYear, initialFmrv) { mutableStateOf(initialFmrv != null) }
+    var inputFmrvCents by remember(selectedYear, initialFmrv) { mutableStateOf(initialFmrv ?: 0L) }
     var mode by remember(taxProfile) { mutableStateOf(taxProfile.mode) }
     var simpleFedRate by remember(taxProfile) { mutableStateOf(taxProfile.simpleFederalRatePercent.toString()) }
     var simpleStateRate by remember(taxProfile) { mutableStateOf(taxProfile.simpleStateRatePercent.toString()) }
@@ -115,6 +136,9 @@ fun MhaConfigContent(
         onConfirm = {
             val resolvedCap = if (enableDesignatedCap) max(0L, inputDesignatedCapCents) else null
             val resolvedFmrv = if (enableFmrv) max(0L, inputFmrvCents) else null
+            val parsedYearRate = if (pinCustomYearRate) {
+                (customEffectiveRateText.toDoubleOrNull() ?: initialCustomRate).coerceIn(0.0, 100.0)
+            } else null
             val updated = taxProfile.copy(
                 mode = mode,
                 simpleFederalRatePercent = simpleFedRate.toDoubleOrNull() ?: 22.0,
@@ -124,15 +148,13 @@ fun MhaConfigContent(
                 deductionMode = deductionMode,
                 itemizedDeductionCents = itemizedDeductionCents,
                 taxableIncomeOverrideCents = if (enableTaxableIncomeOverride) max(0L, inputTaxableIncomeOverrideCents) else null,
-                stateRateOverridePercent = if (enableStateRateOverride) inputStateRateOverride.toDoubleOrNull()?.coerceIn(0.0, 100.0) else null,
-                designatedCapCents = resolvedCap,
-                fairMarketRentalValueCents = resolvedFmrv
+                stateRateOverridePercent = if (enableStateRateOverride) inputStateRateOverride.toDoubleOrNull()?.coerceIn(0.0, 100.0) else null
             )
-            onSave(updated, resolvedCap, resolvedFmrv)
+            onSave(updated, resolvedCap, resolvedFmrv, parsedYearRate, pinCustomYearRate)
         },
         modifier = modifier,
-        title = "MHA Tax Assumptions",
-        subtitle = "Configure IRS Section 107 limits and federal/state tax rates.",
+        title = "$selectedYear MHA Tax Rules",
+        subtitle = if (isHistorical) "Edit $selectedYear effective rate and Section 107 caps." else "Configure Section 107 limits and tax calculation rates.",
         bodySpacing = 16.dp
     ) {
 
@@ -144,6 +166,16 @@ fun MhaConfigContent(
                 currentMhaEnabled = it
                 onToggleMhaEnabled?.invoke(it)
             }
+        )
+
+        MhaYearRateSection(
+            selectedYear = selectedYear,
+            currentYear = currentYear,
+            activeYearRecord = activeYearRecord,
+            pinCustomRate = pinCustomYearRate,
+            onTogglePinCustomRate = { pinCustomYearRate = it },
+            customEffectiveRateText = customEffectiveRateText,
+            onCustomEffectiveRateChange = { customEffectiveRateText = it }
         )
 
         OrbitSwitchRow(

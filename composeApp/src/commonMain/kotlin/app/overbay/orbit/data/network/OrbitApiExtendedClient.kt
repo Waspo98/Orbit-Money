@@ -325,7 +325,10 @@ suspend fun OrbitApiClient.putMhaTaxProfile(profile: MhaTaxProfile): Result<MhaT
         deductionMode = profile.deductionMode,
         itemizedDeduction = MoneyUtils.centsToDollars(profile.itemizedDeductionCents),
         taxableIncomeOverride = profile.taxableIncomeOverrideCents?.let { MoneyUtils.centsToDollars(it) },
-        stateRateOverride = profile.stateRateOverridePercent
+        stateRateOverride = profile.stateRateOverridePercent,
+        designatedCap = profile.designatedCapCents?.let { MoneyUtils.centsToDollars(it) },
+        fairMarketRentalValue = profile.fairMarketRentalValueCents?.let { MoneyUtils.centsToDollars(it) },
+        yearlyRecords = profile.yearlyRecords.mapValues { (_, record) -> MhaYearTaxRecordDto.fromDomain(record) }
     )
     val res = client.put(url("/api/mha/tax-profile")) {
         contentType(ContentType.Application.Json); auth(sessionCookie); setBody(req)

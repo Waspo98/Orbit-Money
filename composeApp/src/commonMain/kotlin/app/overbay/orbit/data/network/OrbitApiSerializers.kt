@@ -3,6 +3,7 @@ package app.overbay.orbit.data.network
 import app.overbay.orbit.data.model.FilingStatus
 import app.overbay.orbit.data.model.HouseholdMember
 import app.overbay.orbit.data.model.MhaTaxProfile
+import app.overbay.orbit.data.model.MhaYearTaxRecord
 import app.overbay.orbit.data.model.RuleAction
 import app.overbay.orbit.data.model.RuleActionType
 import app.overbay.orbit.data.model.RuleCondition
@@ -242,6 +243,48 @@ data class HouseholdResponseDto(
 )
 
 @Serializable
+data class MhaYearTaxRecordDto(
+    val year: Int = 0,
+    val effectiveRatePercent: Double = 0.0,
+    val federalRatePercent: Double? = null,
+    val stateRatePercent: Double? = null,
+    val mode: String = "household",
+    val designatedCap: Double? = null,
+    val fairMarketRentalValue: Double? = null,
+    val capsConfigured: Boolean = false,
+    val isLocked: Boolean = false,
+    val updatedAt: String = ""
+) {
+    fun toDomain(): MhaYearTaxRecord = MhaYearTaxRecord(
+        year = year,
+        effectiveRatePercent = effectiveRatePercent,
+        federalRatePercent = federalRatePercent,
+        stateRatePercent = stateRatePercent,
+        mode = mode,
+        designatedCapCents = designatedCap?.let { MoneyUtils.dollarsToCents(it) },
+        fairMarketRentalValueCents = fairMarketRentalValue?.let { MoneyUtils.dollarsToCents(it) },
+        capsConfigured = capsConfigured,
+        isLocked = isLocked,
+        updatedAt = updatedAt
+    )
+
+    companion object {
+        fun fromDomain(record: MhaYearTaxRecord): MhaYearTaxRecordDto = MhaYearTaxRecordDto(
+            year = record.year,
+            effectiveRatePercent = record.effectiveRatePercent,
+            federalRatePercent = record.federalRatePercent,
+            stateRatePercent = record.stateRatePercent,
+            mode = record.mode,
+            designatedCap = record.designatedCapCents?.let { MoneyUtils.centsToDollars(it) },
+            fairMarketRentalValue = record.fairMarketRentalValueCents?.let { MoneyUtils.centsToDollars(it) },
+            capsConfigured = record.capsConfigured,
+            isLocked = record.isLocked,
+            updatedAt = record.updatedAt
+        )
+    }
+}
+
+@Serializable
 data class MhaTaxProfileDto(
     val mode: String = "simple",
     val simpleFederalRate: Double = 22.0,
@@ -251,7 +294,10 @@ data class MhaTaxProfileDto(
     val deductionMode: String = "standard",
     val itemizedDeduction: Double = 0.0,
     val taxableIncomeOverride: Double? = null,
-    val stateRateOverride: Double? = null
+    val stateRateOverride: Double? = null,
+    val designatedCap: Double? = null,
+    val fairMarketRentalValue: Double? = null,
+    val yearlyRecords: Map<String, MhaYearTaxRecordDto> = emptyMap()
 ) {
     fun toDomain(): MhaTaxProfile = MhaTaxProfile(
         mode = mode,
@@ -262,7 +308,10 @@ data class MhaTaxProfileDto(
         deductionMode = deductionMode,
         itemizedDeductionCents = MoneyUtils.dollarsToCents(itemizedDeduction),
         taxableIncomeOverrideCents = taxableIncomeOverride?.let { MoneyUtils.dollarsToCents(it) },
-        stateRateOverridePercent = stateRateOverride
+        stateRateOverridePercent = stateRateOverride,
+        designatedCapCents = designatedCap?.let { MoneyUtils.dollarsToCents(it) },
+        fairMarketRentalValueCents = fairMarketRentalValue?.let { MoneyUtils.dollarsToCents(it) },
+        yearlyRecords = yearlyRecords.mapValues { (_, dto) -> dto.toDomain() }
     )
 }
 

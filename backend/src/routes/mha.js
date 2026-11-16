@@ -223,7 +223,8 @@ router.get('/', requireAuth, (req, res) => {
     const taxEstimate = estimateMhaTaxSavings({
       transactionTotal: baseSummary.transactionTotal,
       profile: taxProfile,
-      householdMembers: getHouseholdTaxMembers(householdId)
+      householdMembers: getHouseholdTaxMembers(householdId),
+      year
     });
     const summary = {
       ...baseSummary,

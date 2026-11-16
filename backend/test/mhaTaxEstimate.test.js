@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   buildHouseholdTaxSnapshot,
   estimateMhaTaxSavings,
+  normalizeMhaTaxProfile,
   taxDataMeta
 } from '../src/services/mhaTaxEstimate.js';
 
@@ -85,4 +86,47 @@ test('household taxable income assumes stored paycheck contributions are pre-tax
 test('tax data metadata marks tables stale after the review date', () => {
   assert.equal(taxDataMeta(new Date('2026-06-01T00:00:00Z')).stale, false);
   assert.equal(taxDataMeta(new Date('2027-01-15T00:00:00Z')).stale, true);
+});
+
+test('normalizeMhaTaxProfile preserves caps and yearlyRecords, and estimateMhaTaxSavings honors historical year records', () => {
+  const normalized = normalizeMhaTaxProfile({
+    mode: 'simple',
+    simpleFederalRate: 22,
+    simpleStateRate: 4.95,
+    designatedCap: 50000,
+    fairMarketRentalValue: 55000,
+    yearlyRecords: {
+      2025: {
+        year: 2025,
+        effectiveRatePercent: 18.5,
+        stateRatePercent: 4.95,
+        designatedCap: 25000,
+        capsConfigured: true,
+        isLocked: true
+      }
+    }
+  });
+
+  assert.equal(normalized.designatedCap, 50000);
+  assert.equal(normalized.fairMarketRentalValue, 55000);
+  assert.equal(normalized.yearlyRecords['2025'].effectiveRatePercent, 18.5);
+
+  const est2025 = estimateMhaTaxSavings({
+    transactionTotal: 30000,
+    profile: normalized,
+    year: 2025,
+    currentYear: 2026
+  });
+  assert.equal(est2025.excludableAllowance, 25000);
+  assert.equal(est2025.savings, 4625);
+  assert.equal(est2025.stateRateSource, 'stored_year');
+
+  const est2026 = estimateMhaTaxSavings({
+    transactionTotal: 30000,
+    profile: normalized,
+    year: 2026,
+    currentYear: 2026
+  });
+  assert.equal(est2026.excludableAllowance, 30000);
+  assert.equal(est2026.savings, 8085);
 });

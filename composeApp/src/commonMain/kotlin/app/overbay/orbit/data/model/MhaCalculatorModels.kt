@@ -29,6 +29,20 @@ enum class MhaDeductionMode {
 }
 
 @Serializable
+data class MhaYearTaxRecord(
+    val year: Int,
+    val effectiveRatePercent: Double = 0.0,
+    val federalRatePercent: Double? = null,
+    val stateRatePercent: Double? = null,
+    val mode: String = "household", // simple | household | manual_effective
+    val designatedCapCents: Cents? = null,
+    val fairMarketRentalValueCents: Cents? = null,
+    val capsConfigured: Boolean = false,
+    val isLocked: Boolean = false,
+    val updatedAt: String = ""
+)
+
+@Serializable
 data class MhaTaxProfile(
     val mode: String = "simple", // simple | household
     val simpleFederalRatePercent: Double = 22.0,
@@ -40,7 +54,8 @@ data class MhaTaxProfile(
     val taxableIncomeOverrideCents: Cents? = null,
     val stateRateOverridePercent: Double? = null,
     val designatedCapCents: Cents? = null,
-    val fairMarketRentalValueCents: Cents? = null
+    val fairMarketRentalValueCents: Cents? = null,
+    val yearlyRecords: Map<String, MhaYearTaxRecord> = emptyMap()
 ) {
     val simpleFederalRate: Double get() = simpleFederalRatePercent
     val simpleStateRate: Double get() = simpleStateRatePercent

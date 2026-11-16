@@ -22,7 +22,10 @@ export function defaultMhaTaxProfile() {
     deductionMode: 'standard',
     itemizedDeduction: 0,
     taxableIncomeOverride: null,
-    stateRateOverride: null
+    stateRateOverride: null,
+    designatedCap: null,
+    fairMarketRentalValue: null,
+    yearlyRecords: {}
   };
 }
 
@@ -46,6 +49,37 @@ function cleanOptionalMoney(value) {
   return Math.max(0, number);
 }
 
+function normalizeYearRecord(yearKey, raw) {
+  const yearNum = Number.parseInt(yearKey, 10);
+  const year = Number.isInteger(raw?.year) ? raw.year : yearNum;
+  if (!Number.isInteger(year) || year < 1900 || year > 2200) return null;
+  return {
+    year,
+    effectiveRatePercent: clampPercent(raw?.effectiveRatePercent, 0),
+    federalRatePercent: raw?.federalRatePercent == null ? null : clampPercent(raw.federalRatePercent, 0),
+    stateRatePercent: raw?.stateRatePercent == null ? null : clampPercent(raw.stateRatePercent, 0),
+    mode: raw?.mode === 'simple' || raw?.mode === 'manual_effective' ? raw.mode : 'household',
+    designatedCap: cleanOptionalMoney(raw?.designatedCap),
+    fairMarketRentalValue: cleanOptionalMoney(raw?.fairMarketRentalValue),
+    capsConfigured: Boolean(raw?.capsConfigured),
+    isLocked: Boolean(raw?.isLocked),
+    updatedAt: typeof raw?.updatedAt === 'string' ? raw.updatedAt : ''
+  };
+}
+
+function normalizeYearlyRecords(rawRecords) {
+  if (!rawRecords || typeof rawRecords !== 'object' || Array.isArray(rawRecords)) return {};
+  const result = {};
+  for (const [key, value] of Object.entries(rawRecords)) {
+    if (!value || typeof value !== 'object') continue;
+    const normalized = normalizeYearRecord(key, value);
+    if (normalized) {
+      result[String(normalized.year)] = normalized;
+    }
+  }
+  return result;
+}
+
 export function normalizeMhaTaxProfile(value) {
   const defaults = defaultMhaTaxProfile();
   const source = value && typeof value === 'object' ? value : {};
@@ -63,7 +97,10 @@ export function normalizeMhaTaxProfile(value) {
     deductionMode,
     itemizedDeduction: cleanMoneyValue(source.itemizedDeduction, defaults.itemizedDeduction),
     taxableIncomeOverride: cleanOptionalMoney(source.taxableIncomeOverride),
-    stateRateOverride: cleanOptionalMoney(source.stateRateOverride)
+    stateRateOverride: cleanOptionalMoney(source.stateRateOverride),
+    designatedCap: cleanOptionalMoney(source.designatedCap),
+    fairMarketRentalValue: cleanOptionalMoney(source.fairMarketRentalValue),
+    yearlyRecords: normalizeYearlyRecords(source.yearlyRecords)
   };
 }
 
@@ -228,13 +265,59 @@ export function stateRateForProfile(profile, taxableIncome) {
   };
 }
 
+function applyParsonageCap(eligibleTotal, designatedCap, fairMarketRentalValue) {
+  let cap = Math.max(0, eligibleTotal);
+  if (designatedCap !== null && designatedCap !== undefined && designatedCap >= 0) {
+    cap = Math.min(cap, designatedCap);
+  }
+  if (fairMarketRentalValue !== null && fairMarketRentalValue !== undefined && fairMarketRentalValue >= 0) {
+    cap = Math.min(cap, fairMarketRentalValue);
+  }
+  return roundMoney(Math.max(0, cap));
+}
+
 export function estimateMhaTaxSavings({
   transactionTotal = 0,
   profile = defaultMhaTaxProfile(),
-  householdMembers = []
+  householdMembers = [],
+  year = null,
+  currentYear = new Date().getFullYear()
 } = {}) {
   const normalized = normalizeMhaTaxProfile(profile);
   const eligibleTotal = roundMoney(Math.max(0, toFiniteNumber(transactionTotal)));
+  const targetYear = Number.isInteger(year) ? year : TAX_YEAR;
+  const yearRecord = year !== null && year !== undefined ? normalized.yearlyRecords?.[String(year)] || null : null;
+  const cap = yearRecord?.capsConfigured ? yearRecord.designatedCap : normalized.designatedCap;
+  const fmrv = yearRecord?.capsConfigured ? yearRecord.fairMarketRentalValue : normalized.fairMarketRentalValue;
+  const excludableTotal = applyParsonageCap(eligibleTotal, cap, fmrv);
+
+  if (yearRecord && (targetYear < currentYear || yearRecord.isLocked)) {
+    const effectiveRate = clampPercent(yearRecord.effectiveRatePercent, 0) / 100;
+    const totalSavings = roundMoney(excludableTotal * effectiveRate);
+    const hasStateRate = yearRecord.stateRatePercent !== null && yearRecord.stateRatePercent !== undefined;
+    const stateRate = hasStateRate ? clampPercent(yearRecord.stateRatePercent, 0) / 100 : 0;
+    const stateSavings = hasStateRate ? Math.min(totalSavings, roundMoney(excludableTotal * stateRate)) : 0;
+    const federalSavings = roundMoney(Math.max(0, totalSavings - stateSavings));
+    const federalRate = yearRecord.federalRatePercent !== null && yearRecord.federalRatePercent !== undefined
+      ? clampPercent(yearRecord.federalRatePercent, 0) / 100
+      : effectiveRate;
+
+    return {
+      mode: yearRecord.mode || normalized.mode,
+      taxYear: targetYear,
+      eligibleTotal,
+      excludableAllowance: excludableTotal,
+      savings: totalSavings,
+      effectiveRate,
+      federalRate,
+      federalSavings,
+      stateRate,
+      stateSavings,
+      stateRateSource: 'stored_year',
+      household: null,
+      assumptions: [`Using saved ${targetYear} effective tax rate (${yearRecord.effectiveRatePercent}%).`]
+    };
+  }
 
   if (normalized.mode === 'simple') {
     const federalRate = clampPercent(normalized.simpleFederalRate) / 100;
@@ -242,14 +325,15 @@ export function estimateMhaTaxSavings({
     const effectiveRate = federalRate + stateRate;
     return {
       mode: normalized.mode,
-      taxYear: TAX_YEAR,
+      taxYear: targetYear,
       eligibleTotal,
-      savings: roundMoney(eligibleTotal * effectiveRate),
+      excludableAllowance: excludableTotal,
+      savings: roundMoney(excludableTotal * effectiveRate),
       effectiveRate,
       federalRate,
-      federalSavings: roundMoney(eligibleTotal * federalRate),
+      federalSavings: roundMoney(excludableTotal * federalRate),
       stateRate,
-      stateSavings: roundMoney(eligibleTotal * stateRate),
+      stateSavings: roundMoney(excludableTotal * stateRate),
       stateRateSource: 'manual',
       household: null,
       assumptions: ['Simple mode uses the rates you enter.']
@@ -258,20 +342,21 @@ export function estimateMhaTaxSavings({
 
   const household = buildHouseholdTaxSnapshot(householdMembers, normalized);
   const taxableBefore = household.taxableIncome;
-  const taxableAfter = Math.max(0, taxableBefore - eligibleTotal);
+  const taxableAfter = Math.max(0, taxableBefore - excludableTotal);
   const federalBefore = federalTaxForTaxableIncome(taxableBefore, normalized.filingStatus);
   const federalAfter = federalTaxForTaxableIncome(taxableAfter, normalized.filingStatus);
   const federalSavings = roundMoney(Math.max(0, federalBefore - federalAfter));
   const federalRate = federalMarginalRate(taxableBefore, normalized.filingStatus);
   const stateRate = stateRateForProfile(normalized, taxableBefore);
-  const stateSavings = roundMoney(eligibleTotal * stateRate.rate);
+  const stateSavings = roundMoney(excludableTotal * stateRate.rate);
   const savings = roundMoney(federalSavings + stateSavings);
-  const effectiveRate = eligibleTotal > 0 ? savings / eligibleTotal : federalRate + stateRate.rate;
+  const effectiveRate = excludableTotal > 0 ? savings / excludableTotal : federalRate + stateRate.rate;
 
   return {
     mode: normalized.mode,
-    taxYear: TAX_YEAR,
+    taxYear: targetYear,
     eligibleTotal,
+    excludableAllowance: excludableTotal,
     savings,
     effectiveRate,
     federalRate,
