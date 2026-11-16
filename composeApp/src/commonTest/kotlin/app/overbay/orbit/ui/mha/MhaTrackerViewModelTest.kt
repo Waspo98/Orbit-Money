@@ -501,4 +501,110 @@ class MhaTrackerViewModelTest {
 
         collectJob.cancel()
     }
+
+    @Test
+    fun testHistoricalYear_unlockingWithCapsRevertsToLiveProfileWithoutSticking() = runTest(testDispatcher) {
+        val cat = Category(id = 10L, name = "Housing", isIncome = false, isTransfer = false, mhaDefaultEligible = true)
+        repository.saveCategory(cat)
+        repository.saveTransaction(Transaction(id = 1L, accountId = 1L, originalDate = "2025-04-01", originalMerchant = "Rent 2025", originalAmountCents = -25_000_00L, originalCategoryId = 10L))
+
+        val collectJob = launch(testDispatcher) { viewModel.uiState.collect {} }
+        viewModel.setYear(2025)
+        testScheduler.advanceUntilIdle()
+
+        // 1. Lock a custom 18.0% rate + $20k cap for 2025
+        viewModel.saveYearConfig(
+            year = 2025,
+            updatedProfile = MhaTaxProfile(mode = "simple", simpleFederalRatePercent = 22.0, simpleStateRatePercent = 4.95),
+            designationCapCents = 20_000_00L,
+            fairMarketRentalValueCents = null,
+            customEffectiveRatePercent = 18.0,
+            lockYearRate = true
+        )
+        testScheduler.advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.isUsingStoredYearRate)
+        assertEquals(3600_00L, viewModel.uiState.value.taxCalculationResult?.totalSavingsCents)
+
+        // 2. Uncheck saved rate while keeping 2025's $20k cap -> must revert to live profile (26.95%)
+        viewModel.saveYearConfig(
+            year = 2025,
+            updatedProfile = MhaTaxProfile(mode = "simple", simpleFederalRatePercent = 22.0, simpleStateRatePercent = 4.95),
+            designationCapCents = 20_000_00L,
+            fairMarketRentalValueCents = null,
+            customEffectiveRatePercent = null,
+            lockYearRate = false
+        )
+        testScheduler.advanceUntilIdle()
+        assertFalse(viewModel.uiState.value.isUsingStoredYearRate)
+        assertTrue(viewModel.uiState.value.isHistoricalYearWithoutSavedRate)
+        assertEquals(20_000_00L, viewModel.uiState.value.designatedCapCents)
+        assertEquals(5390_00L, viewModel.uiState.value.taxCalculationResult?.totalSavingsCents)
+
+        // 3. Updating active simple rate propagates to 2025 while 2025 keeps its $20k cap
+        viewModel.saveYearConfig(
+            year = 2025,
+            updatedProfile = viewModel.uiState.value.taxProfile.copy(simpleFederalRatePercent = 24.0, simpleStateRatePercent = 5.0),
+            designationCapCents = 20_000_00L,
+            fairMarketRentalValueCents = null,
+            customEffectiveRatePercent = null,
+            lockYearRate = false
+        )
+        testScheduler.advanceUntilIdle()
+        assertEquals(5800_00L, viewModel.uiState.value.taxCalculationResult?.totalSavingsCents)
+
+        // 4. Clearing caps and saved rate when no global caps exist removes the 2025 record cleanly
+        viewModel.saveYearConfig(
+            year = 2025,
+            updatedProfile = viewModel.uiState.value.taxProfile,
+            designationCapCents = null,
+            fairMarketRentalValueCents = null,
+            customEffectiveRatePercent = null,
+            lockYearRate = false
+        )
+        testScheduler.advanceUntilIdle()
+        assertNull(repository.snapshot.value.mhaTaxProfile.yearlyRecords["2025"])
+        assertEquals(7250_00L, viewModel.uiState.value.taxCalculationResult?.totalSavingsCents)
+
+        collectJob.cancel()
+    }
+
+    @Test
+    fun testRecordCurrentYearRateIfChanged_preservesExistingGlobalCapsConfiguredFlag() = runTest(testDispatcher) {
+        val cat = Category(id = 10L, name = "Housing", isIncome = false, isTransfer = false, mhaDefaultEligible = true)
+        repository.saveCategory(cat)
+        val currentYr = app.overbay.orbit.domain.LocalDateUtils.todayLocalDate().year
+        repository.updateMhaTaxProfile(
+            MhaTaxProfile(
+                mode = "simple",
+                simpleFederalRatePercent = 22.0,
+                simpleStateRatePercent = 4.95,
+                designatedCapCents = 30_000_00L
+            )
+        )
+        repository.saveTransaction(
+            Transaction(
+                id = 1L,
+                accountId = 1L,
+                originalDate = "$currentYr-05-01",
+                originalMerchant = "Mortgage",
+                originalAmountCents = -10_000_00L,
+                originalCategoryId = 10L
+            )
+        )
+
+        val collectJob = launch(testDispatcher) { viewModel.uiState.collect {} }
+        viewModel.setYear(currentYr)
+        testScheduler.advanceUntilIdle()
+
+        viewModel.recordCurrentYearRateIfChanged()
+        testScheduler.advanceUntilIdle()
+
+        val savedRecord = repository.snapshot.value.mhaTaxProfile.yearlyRecords[currentYr.toString()]
+        assertNotNull(savedRecord)
+        assertTrue(savedRecord.capsConfigured)
+        assertEquals(30_000_00L, savedRecord.designatedCapCents)
+        assertFalse(savedRecord.useLiveProfile)
+
+        collectJob.cancel()
+    }
 }

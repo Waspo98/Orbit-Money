@@ -2,6 +2,9 @@ package app.overbay.orbit.domain
 
 import app.overbay.orbit.data.model.MhaTaxProfile
 import app.overbay.orbit.data.model.MhaYearTaxRecord
+import app.overbay.orbit.data.network.MhaTaxProfileDto
+import app.overbay.orbit.data.network.MhaYearTaxRecordDto
+import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -133,6 +136,73 @@ class MhaAndCalculatorsTest {
             profile = profile
         )
         assertEquals(5390_00L, result2024.totalSavingsCents)
+    }
+
+    @Test
+    fun testMhaTaxEngine_calculateMhaSavingsForYear_liveHistoricalRecordUsesActiveProfileWithYearCap() {
+        val profile = MhaTaxProfile(
+            mode = "simple",
+            simpleFederalRatePercent = 22.0,
+            simpleStateRatePercent = 4.95,
+            designatedCapCents = 50_000_00L,
+            yearlyRecords = mapOf(
+                "2025" to MhaYearTaxRecord(
+                    year = 2025,
+                    effectiveRatePercent = 18.0,
+                    designatedCapCents = 20_000_00L,
+                    capsConfigured = true,
+                    isLocked = false,
+                    useLiveProfile = true
+                )
+            )
+        )
+
+        val result2025 = MhaTaxEngine.calculateMhaSavingsForYear(
+            year = 2025,
+            currentYear = 2026,
+            actualEligibleCents = 30_000_00L,
+            profile = profile
+        )
+        assertEquals(20_000_00L, result2025.excludableAllowanceCents)
+        // Live active rate (26.95% of $20,000 = $5,390.00), NOT stored 18.0%
+        assertEquals(5390_00L, result2025.totalSavingsCents)
+    }
+
+    @Test
+    fun testMhaTaxProfileDto_yearlyRecordsRoundTripAndPercentFormatting() {
+        val domain = MhaTaxProfile(
+            mode = "household",
+            designatedCapCents = 30_000_00L,
+            yearlyRecords = mapOf(
+                "2025" to MhaYearTaxRecord(
+                    year = 2025,
+                    effectiveRatePercent = 18.5,
+                    federalRatePercent = 13.55,
+                    stateRatePercent = 4.95,
+                    mode = "manual_effective",
+                    designatedCapCents = 24_000_00L,
+                    fairMarketRentalValueCents = 28_000_00L,
+                    capsConfigured = true,
+                    isLocked = true,
+                    useLiveProfile = false,
+                    updatedAt = "2026-11-15"
+                )
+            )
+        )
+        val dto = MhaTaxProfileDto(
+            mode = domain.mode,
+            designatedCap = MoneyUtils.centsToDollars(domain.designatedCapCents!!),
+            yearlyRecords = domain.yearlyRecords.mapValues { (_, r) -> MhaYearTaxRecordDto.fromDomain(r) }
+        )
+        val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+        val encoded = json.encodeToString(MhaTaxProfileDto.serializer(), dto)
+        val decoded = json.decodeFromString(MhaTaxProfileDto.serializer(), encoded).toDomain()
+
+        assertEquals(domain.designatedCapCents, decoded.designatedCapCents)
+        assertEquals(domain.yearlyRecords["2025"], decoded.yearlyRecords["2025"])
+        assertEquals("22", MhaTaxEngine.formatPercent(22.0))
+        assertEquals("18.5", MhaTaxEngine.formatPercent(18.5))
+        assertEquals("26.95", MhaTaxEngine.formatPercent(26.95))
     }
 
     // -------------------------------------------------------------------------

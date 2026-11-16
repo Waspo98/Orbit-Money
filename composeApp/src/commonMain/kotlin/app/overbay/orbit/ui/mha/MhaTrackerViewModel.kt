@@ -11,7 +11,6 @@ import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.MhaTaxProfile
 import app.overbay.orbit.data.model.MhaYearTaxRecord
 import app.overbay.orbit.data.model.Transaction
-import app.overbay.orbit.data.model.displayEmoji
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MhaTaxEngine
@@ -32,7 +31,6 @@ class MhaTrackerViewModel(
 ) : ViewModel() {
 
     private val _selectedYear = MutableStateFlow(LocalDateUtils.todayLocalDate().year)
-    private val _selectedTabFilter = MutableStateFlow(MhaTransactionTabFilter.ELIGIBLE)
     private val _activeScreenTab = MutableStateFlow(MhaScreenTab.TRACKER)
     private val _searchQuery = MutableStateFlow("")
     var searchQueryInput by mutableStateOf("")
@@ -55,13 +53,12 @@ class MhaTrackerViewModel(
             SnapshotData(snapshot, txns, accounts, cats, year)
         },
         combine(
-            _selectedTabFilter,
             _activeScreenTab,
             _searchQuery,
             _showConfigSheet,
             _errorMessage
-        ) { tab, screenTab, search, showConfig, err ->
-            ViewFilterData(tab, screenTab, search, showConfig, err)
+        ) { screenTab, search, showConfig, err ->
+            ViewFilterData(screenTab, search, showConfig, err)
         },
         combine(
             _selectedCategoryId,
@@ -90,64 +87,10 @@ class MhaTrackerViewModel(
         val year = snapData.year
         val profile = snapshot.mhaTaxProfile
 
-        val accountMap = accounts.associateBy { it.id }
-        val categoryMap = categories.associateBy { it.id }
-        val yearPrefix = "$year-"
-        val yearTxns = transactions.filter { it.effectiveDate.startsWith(yearPrefix) }
-
-        val accountMhaSet = accounts.filter { it.mhaDefaultEligible }.map { it.id }.toSet()
-        val catMhaSet = categories.filter { it.mhaDefaultEligible }.map { it.id }.toSet()
-        val catIgnoredSet = categories.filter { it.mhaDefaultIgnored }.map { it.id }.toSet()
-
-        val allItems = mutableListOf<MhaTransactionItem>()
-        val eligibleItems = mutableListOf<MhaTransactionItem>()
-        val reviewQueueItems = mutableListOf<MhaTransactionItem>()
-        var actualSpentCents = 0L
-
-        for (txn in yearTxns) {
-            val amount = txn.effectiveAmountCents
-            val isOutflow = amount < 0L
-            val isTransfer = txn.effectiveIsTransfer || (txn.effectiveCategoryId?.let { categoryMap[it]?.isTransfer } == true)
-            if (!isOutflow || isTransfer) continue
-
-            val isIgnored = txn.effectiveIsIgnored
-            val catId = txn.effectiveCategoryId
-            val accId = txn.accountId
-            val cat = catId?.let { categoryMap[it] }
-            val acct = accountMap[accId]
-
-            val isEligible = if (isIgnored && txn.editedMhaEligible != true) {
-                false
-            } else {
-                txn.editedMhaEligible ?: run {
-                    if (catId != null && catId in catIgnoredSet) false
-                    else (accId in accountMhaSet) || (catId != null && catId in catMhaSet)
-                }
-            }
-
-            val item = MhaTransactionItem(
-                transaction = txn,
-                category = cat,
-                account = acct,
-                isEligible = isEligible,
-                isExplicitOverride = txn.editedMhaEligible != null,
-                isOverriddenByUser = txn.editedMhaEligibleSource == "user",
-                eligibilityReason = MhaTrackerTransform.resolveEligibilityReason(txn, isIgnored, cat, acct)
-            )
-
-            allItems.add(item)
-            if (isEligible) {
-                eligibleItems.add(item)
-                actualSpentCents += abs(amount)
-            } else {
-                reviewQueueItems.add(item)
-            }
-        }
-
-        val itemComparator = compareByDescending<MhaTransactionItem> { it.effectiveDate }.thenByDescending { it.id }
-        val sortedAll = allItems.sortedWith(itemComparator)
-        val sortedEligible = eligibleItems.sortedWith(itemComparator)
-        val sortedReview = reviewQueueItems.sortedWith(itemComparator)
+        val classified = MhaTrackerTransform.classifyYearTransactions(year, transactions, accounts, categories)
+        val sortedAll = classified.allOutflows
+        val sortedEligible = classified.eligible
+        val actualSpentCents = classified.actualSpentCents
 
         val today = LocalDateUtils.todayLocalDate()
         val currentYear = today.year
@@ -180,8 +123,8 @@ class MhaTrackerViewModel(
             taxCalc.totalSavingsCents
         }
 
-        val isStoredRateActive = yearRecord != null && (year < currentYear || yearRecord.isLocked)
-        val isHistoricalUnset = year < currentYear && yearRecord == null
+        val isStoredRateActive = yearRecord != null && !yearRecord.useLiveProfile && (year < currentYear || yearRecord.isLocked)
+        val isHistoricalUnset = year < currentYear && (yearRecord == null || yearRecord.useLiveProfile)
         val taxRateSourceLabel = when {
             isStoredRateActive -> "Saved $year Rate"
             isHistoricalUnset -> "Estimated"
@@ -222,13 +165,11 @@ class MhaTrackerViewModel(
             isHistoricalYearWithoutSavedRate = isHistoricalUnset,
             taxRateSourceLabel = taxRateSourceLabel,
             eligibleTransactions = sortedEligible,
-            reviewQueueTransactions = sortedReview,
             allYearOutflows = sortedAll,
             visibleTransactions = visibleItems,
             groupedVisibleMonths = groupedMonths,
             visibleTotalCents = visibleTotalCents,
             categoryBreakdown = categoryBreakdown,
-            selectedTabFilter = filterData.tabFilter,
             selectedCategoryId = validCatFilter,
             showExcludedInList = listFilter.showExcludedInList,
             inspectingTransaction = listFilter.inspectingTransactionId?.let { id -> sortedAll.find { it.id == id } },
@@ -250,15 +191,14 @@ class MhaTrackerViewModel(
         _inspectingTransactionId.value = null
     }
 
-    fun setTabFilter(filter: MhaTransactionTabFilter) {
-        _selectedTabFilter.value = filter
-    }
-
     fun setSelectedCategory(categoryId: Long?) {
         _selectedCategoryId.value = categoryId
     }
 
     fun setShowExcludedInList(show: Boolean) {
+        if (show && uiState.value.selectedCategoryId == null) {
+            _selectedCategoryId.value = null
+        }
         _showExcludedInList.value = show
     }
 
@@ -350,17 +290,22 @@ class MhaTrackerViewModel(
         if (existing?.isLocked == true) return
         val calc = state.taxCalculationResult ?: return
 
+        val resolvedCapsConfigured = existing?.capsConfigured
+            ?: (state.designatedCapCents != null || state.fairMarketRentalValueCents != null)
         val computedRecord = MhaTaxEngine.toYearRecord(
             year = state.currentYear,
             result = calc,
             profile = state.taxProfile,
             designatedCapCents = state.designatedCapCents,
             fairMarketRentalValueCents = state.fairMarketRentalValueCents,
-            capsConfigured = existing?.capsConfigured ?: false,
+            capsConfigured = resolvedCapsConfigured,
             isLocked = false,
+            useLiveProfile = false,
             updatedAt = LocalDateUtils.todayIsoDate()
         )
         val unchanged = existing != null &&
+            !existing.useLiveProfile &&
+            existing.capsConfigured == computedRecord.capsConfigured &&
             abs(existing.effectiveRatePercent - computedRecord.effectiveRatePercent) < 0.01 &&
             existing.federalRatePercent == computedRecord.federalRatePercent &&
             existing.stateRatePercent == computedRecord.stateRatePercent &&
@@ -369,7 +314,7 @@ class MhaTrackerViewModel(
             existing.mode == computedRecord.mode
         if (unchanged) return
 
-        val fingerprint = "${computedRecord.year}:${computedRecord.effectiveRatePercent}:${computedRecord.federalRatePercent}:${computedRecord.stateRatePercent}:${computedRecord.designatedCapCents}:${computedRecord.fairMarketRentalValueCents}:${computedRecord.mode}"
+        val fingerprint = "${computedRecord.year}:${computedRecord.effectiveRatePercent}:${computedRecord.federalRatePercent}:${computedRecord.stateRatePercent}:${computedRecord.designatedCapCents}:${computedRecord.fairMarketRentalValueCents}:${computedRecord.capsConfigured}:${computedRecord.mode}"
         if (lastAutoRecordedFingerprint == fingerprint) return
         lastAutoRecordedFingerprint = fingerprint
 
@@ -418,6 +363,13 @@ class MhaTrackerViewModel(
         }
 
         val updatedRecords = baseProfile.yearlyRecords.toMutableMap()
+        val yearSpent = MhaTrackerTransform.classifyYearTransactions(
+            year = year,
+            transactions = repository.transactions.value,
+            accounts = repository.accounts.value,
+            categories = repository.categories.value
+        ).actualSpentCents
+
         if (lockYearRate && customEffectiveRatePercent != null) {
             val clamped = MhaTaxEngine.roundPercentTwoDecimals(customEffectiveRatePercent.coerceIn(0.0, 100.0))
             val existing = updatedRecords[yearKey]
@@ -433,12 +385,12 @@ class MhaTrackerViewModel(
                 fairMarketRentalValueCents = fairMarketRentalValueCents,
                 capsConfigured = true,
                 isLocked = true,
+                useLiveProfile = false,
                 updatedAt = LocalDateUtils.todayIsoDate()
             )
         } else if (isCurrentYear) {
-            val spent = uiState.value.actualEligibleHousingSpentCents
             val liveCalc = MhaTaxEngine.calculateMhaSavings(
-                actualEligibleCents = spent,
+                actualEligibleCents = yearSpent,
                 profile = baseProfile,
                 householdMembers = snap.members,
                 designatedCapCents = designationCapCents,
@@ -452,15 +404,16 @@ class MhaTrackerViewModel(
                 fairMarketRentalValueCents = fairMarketRentalValueCents,
                 capsConfigured = true,
                 isLocked = false,
+                useLiveProfile = false,
                 updatedAt = LocalDateUtils.todayIsoDate()
             )
         } else {
-            // Historical year switched back to live profile calculation, preserving per-year caps if configured
-            val existing = updatedRecords[yearKey]
-            if (designationCapCents != null || fairMarketRentalValueCents != null || existing?.capsConfigured == true) {
-                val spent = uiState.value.actualEligibleHousingSpentCents
+            // Historical year using live profile calculation; keep record only if caps exist or override global caps
+            val hasYearCaps = designationCapCents != null || fairMarketRentalValueCents != null
+            val overridesGlobalCaps = baseProfile.designatedCapCents != null || baseProfile.fairMarketRentalValueCents != null
+            if (hasYearCaps || overridesGlobalCaps) {
                 val liveCalc = MhaTaxEngine.calculateMhaSavings(
-                    actualEligibleCents = spent,
+                    actualEligibleCents = yearSpent,
                     profile = baseProfile,
                     householdMembers = snap.members,
                     designatedCapCents = designationCapCents,
@@ -474,6 +427,7 @@ class MhaTrackerViewModel(
                     fairMarketRentalValueCents = fairMarketRentalValueCents,
                     capsConfigured = true,
                     isLocked = false,
+                    useLiveProfile = true,
                     updatedAt = LocalDateUtils.todayIsoDate()
                 )
             } else {
@@ -501,7 +455,6 @@ class MhaTrackerViewModel(
     )
 
     private data class ViewFilterData(
-        val tabFilter: MhaTransactionTabFilter,
         val screenTab: MhaScreenTab,
         val searchQuery: String,
         val showConfig: Boolean,

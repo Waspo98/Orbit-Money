@@ -431,7 +431,7 @@ class MhaChallengerStressTest {
 
         // 1. Initial State: not eligible
         assertFalse(viewModel.uiState.value.eligibleTransactions.any { it.id == 777L })
-        assertTrue(viewModel.uiState.value.reviewQueueTransactions.any { it.id == 777L })
+        assertTrue(viewModel.uiState.value.allYearOutflows.any { it.id == 777L && !it.isEligible })
 
         // 2. Toggle to Eligible (User action)
         viewModel.toggleTransactionEligibility(777L)
@@ -466,7 +466,7 @@ class MhaChallengerStressTest {
         assertEquals(EditSource.NONE, resetTx.editSource)
         // Verify UI state reflects reset
         assertFalse(viewModel.uiState.value.eligibleTransactions.any { it.id == 777L })
-        assertTrue(viewModel.uiState.value.reviewQueueTransactions.any { it.id == 777L })
+        assertTrue(viewModel.uiState.value.allYearOutflows.any { it.id == 777L && !it.isEligible })
 
         collectJob.cancel()
     }

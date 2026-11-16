@@ -37,7 +37,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
-import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.ui.components.MorphingPageHero
 import app.overbay.orbit.ui.components.OrbitSegmentedTabRow
@@ -66,8 +65,7 @@ fun MhaTrackerScreen(
     val heroScrollState = rememberHeroScrollState()
 
     var showYearMenu by remember { mutableStateOf(false) }
-    val currentYear = remember { LocalDateUtils.todayLocalDate().year }
-    val maxNavYear = maxOf(currentYear, state.availableYears.maxOrNull() ?: currentYear)
+    val maxNavYear = maxOf(state.currentYear, state.availableYears.maxOrNull() ?: state.currentYear)
     val canGoNext = state.selectedYear < maxNavYear
 
     LaunchedEffect(state.errorMessage) {
@@ -79,12 +77,13 @@ fun MhaTrackerScreen(
 
     LaunchedEffect(
         state.isLoading,
+        state.showConfigSheet,
         state.selectedYear,
         state.taxCalculationResult?.effectiveSavingsRatePercent,
         state.designatedCapCents,
         state.fairMarketRentalValueCents
     ) {
-        if (!state.isLoading) {
+        if (!state.isLoading && !state.showConfigSheet) {
             viewModel.recordCurrentYearRateIfChanged()
         }
     }

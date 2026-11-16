@@ -4,6 +4,7 @@ import app.overbay.orbit.data.model.FilingStatus
 import app.overbay.orbit.data.model.HouseholdMember
 import app.overbay.orbit.data.model.MhaTaxProfile
 import app.overbay.orbit.data.model.MhaYearTaxRecord
+import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToLong
@@ -325,7 +326,7 @@ object MhaTaxEngine {
         val resolvedCap = if (yearRecord?.capsConfigured == true) yearRecord.designatedCapCents else designatedCapCents
         val resolvedFmrv = if (yearRecord?.capsConfigured == true) yearRecord.fairMarketRentalValueCents else fairMarketRentalValueCents
 
-        val useStoredRate = yearRecord != null && (year < currentYear || yearRecord.isLocked)
+        val useStoredRate = yearRecord != null && !yearRecord.useLiveProfile && (year < currentYear || yearRecord.isLocked)
         if (!useStoredRate) {
             return calculateMhaSavings(
                 actualEligibleCents = actualEligibleCents,
@@ -374,6 +375,17 @@ object MhaTaxEngine {
     fun roundPercentTwoDecimals(percent: Double): Double =
         (percent * 100.0).roundToLong() / 100.0
 
+    fun formatPercent(percent: Double): String {
+        val hundredths = (percent * 100.0).roundToLong()
+        val whole = hundredths / 100
+        val frac = abs(hundredths % 100)
+        return when {
+            frac == 0L -> "$whole"
+            frac % 10L == 0L -> "$whole.${frac / 10}"
+            else -> "$whole.${frac.toString().padStart(2, '0')}"
+        }
+    }
+
     fun toYearRecord(
         year: Int,
         result: MhaTaxCalculationResult,
@@ -382,6 +394,7 @@ object MhaTaxEngine {
         fairMarketRentalValueCents: Cents?,
         capsConfigured: Boolean,
         isLocked: Boolean,
+        useLiveProfile: Boolean = false,
         updatedAt: String = ""
     ): MhaYearTaxRecord = MhaYearTaxRecord(
         year = year,
@@ -393,6 +406,7 @@ object MhaTaxEngine {
         fairMarketRentalValueCents = fairMarketRentalValueCents,
         capsConfigured = capsConfigured,
         isLocked = isLocked,
+        useLiveProfile = useLiveProfile,
         updatedAt = updatedAt
     )
 

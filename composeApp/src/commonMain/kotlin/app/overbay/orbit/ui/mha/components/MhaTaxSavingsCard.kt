@@ -51,8 +51,6 @@ import app.overbay.orbit.ui.components.OrbitPillProgressBar
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.ui.components.OrbitStackedSegmentBar
 import app.overbay.orbit.ui.components.RollingTickerCents
-import kotlin.math.abs
-import kotlin.math.roundToLong
 import kotlinx.datetime.LocalDate
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -165,7 +163,7 @@ fun MhaTaxSavingsCard(
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "${formatRatePercent(effectiveRatePercent)}% effective rate",
+                        text = "${MhaTaxEngine.formatPercent(effectiveRatePercent)}% effective rate",
                         style = TabularNumStyle.copy(fontSize = 13.5.sp, fontWeight = FontWeight.Medium),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -277,18 +275,23 @@ fun MhaTaxSavingsCard(
                 OrbitMiniStatRow(
                     label = "Saved $selectedYear effective rate",
                     detail = "Applied to ${MoneyUtils.formatCents(excludableAllowanceCents)} excludable housing",
-                    value = "${formatRatePercent(effectiveRatePercent)}%",
+                    value = "${MhaTaxEngine.formatPercent(effectiveRatePercent)}%",
                     valueColor = MaterialTheme.colorScheme.primary
                 )
             } else {
+                val stateRateDetail = if (isHousehold && !isUsingStoredYearRate) {
+                    "${MhaTaxEngine.formatPercent(stateRatePercent)}% ${taxProfile.state} rate"
+                } else {
+                    "${MhaTaxEngine.formatPercent(stateRatePercent)}% rate"
+                }
                 OrbitMiniStatRow(
                     label = "Federal tax savings",
-                    detail = "${formatRatePercent(fedRatePercent)}% marginal bracket",
+                    detail = "${MhaTaxEngine.formatPercent(fedRatePercent)}% marginal bracket",
                     value = MoneyUtils.formatCents(fedSavings)
                 )
                 OrbitMiniStatRow(
                     label = "State tax savings",
-                    detail = "${formatRatePercent(stateRatePercent)}% ${taxProfile.state} rate",
+                    detail = stateRateDetail,
                     value = MoneyUtils.formatCents(stateSavings),
                     showTopDivider = true
                 )
@@ -371,16 +374,5 @@ private fun SavingsLegendDot(
             style = TabularNumStyle.copy(fontSize = 11.5.sp, fontWeight = FontWeight.Medium),
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-    }
-}
-
-private fun formatRatePercent(percent: Double): String {
-    val hundredths = (percent * 100.0).roundToLong()
-    val whole = hundredths / 100
-    val frac = abs(hundredths % 100)
-    return when {
-        frac == 0L -> "$whole"
-        frac % 10L == 0L -> "$whole.${frac / 10}"
-        else -> "$whole.${frac.toString().padStart(2, '0')}"
     }
 }

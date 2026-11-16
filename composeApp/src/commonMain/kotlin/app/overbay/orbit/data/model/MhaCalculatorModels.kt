@@ -39,6 +39,7 @@ data class MhaYearTaxRecord(
     val fairMarketRentalValueCents: Cents? = null,
     val capsConfigured: Boolean = false,
     val isLocked: Boolean = false,
+    val useLiveProfile: Boolean = false,
     val updatedAt: String = ""
 )
 

@@ -130,3 +130,34 @@ test('normalizeMhaTaxProfile preserves caps and yearlyRecords, and estimateMhaTa
   assert.equal(est2026.excludableAllowance, 30000);
   assert.equal(est2026.savings, 8085);
 });
+
+test('historical year record with useLiveProfile=true uses live rates while preserving per-year caps', () => {
+  const normalized = normalizeMhaTaxProfile({
+    mode: 'simple',
+    simpleFederalRate: 22,
+    simpleStateRate: 4.95,
+    designatedCap: 50000,
+    yearlyRecords: {
+      2025: {
+        year: 2025,
+        effectiveRatePercent: 18.0,
+        designatedCap: 20000,
+        capsConfigured: true,
+        isLocked: false,
+        useLiveProfile: true
+      }
+    }
+  });
+
+  assert.equal(normalized.yearlyRecords['2025'].useLiveProfile, true);
+
+  const est2025 = estimateMhaTaxSavings({
+    transactionTotal: 30000,
+    profile: normalized,
+    year: 2025,
+    currentYear: 2026
+  });
+  assert.equal(est2025.excludableAllowance, 20000);
+  assert.equal(est2025.savings, 5390);
+  assert.equal(est2025.stateRateSource, 'manual');
+});

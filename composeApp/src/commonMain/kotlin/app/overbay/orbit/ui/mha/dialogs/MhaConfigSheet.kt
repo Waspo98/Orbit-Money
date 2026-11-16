@@ -1,30 +1,14 @@
 package app.overbay.orbit.ui.mha.dialogs
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import app.overbay.orbit.data.model.FilingStatus
 import app.overbay.orbit.data.model.MhaTaxProfile
 import app.overbay.orbit.data.model.MhaYearTaxRecord
 import app.overbay.orbit.domain.Cents
@@ -32,13 +16,9 @@ import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MhaTaxEngine
 import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.OrbitAccordionVisibility
-import app.overbay.orbit.ui.components.OrbitDropdownField
 import app.overbay.orbit.ui.components.OrbitModalScaffold
 import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.ui.components.OrbitSwitchRow
-import app.overbay.orbit.ui.components.OrbitTextField
-import app.overbay.orbit.ui.components.orbitMorphContentTransform
-import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlin.math.max
 
 @Composable
@@ -76,7 +56,6 @@ fun MhaConfigSheet(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MhaConfigContent(
     taxProfile: MhaTaxProfile,
@@ -92,41 +71,49 @@ fun MhaConfigContent(
     onSave: (MhaTaxProfile, Cents?, Cents?, Double?, Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val haptics = LocalOrbitHaptics.current
     val initialCap = if (activeYearRecord?.capsConfigured == true) activeYearRecord.designatedCapCents else (designatedCapCents ?: taxProfile.designatedCapCents)
     val initialFmrv = if (activeYearRecord?.capsConfigured == true) activeYearRecord.fairMarketRentalValueCents else (fairMarketRentalValueCents ?: taxProfile.fairMarketRentalValueCents)
     val isHistorical = selectedYear < currentYear
-    val defaultPin = if (isHistorical) activeYearRecord != null else activeYearRecord?.isLocked == true
-    val initialCustomRate = activeYearRecord?.effectiveRatePercent ?: computedEffectiveRatePercent
+    val hasStoredHistoricalRate = activeYearRecord != null && !activeYearRecord.useLiveProfile
+    val defaultPin = if (isHistorical) hasStoredHistoricalRate else activeYearRecord?.isLocked == true
+    val initialCustomRate = if (hasStoredHistoricalRate) activeYearRecord!!.effectiveRatePercent else computedEffectiveRatePercent
+    val globalProfileKey = remember(taxProfile) { taxProfile.copy(yearlyRecords = emptyMap()) }
 
     var currentMhaEnabled by remember(mhaEnabled) { mutableStateOf(mhaEnabled) }
-    var pinCustomYearRate by remember(selectedYear, activeYearRecord) { mutableStateOf(defaultPin) }
-    var customEffectiveRateText by remember(selectedYear, activeYearRecord, computedEffectiveRatePercent) {
-        mutableStateOf(formatTwoDecimals(initialCustomRate))
+    var pinCustomYearRate by remember(selectedYear, activeYearRecord?.year, activeYearRecord?.isLocked, activeYearRecord?.useLiveProfile) {
+        mutableStateOf(defaultPin)
+    }
+    var customEffectiveRateText by remember(selectedYear, activeYearRecord?.year, activeYearRecord?.effectiveRatePercent, activeYearRecord?.useLiveProfile) {
+        mutableStateOf(MhaTaxEngine.formatPercent(initialCustomRate))
+    }
+    LaunchedEffect(computedEffectiveRatePercent, pinCustomYearRate, hasStoredHistoricalRate) {
+        if (!pinCustomYearRate && !hasStoredHistoricalRate) {
+            customEffectiveRateText = MhaTaxEngine.formatPercent(computedEffectiveRatePercent)
+        }
     }
     var enableDesignatedCap by remember(selectedYear, initialCap) { mutableStateOf(initialCap != null) }
     var inputDesignatedCapCents by remember(selectedYear, initialCap) { mutableStateOf(initialCap ?: 0L) }
     var enableFmrv by remember(selectedYear, initialFmrv) { mutableStateOf(initialFmrv != null) }
     var inputFmrvCents by remember(selectedYear, initialFmrv) { mutableStateOf(initialFmrv ?: 0L) }
-    var mode by remember(taxProfile) { mutableStateOf(taxProfile.mode) }
-    var simpleFedRate by remember(taxProfile) { mutableStateOf(taxProfile.simpleFederalRatePercent.toString()) }
-    var simpleStateRate by remember(taxProfile) { mutableStateOf(taxProfile.simpleStateRatePercent.toString()) }
-    var selectedFilingStatus by remember(taxProfile) { mutableStateOf(taxProfile.filingStatus) }
-    var stateCode by remember(taxProfile) { mutableStateOf(taxProfile.state) }
-    var deductionMode by remember(taxProfile) { mutableStateOf(taxProfile.deductionMode) }
-    var itemizedDeductionCents by remember(taxProfile) { mutableStateOf(taxProfile.itemizedDeductionCents) }
+    var mode by remember(globalProfileKey) { mutableStateOf(taxProfile.mode) }
+    var simpleFedRate by remember(globalProfileKey) { mutableStateOf(taxProfile.simpleFederalRatePercent.toString()) }
+    var simpleStateRate by remember(globalProfileKey) { mutableStateOf(taxProfile.simpleStateRatePercent.toString()) }
+    var selectedFilingStatus by remember(globalProfileKey) { mutableStateOf(taxProfile.filingStatus) }
+    var stateCode by remember(globalProfileKey) { mutableStateOf(taxProfile.state) }
+    var deductionMode by remember(globalProfileKey) { mutableStateOf(taxProfile.deductionMode) }
+    var itemizedDeductionCents by remember(globalProfileKey) { mutableStateOf(taxProfile.itemizedDeductionCents) }
 
-    var enableTaxableIncomeOverride by remember(taxProfile) {
+    var enableTaxableIncomeOverride by remember(globalProfileKey) {
         mutableStateOf(taxProfile.taxableIncomeOverrideCents != null)
     }
-    var inputTaxableIncomeOverrideCents by remember(taxProfile) {
+    var inputTaxableIncomeOverrideCents by remember(globalProfileKey) {
         mutableStateOf(taxProfile.taxableIncomeOverrideCents ?: 0L)
     }
 
-    var enableStateRateOverride by remember(taxProfile) {
+    var enableStateRateOverride by remember(globalProfileKey) {
         mutableStateOf(taxProfile.stateRateOverridePercent != null)
     }
-    var inputStateRateOverride by remember(taxProfile) {
+    var inputStateRateOverride by remember(globalProfileKey) {
         mutableStateOf(taxProfile.stateRateOverridePercent?.toString() ?: "")
     }
 
@@ -139,17 +126,21 @@ fun MhaConfigContent(
             val parsedYearRate = if (pinCustomYearRate) {
                 (customEffectiveRateText.toDoubleOrNull() ?: initialCustomRate).coerceIn(0.0, 100.0)
             } else null
-            val updated = taxProfile.copy(
-                mode = mode,
-                simpleFederalRatePercent = simpleFedRate.toDoubleOrNull() ?: 22.0,
-                simpleStateRatePercent = simpleStateRate.toDoubleOrNull() ?: 4.95,
-                state = stateCode.take(2).uppercase().ifEmpty { "IL" },
-                filingStatus = selectedFilingStatus,
-                deductionMode = deductionMode,
-                itemizedDeductionCents = itemizedDeductionCents,
-                taxableIncomeOverrideCents = if (enableTaxableIncomeOverride) max(0L, inputTaxableIncomeOverrideCents) else null,
-                stateRateOverridePercent = if (enableStateRateOverride) inputStateRateOverride.toDoubleOrNull()?.coerceIn(0.0, 100.0) else null
-            )
+            val updated = if (isHistorical && pinCustomYearRate) {
+                taxProfile
+            } else {
+                taxProfile.copy(
+                    mode = mode,
+                    simpleFederalRatePercent = simpleFedRate.toDoubleOrNull() ?: 22.0,
+                    simpleStateRatePercent = simpleStateRate.toDoubleOrNull() ?: 4.95,
+                    state = stateCode.take(2).uppercase().ifEmpty { "IL" },
+                    filingStatus = selectedFilingStatus,
+                    deductionMode = deductionMode,
+                    itemizedDeductionCents = itemizedDeductionCents,
+                    taxableIncomeOverrideCents = if (enableTaxableIncomeOverride) max(0L, inputTaxableIncomeOverrideCents) else null,
+                    stateRateOverridePercent = if (enableStateRateOverride) inputStateRateOverride.toDoubleOrNull()?.coerceIn(0.0, 100.0) else null
+                )
+            }
             onSave(updated, resolvedCap, resolvedFmrv, parsedYearRate, pinCustomYearRate)
         },
         modifier = modifier,
@@ -208,184 +199,31 @@ fun MhaConfigContent(
             )
         }
 
-        Text(
-            text = "Tax Calculation Mode",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold
-        )
-
-        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-            SegmentedButton(
-                selected = mode == "simple",
-                onClick = {
-                    haptics.tick()
-                    mode = "simple"
-                },
-                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-            ) {
-                Text("Simple Flat Rates")
-            }
-            SegmentedButton(
-                selected = mode == "household",
-                onClick = {
-                    haptics.tick()
-                    mode = "household"
-                },
-                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-            ) {
-                Text("Household Brackets")
-            }
-        }
-
-        AnimatedContent(
-            targetState = mode == "simple",
-            transitionSpec = { orbitMorphContentTransform(clip = false) },
-            modifier = Modifier.fillMaxWidth()
-        ) { isSimpleMode ->
-            if (isSimpleMode) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OrbitTextField(
-                        value = simpleFedRate,
-                        onValueChange = { simpleFedRate = it },
-                        label = { Text("Federal Rate (%)") },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f)
-                    )
-                    OrbitTextField(
-                        value = simpleStateRate,
-                        onValueChange = { simpleStateRate = it },
-                        label = { Text("State Rate (%)") },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    val selectedStatePair = remember(stateCode) {
-                        MhaTaxEngine.US_STATES.firstOrNull { it.first.equals(stateCode, ignoreCase = true) }
-                            ?: ("IL" to "Illinois")
-                    }
-
-                    OrbitDropdownField(
-                        label = "State",
-                        selectedText = "${selectedStatePair.second} (${selectedStatePair.first})",
-                        options = MhaTaxEngine.US_STATES,
-                        optionLabel = { "${it.second} (${it.first})" },
-                        onOptionSelected = { stateCode = it.first }
-                    )
-
-                    OrbitDropdownField(
-                        label = "Filing Status",
-                        selectedText = selectedFilingStatus.displayName,
-                        options = FilingStatus.entries,
-                        optionLabel = { it.displayName },
-                        onOptionSelected = { selectedFilingStatus = it }
-                    )
-
-                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                        SegmentedButton(
-                            selected = deductionMode == "standard",
-                            onClick = {
-                                haptics.tick()
-                                deductionMode = "standard"
-                            },
-                            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-                        ) {
-                            Text("Standard Deduction")
-                        }
-                        SegmentedButton(
-                            selected = deductionMode == "itemized",
-                            onClick = {
-                                haptics.tick()
-                                deductionMode = "itemized"
-                            },
-                            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                        ) {
-                            Text("Itemized Deduction")
-                        }
-                    }
-
-                    AnimatedContent(
-                        targetState = deductionMode == "standard",
-                        transitionSpec = { orbitMorphContentTransform(clip = false) },
-                        modifier = Modifier.fillMaxWidth()
-                    ) { isStandard ->
-                        if (isStandard) {
-                            val standardDeductionRef = when (selectedFilingStatus) {
-                                FilingStatus.SINGLE -> "$16,100"
-                                FilingStatus.MARRIED_JOINT -> "$32,200"
-                                FilingStatus.MARRIED_SEPARATE -> "$16,100"
-                                FilingStatus.HEAD_OF_HOUSEHOLD -> "$24,150"
-                            }
-
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Column(modifier = Modifier.padding(12.dp)) {
-                                    Text(
-                                        text = "2026 IRS Standard Deduction Reference",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.outline
-                                    )
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        text = "${selectedFilingStatus.displayName}: $standardDeductionRef",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-                            }
-                        } else {
-                            CurrencyTextField(
-                                cents = itemizedDeductionCents,
-                                onCentsChange = { itemizedDeductionCents = it },
-                                label = "Annual Itemized Deductions ($)",
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    OrbitSwitchRow(
-                        title = "Taxable Income Override",
-                        subtitle = if (enableTaxableIncomeOverride) "Using custom taxable income" else "Calculated from gross income and deductions",
-                        checked = enableTaxableIncomeOverride,
-                        onCheckedChange = { enableTaxableIncomeOverride = it }
-                    )
-
-                    OrbitAccordionVisibility(visible = enableTaxableIncomeOverride) {
-                        CurrencyTextField(
-                            cents = inputTaxableIncomeOverrideCents,
-                            onCentsChange = { inputTaxableIncomeOverrideCents = it },
-                            label = "Taxable Income Override ($)",
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    OrbitSwitchRow(
-                        title = "State Tax Rate Override",
-                        subtitle = if (enableStateRateOverride) "Using custom state tax rate" else "Using bundled state rate if single-rate state",
-                        checked = enableStateRateOverride,
-                        onCheckedChange = { enableStateRateOverride = it }
-                    )
-
-                    OrbitAccordionVisibility(visible = enableStateRateOverride) {
-                        OrbitTextField(
-                            value = inputStateRateOverride,
-                            onValueChange = { inputStateRateOverride = it },
-                            label = { Text("State Tax Rate Override (%)") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                }
-            }
+        if (!isHistorical || !pinCustomYearRate) {
+            MhaTaxModeSection(
+                mode = mode,
+                onModeChange = { mode = it },
+                simpleFedRate = simpleFedRate,
+                onSimpleFedRateChange = { simpleFedRate = it },
+                simpleStateRate = simpleStateRate,
+                onSimpleStateRateChange = { simpleStateRate = it },
+                stateCode = stateCode,
+                onStateCodeChange = { stateCode = it },
+                selectedFilingStatus = selectedFilingStatus,
+                onFilingStatusChange = { selectedFilingStatus = it },
+                deductionMode = deductionMode,
+                onDeductionModeChange = { deductionMode = it },
+                itemizedDeductionCents = itemizedDeductionCents,
+                onItemizedDeductionChange = { itemizedDeductionCents = it },
+                enableTaxableIncomeOverride = enableTaxableIncomeOverride,
+                onToggleTaxableIncomeOverride = { enableTaxableIncomeOverride = it },
+                inputTaxableIncomeOverrideCents = inputTaxableIncomeOverrideCents,
+                onTaxableIncomeOverrideChange = { inputTaxableIncomeOverrideCents = it },
+                enableStateRateOverride = enableStateRateOverride,
+                onToggleStateRateOverride = { enableStateRateOverride = it },
+                inputStateRateOverride = inputStateRateOverride,
+                onStateRateOverrideChange = { inputStateRateOverride = it }
+            )
         }
     }
 }

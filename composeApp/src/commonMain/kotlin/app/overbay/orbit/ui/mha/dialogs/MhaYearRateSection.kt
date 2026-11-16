@@ -14,12 +14,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.MhaYearTaxRecord
+import app.overbay.orbit.domain.MhaTaxEngine
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.OrbitAccordionVisibility
 import app.overbay.orbit.ui.components.OrbitSwitchRow
 import app.overbay.orbit.ui.components.OrbitTextField
-import kotlin.math.abs
-import kotlin.math.roundToLong
 
 @Composable
 fun MhaYearRateSection(
@@ -53,7 +52,7 @@ fun MhaYearRateSection(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = "${formatTwoDecimals(activeYearRecord.effectiveRatePercent)}% saved automatically for $selectedYear history",
+                        text = "${MhaTaxEngine.formatPercent(activeYearRecord.effectiveRatePercent)}% saved automatically for $selectedYear history",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.primary
@@ -83,16 +82,5 @@ fun MhaYearRateSection(
                 modifier = Modifier.fillMaxWidth()
             )
         }
-    }
-}
-
-internal fun formatTwoDecimals(value: Double): String {
-    val hundredths = (value * 100.0).roundToLong()
-    val whole = hundredths / 100
-    val frac = abs(hundredths % 100)
-    return when {
-        frac == 0L -> "$whole"
-        frac % 10L == 0L -> "$whole.${frac / 10}"
-        else -> "$whole.${frac.toString().padStart(2, '0')}"
     }
 }

@@ -253,6 +253,7 @@ data class MhaYearTaxRecordDto(
     val fairMarketRentalValue: Double? = null,
     val capsConfigured: Boolean = false,
     val isLocked: Boolean = false,
+    val useLiveProfile: Boolean = false,
     val updatedAt: String = ""
 ) {
     fun toDomain(): MhaYearTaxRecord = MhaYearTaxRecord(
@@ -265,6 +266,7 @@ data class MhaYearTaxRecordDto(
         fairMarketRentalValueCents = fairMarketRentalValue?.let { MoneyUtils.dollarsToCents(it) },
         capsConfigured = capsConfigured,
         isLocked = isLocked,
+        useLiveProfile = useLiveProfile,
         updatedAt = updatedAt
     )
 
@@ -279,6 +281,7 @@ data class MhaYearTaxRecordDto(
             fairMarketRentalValue = record.fairMarketRentalValueCents?.let { MoneyUtils.centsToDollars(it) },
             capsConfigured = record.capsConfigured,
             isLocked = record.isLocked,
+            useLiveProfile = record.useLiveProfile,
             updatedAt = record.updatedAt
         )
     }

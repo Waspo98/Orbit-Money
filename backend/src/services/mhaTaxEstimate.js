@@ -63,6 +63,7 @@ function normalizeYearRecord(yearKey, raw) {
     fairMarketRentalValue: cleanOptionalMoney(raw?.fairMarketRentalValue),
     capsConfigured: Boolean(raw?.capsConfigured),
     isLocked: Boolean(raw?.isLocked),
+    useLiveProfile: Boolean(raw?.useLiveProfile),
     updatedAt: typeof raw?.updatedAt === 'string' ? raw.updatedAt : ''
   };
 }
@@ -291,7 +292,7 @@ export function estimateMhaTaxSavings({
   const fmrv = yearRecord?.capsConfigured ? yearRecord.fairMarketRentalValue : normalized.fairMarketRentalValue;
   const excludableTotal = applyParsonageCap(eligibleTotal, cap, fmrv);
 
-  if (yearRecord && (targetYear < currentYear || yearRecord.isLocked)) {
+  if (yearRecord && !yearRecord.useLiveProfile && (targetYear < currentYear || yearRecord.isLocked)) {
     const effectiveRate = clampPercent(yearRecord.effectiveRatePercent, 0) / 100;
     const totalSavings = roundMoney(excludableTotal * effectiveRate);
     const hasStateRate = yearRecord.stateRatePercent !== null && yearRecord.stateRatePercent !== undefined;

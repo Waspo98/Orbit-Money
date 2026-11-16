@@ -29,12 +29,6 @@ enum class MhaLimitingFactor(val displayName: String, val description: String) {
 
 typealias MhaBindingLimit = MhaLimitingFactor
 
-enum class MhaTransactionTabFilter(val label: String) {
-    ELIGIBLE("Eligible Housing"),
-    REVIEW_QUEUE("Review Queue"),
-    ALL("All Expenses")
-}
-
 enum class MhaScreenTab(val label: String) {
     TRACKER("Tracker"),
     DEFAULTS("Defaults")
@@ -92,13 +86,11 @@ data class MhaTrackerUiState(
     val isHistoricalYearWithoutSavedRate: Boolean = false,
     val taxRateSourceLabel: String = "",
     val eligibleTransactions: List<MhaTransactionItem> = emptyList(),
-    val reviewQueueTransactions: List<MhaTransactionItem> = emptyList(),
     val allYearOutflows: List<MhaTransactionItem> = emptyList(),
     val visibleTransactions: List<MhaTransactionItem> = emptyList(),
     val groupedVisibleMonths: List<MhaMonthGroup> = emptyList(),
     val visibleTotalCents: Cents = 0L,
     val categoryBreakdown: List<MhaCategoryTotal> = emptyList(),
-    val selectedTabFilter: MhaTransactionTabFilter = MhaTransactionTabFilter.ELIGIBLE,
     val selectedCategoryId: Long? = null,
     val showExcludedInList: Boolean = false,
     val inspectingTransaction: MhaTransactionItem? = null,

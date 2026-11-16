@@ -8,7 +8,76 @@ import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.LocalDateUtils
 import kotlin.math.abs
 
+internal data class YearTransactionsClassification(
+    val allOutflows: List<MhaTransactionItem>,
+    val eligible: List<MhaTransactionItem>,
+    val actualSpentCents: Cents
+)
+
 internal object MhaTrackerTransform {
+
+    fun classifyYearTransactions(
+        year: Int,
+        transactions: List<Transaction>,
+        accounts: List<Account>,
+        categories: List<Category>
+    ): YearTransactionsClassification {
+        val accountMap = accounts.associateBy { it.id }
+        val categoryMap = categories.associateBy { it.id }
+        val yearPrefix = "$year-"
+        val accountMhaSet = accounts.filter { it.mhaDefaultEligible }.map { it.id }.toSet()
+        val catMhaSet = categories.filter { it.mhaDefaultEligible }.map { it.id }.toSet()
+        val catIgnoredSet = categories.filter { it.mhaDefaultIgnored }.map { it.id }.toSet()
+
+        val allItems = mutableListOf<MhaTransactionItem>()
+        val eligibleItems = mutableListOf<MhaTransactionItem>()
+        var actualSpentCents = 0L
+
+        for (txn in transactions) {
+            if (!txn.effectiveDate.startsWith(yearPrefix)) continue
+            val amount = txn.effectiveAmountCents
+            val isOutflow = amount < 0L
+            val isTransfer = txn.effectiveIsTransfer || (txn.effectiveCategoryId?.let { categoryMap[it]?.isTransfer } == true)
+            if (!isOutflow || isTransfer) continue
+
+            val isIgnored = txn.effectiveIsIgnored
+            val catId = txn.effectiveCategoryId
+            val accId = txn.accountId
+            val cat = catId?.let { categoryMap[it] }
+            val acct = accountMap[accId]
+
+            val isEligible = if (isIgnored && txn.editedMhaEligible != true) {
+                false
+            } else {
+                txn.editedMhaEligible ?: run {
+                    if (catId != null && catId in catIgnoredSet) false
+                    else (accId in accountMhaSet) || (catId != null && catId in catMhaSet)
+                }
+            }
+
+            val item = MhaTransactionItem(
+                transaction = txn,
+                category = cat,
+                account = acct,
+                isEligible = isEligible,
+                isExplicitOverride = txn.editedMhaEligible != null,
+                isOverriddenByUser = txn.editedMhaEligibleSource == "user",
+                eligibilityReason = resolveEligibilityReason(txn, isIgnored, cat, acct)
+            )
+            allItems.add(item)
+            if (isEligible) {
+                eligibleItems.add(item)
+                actualSpentCents += abs(amount)
+            }
+        }
+
+        val itemComparator = compareByDescending<MhaTransactionItem> { it.effectiveDate }.thenByDescending { it.id }
+        return YearTransactionsClassification(
+            allOutflows = allItems.sortedWith(itemComparator),
+            eligible = eligibleItems.sortedWith(itemComparator),
+            actualSpentCents = actualSpentCents
+        )
+    }
 
     fun resolveLimitingFactor(
         actualSpentCents: Cents,
