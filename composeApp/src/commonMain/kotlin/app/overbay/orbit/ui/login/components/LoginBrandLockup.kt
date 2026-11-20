@@ -127,7 +127,7 @@ private fun LoginBrandIcon(
     Surface(
         modifier = modifier,
         shape = shape,
-        color = Color(0xFF50C878)
+        color = Color(0xFF059669)
     ) {
         Image(
             painter = painterResource(Res.drawable.orbit_logo),

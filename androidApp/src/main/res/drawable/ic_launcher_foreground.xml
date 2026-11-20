@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:pathData="M42.291,62.321 C38.778,57.379 38.748,50.763 42.214,45.788 C45.680,40.813 51.897,38.550 57.750,40.133 C63.603,41.716 67.832,46.804 68.319,52.848 C64.380,55.319 60.130,57.264 55.769,58.859 C51.402,60.440 46.896,61.683 42.291,62.321 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="43.812"
+                android:startY="47.008"
+                android:endX="66.030"
+                android:endY="61.851">
+                <item android:color="#FFFFFF" android:offset="0.0" />
+                <item android:color="#DCFCE7" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path android:pathData="M52.695,68.305 C56.622,67.188 60.469,65.788 64.195,64.120 C61.177,67.160 56.961,68.695 52.695,68.305 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="43.812"
+                android:startY="47.008"
+                android:endX="66.030"
+                android:endY="61.851">
+                <item android:color="#FFFFFF" android:offset="0.0" />
+                <item android:color="#DCFCE7" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M27.690,62.353 C29.557,67.483 42.541,67.037 56.850,61.829 C71.158,56.621 81.391,48.616 79.524,43.487 C78.443,40.517 72.331,39.685 64.182,40.816 C69.092,40.864 72.847,41.943 73.732,44.372 C75.107,48.152 66.911,54.193 55.572,58.320 C44.233,62.447 34.072,63.088 32.696,59.308 C31.812,56.878 33.995,53.638 37.725,50.446 C30.756,54.817 26.609,59.384 27.690,62.353 Z" />
+</vector>
