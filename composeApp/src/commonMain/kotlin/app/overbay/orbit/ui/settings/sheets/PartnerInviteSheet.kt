@@ -26,6 +26,8 @@ import app.overbay.orbit.ui.settings.components.SettingsCalloutBanner
  */
 @Composable
 fun PartnerInviteSheet(
+    isSending: Boolean = false,
+    errorMessage: String? = null,
     onSendInvite: (email: String, role: String, accessLevel: String) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
@@ -39,7 +41,9 @@ fun PartnerInviteSheet(
         onDismissRequest = onDismiss,
         confirmText = "Send Invite",
         onConfirm = { onSendInvite(trimmedEmail, "member", accessLevel) },
-        confirmEnabled = isEmailValid,
+        confirmEnabled = isEmailValid && !isSending,
+        isSaving = isSending,
+        errorBannerText = errorMessage,
         modifier = modifier,
         title = "Share With Partner",
         subtitle = "Invite a household partner or spouse to collaborate on budgeting, accounts, and financial goals.",
@@ -51,6 +55,7 @@ fun PartnerInviteSheet(
             label = { Text("Partner Email") },
             placeholder = { Text("partner@example.com") },
             singleLine = true,
+            enabled = !isSending,
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Email,
                 imeAction = ImeAction.Done

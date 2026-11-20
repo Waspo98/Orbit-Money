@@ -26,11 +26,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -55,7 +50,11 @@ import app.overbay.orbit.util.LocalOidcAuthLauncher
 fun LazyListScope.syncAndSharingSectionItems(
     uiState: SettingsUiState,
     onStorageModeChange: (StorageMode) -> Unit,
-    onServerUrlChange: (String) -> Unit,
+    onServerUrlDraftChange: (String) -> Unit,
+    onCommitServerUrl: (String) -> Unit,
+    onTogglePasswordAuth: (Boolean) -> Unit,
+    onUsernameDraftChange: (String) -> Unit,
+    onPasswordDraftChange: (String) -> Unit,
     onTriggerSync: () -> Unit,
     onAuthenticateServer: (username: String, password: String) -> Unit,
     onOpenMigrateWizard: () -> Unit,
@@ -69,16 +68,10 @@ fun LazyListScope.syncAndSharingSectionItems(
 ) {
     item(key = "sync_storage_mode") {
         val oidcLauncher = LocalOidcAuthLauncher.current
-        var serverUrl by remember { mutableStateOf(uiState.preferences.selfHostedServerUrl) }
-        var showPasswordAuth by remember { mutableStateOf(false) }
-        var username by remember { mutableStateOf("") }
-        var password by remember { mutableStateOf("") }
-
-        LaunchedEffect(uiState.preferences.selfHostedServerUrl) {
-            if (uiState.preferences.selfHostedServerUrl != serverUrl.trim()) {
-                serverUrl = uiState.preferences.selfHostedServerUrl
-            }
-        }
+        val serverUrl = uiState.serverUrlDraft
+        val showPasswordAuth = uiState.showServerPasswordLogin
+        val username = uiState.serverUsernameDraft
+        val password = uiState.serverPasswordDraft
 
         val btnShape = RoundedCornerShape(14.dp)
         val statusText = when (val result = uiState.syncStatus) {
@@ -129,7 +122,7 @@ fun LazyListScope.syncAndSharingSectionItems(
                         Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             OrbitTextField(
                                 value = serverUrl,
-                                onValueChange = { serverUrl = it; onServerUrlChange(it) },
+                                onValueChange = onServerUrlDraftChange,
                                 label = { Text("Server Base URL") },
                                 placeholder = { Text("https://orbit.yourdomain.com") },
                                 singleLine = true,
@@ -154,7 +147,7 @@ fun LazyListScope.syncAndSharingSectionItems(
 
                                 OutlinedButton(
                                     onClick = {
-                                        onServerUrlChange(serverUrl)
+                                        onCommitServerUrl(serverUrl)
                                         oidcLauncher.launchOidcLogin(serverUrl, "/api/auth/oidc/login")
                                     },
                                     enabled = !uiState.isSyncing && serverUrl.isNotBlank(),
@@ -170,7 +163,7 @@ fun LazyListScope.syncAndSharingSectionItems(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(10.dp))
-                                    .clickable { showPasswordAuth = !showPasswordAuth }
+                                    .clickable { onTogglePasswordAuth(!showPasswordAuth) }
                                     .padding(vertical = 6.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
@@ -190,10 +183,16 @@ fun LazyListScope.syncAndSharingSectionItems(
 
                             OrbitAccordionVisibility(visible = showPasswordAuth) {
                                 Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                                    OrbitTextField(value = username, onValueChange = { username = it }, label = { Text("Username") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                                    OrbitTextField(
+                                        value = username,
+                                        onValueChange = onUsernameDraftChange,
+                                        label = { Text("Username") },
+                                        singleLine = true,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
                                     OrbitTextField(
                                         value = password,
-                                        onValueChange = { password = it },
+                                        onValueChange = onPasswordDraftChange,
                                         label = { Text("Password") },
                                         visualTransformation = PasswordVisualTransformation(),
                                         singleLine = true,

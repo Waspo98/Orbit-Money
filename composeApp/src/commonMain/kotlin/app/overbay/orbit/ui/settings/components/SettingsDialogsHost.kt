@@ -34,6 +34,7 @@ fun SettingsDialogsHost(
         )
         is SettingsDialogState.BackupRestorePaste -> BackupRestorePasteSheet(
             jsonText = dialog.draftJson,
+            errorMessage = dialog.errorMessage,
             onTextChange = viewModel::updateRestorePasteDraft,
             onPreview = viewModel::previewBackupForRestore,
             onDismiss = viewModel::dismissDialog
@@ -41,6 +42,8 @@ fun SettingsDialogsHost(
 
         is SettingsDialogState.RestorePreview -> RestorePreviewSheet(
             stats = dialog.stats,
+            isRestoring = dialog.isRestoring,
+            errorMessage = dialog.errorMessage,
             onConfirm = viewModel::confirmRestoreBackup,
             onDismiss = viewModel::dismissDialog
         )
@@ -53,7 +56,9 @@ fun SettingsDialogsHost(
             onDismiss = viewModel::dismissDialog
         )
 
-        SettingsDialogState.PartnerInvite -> PartnerInviteSheet(
+        is SettingsDialogState.PartnerInvite -> PartnerInviteSheet(
+            isSending = dialog.isSending,
+            errorMessage = dialog.errorMessage,
             onSendInvite = viewModel::inviteHouseholdPartner,
             onDismiss = viewModel::dismissDialog
         )

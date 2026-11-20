@@ -24,6 +24,8 @@ import app.overbay.orbit.ui.settings.components.SettingsCalloutBanner
 @Composable
 fun RestorePreviewSheet(
     stats: BackupPreviewStats,
+    isRestoring: Boolean = false,
+    errorMessage: String? = null,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
@@ -32,6 +34,9 @@ fun RestorePreviewSheet(
         onDismissRequest = onDismiss,
         confirmText = "Restore Workspace",
         onConfirm = onConfirm,
+        confirmEnabled = !isRestoring,
+        isSaving = isRestoring,
+        errorBannerText = errorMessage,
         modifier = modifier,
         title = "Workspace Restore Preview",
         subtitle = "Review the contents of this backup before replacing local workspace data.",

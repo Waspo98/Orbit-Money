@@ -76,7 +76,7 @@ class SettingsBackupController(
         uiState.update { state ->
             val current = state.activeDialog
             if (current is SettingsDialogState.BackupRestorePaste) {
-                state.copy(activeDialog = current.copy(draftJson = text))
+                state.copy(activeDialog = current.copy(draftJson = text, errorMessage = null))
             } else {
                 state
             }
@@ -89,12 +89,22 @@ class SettingsBackupController(
         if (preview.isSuccess && stats != null) {
             uiState.update { it.copy(activeDialog = SettingsDialogState.RestorePreview(rawJson, stats)) }
         } else {
-            uiState.update { it.copy(statusMessage = "Could not read backup file. Please make sure it is a valid Orbit Money backup.") }
+            val message = "Could not read backup file. Please make sure it is a valid Orbit Money backup."
+            uiState.update { state ->
+                val current = state.activeDialog
+                if (current is SettingsDialogState.BackupRestorePaste) {
+                    state.copy(activeDialog = current.copy(errorMessage = message))
+                } else {
+                    state.copy(statusMessage = message)
+                }
+            }
         }
     }
 
     fun confirmRestoreBackup() {
         val dialog = uiState.value.activeDialog as? SettingsDialogState.RestorePreview ?: return
+        if (dialog.isRestoring) return
+        uiState.update { it.copy(activeDialog = dialog.copy(isRestoring = true, errorMessage = null)) }
         restoreBackup(dialog.rawJson)
     }
 
@@ -105,7 +115,15 @@ class SettingsBackupController(
                 uiState.update { it.copy(activeDialog = SettingsDialogState.None, statusMessage = "Backup restored successfully") }
             } else {
                 val err = result.exceptionOrNull()?.message ?: "Unknown error"
-                uiState.update { it.copy(statusMessage = "Restore failed: $err") }
+                val message = "Restore failed: $err"
+                uiState.update { state ->
+                    val current = state.activeDialog
+                    if (current is SettingsDialogState.RestorePreview) {
+                        state.copy(activeDialog = current.copy(isRestoring = false, errorMessage = message))
+                    } else {
+                        state.copy(statusMessage = message)
+                    }
+                }
             }
         }
     }

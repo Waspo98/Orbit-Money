@@ -20,14 +20,25 @@ enum class NotificationScheduleType {
 sealed interface SettingsDialogState {
     data object None : SettingsDialogState
     data class BackupExport(val jsonText: String) : SettingsDialogState
-    data class BackupRestorePaste(val draftJson: String = "") : SettingsDialogState
-    data class RestorePreview(val rawJson: String, val stats: BackupPreviewStats) : SettingsDialogState
+    data class BackupRestorePaste(
+        val draftJson: String = "",
+        val errorMessage: String? = null
+    ) : SettingsDialogState
+    data class RestorePreview(
+        val rawJson: String,
+        val stats: BackupPreviewStats,
+        val isRestoring: Boolean = false,
+        val errorMessage: String? = null
+    ) : SettingsDialogState
     data class MigrateWorkspace(
         val serverUrl: String,
         val isMigrating: Boolean = false,
         val message: String? = null
     ) : SettingsDialogState
-    data object PartnerInvite : SettingsDialogState
+    data class PartnerInvite(
+        val isSending: Boolean = false,
+        val errorMessage: String? = null
+    ) : SettingsDialogState
     data class ConfirmRemovePartnerUser(val user: HouseholdUserAccess) : SettingsDialogState
     data class ConfirmRevokePartnerShare(val share: HouseholdShare) : SettingsDialogState
     data class GoogleDriveClientId(val draftClientId: String) : SettingsDialogState
@@ -60,6 +71,13 @@ data class SettingsUiState(
     val isSimpleFinLogsExpanded: Boolean = false,
     val isLoadingSimpleFinLogs: Boolean = false,
     val isConnectingSimpleFin: Boolean = false,
+    val serverUrlDraft: String = "",
+    val showServerPasswordLogin: Boolean = false,
+    val serverUsernameDraft: String = "",
+    val serverPasswordDraft: String = "",
+    val simpleFinTokenDraft: String = "",
+    val simpleFinCutoverDateDraft: String? = null,
+    val showSimpleFinReconnectEditor: Boolean = false,
     val householdSharing: HouseholdSharingState? = null,
     val isLoadingSharing: Boolean = false,
     val activeDialog: SettingsDialogState = SettingsDialogState.None

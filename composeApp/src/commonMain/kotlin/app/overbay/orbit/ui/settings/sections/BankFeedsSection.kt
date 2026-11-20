@@ -31,10 +31,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,8 +39,6 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import app.overbay.orbit.data.model.OrbitPreferences
-import app.overbay.orbit.data.model.SimpleFinSyncLogEntry
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.ui.components.DateFieldButton
@@ -52,6 +47,7 @@ import app.overbay.orbit.ui.components.OrbitBadge
 import app.overbay.orbit.ui.components.OrbitCompactListRow
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.ui.components.OrbitTextField
+import app.overbay.orbit.ui.settings.SettingsUiState
 import kotlinx.datetime.Clock
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
@@ -59,27 +55,30 @@ import kotlinx.datetime.toLocalDateTime
 
 @OptIn(ExperimentalLayoutApi::class)
 fun LazyListScope.bankFeedsSectionItems(
-    preferences: OrbitPreferences,
-    syncLogs: List<SimpleFinSyncLogEntry>,
-    isLogsExpanded: Boolean,
-    isConnecting: Boolean,
-    isSyncing: Boolean,
+    uiState: SettingsUiState,
+    onTokenDraftChange: (String) -> Unit,
+    onCutoverDateDraftChange: (String?) -> Unit,
+    onToggleReconnectEditor: (Boolean) -> Unit,
     onSetupBridge: (token: String, cutoverDate: String?) -> Unit,
     onTriggerSync: () -> Unit,
     onRequestDisconnect: () -> Unit,
     onToggleLogsExpanded: () -> Unit,
     onUnmuteAccount: (String) -> Unit
 ) {
+    val preferences = uiState.preferences
+    val syncLogs = uiState.simpleFinLogs
+    val isLogsExpanded = uiState.isSimpleFinLogsExpanded
+    val isConnecting = uiState.isConnectingSimpleFin
+    val isSyncing = uiState.isSyncing
     val isConnected = !preferences.simpleFinToken.isNullOrBlank()
 
     item(key = "bank_feeds_connection") {
         val uriHandler = LocalUriHandler.current
-        var rawToken by remember(preferences.simpleFinToken) { mutableStateOf(preferences.simpleFinToken.orEmpty()) }
-        var showReconnectEditor by remember { mutableStateOf(false) }
-        val parsedCutover = remember(preferences.simpleFinCutoverDate) {
-            preferences.simpleFinCutoverDate?.takeIf { it.isNotBlank() }?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+        val rawToken = uiState.simpleFinTokenDraft
+        val showReconnectEditor = uiState.showSimpleFinReconnectEditor
+        val selectedCutoverDate = remember(uiState.simpleFinCutoverDateDraft) {
+            uiState.simpleFinCutoverDateDraft?.takeIf { it.isNotBlank() }?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
         } ?: Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
-        var selectedCutoverDate by remember(parsedCutover) { mutableStateOf(parsedCutover) }
         val btnShape = RoundedCornerShape(14.dp)
 
         OrbitSectionCard(
@@ -97,9 +96,9 @@ fun LazyListScope.bankFeedsSectionItems(
 
                     SimpleFinBridgeForm(
                         rawToken = rawToken,
-                        onTokenChange = { rawToken = it },
+                        onTokenChange = onTokenDraftChange,
                         selectedCutoverDate = selectedCutoverDate,
-                        onCutoverSelected = { selectedCutoverDate = it },
+                        onCutoverSelected = { onCutoverDateDraftChange(it.toString()) },
                         isConnecting = isConnecting,
                         submitLabel = "Connect SimpleFIN",
                         showCutoverHeading = true,
@@ -139,13 +138,13 @@ fun LazyListScope.bankFeedsSectionItems(
                     }
 
                     HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
-                    DisclosureToggleRow(title = "Reconnect or Update Cutover Date", expanded = showReconnectEditor, onToggle = { showReconnectEditor = !showReconnectEditor })
+                    DisclosureToggleRow(title = "Reconnect or Update Cutover Date", expanded = showReconnectEditor, onToggle = { onToggleReconnectEditor(!showReconnectEditor) })
                     OrbitAccordionVisibility(visible = showReconnectEditor) {
                         SimpleFinBridgeForm(
                             rawToken = rawToken,
-                            onTokenChange = { rawToken = it },
+                            onTokenChange = onTokenDraftChange,
                             selectedCutoverDate = selectedCutoverDate,
-                            onCutoverSelected = { selectedCutoverDate = it },
+                            onCutoverSelected = { onCutoverDateDraftChange(it.toString()) },
                             isConnecting = isConnecting,
                             submitLabel = "Update Connection",
                             showCutoverHeading = false,

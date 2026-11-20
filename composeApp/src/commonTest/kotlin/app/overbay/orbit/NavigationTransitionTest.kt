@@ -414,4 +414,49 @@ class NavigationTransitionTest {
             storage.clear()
         }
     }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `navigating to another settings section while in settings updates top frame without duplicating stack`() = runTest {
+        val testDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(testDispatcher)
+        val storage = PlatformStorage()
+        storage.clear()
+        try {
+            val repo = OrbitRepository(storage)
+            repo.initialize()
+            val controller = OrbitBackStackController(OrbitNavKey.Dashboard)
+            val viewModels = OrbitViewModelHolder(repo)
+            val coordinator = OrbitNavigationCoordinator(controller, viewModels)
+
+            coordinator.navigate(OrbitNavKey.Settings(), fromTab = false)
+            assertEquals(2, controller.entries.size)
+            assertNull(viewModels.settingsViewModel.uiState.value.activeSection)
+
+            // Simulate clicking "Manage Sync" banner while already on Settings
+            coordinator.navigate(OrbitNavKey.Settings(app.overbay.orbit.ui.settings.SettingsSection.BANK_FEEDS), fromTab = false)
+            assertEquals(2, controller.entries.size)
+            assertEquals(
+                app.overbay.orbit.ui.settings.SettingsSection.BANK_FEEDS,
+                viewModels.settingsViewModel.uiState.value.activeSection
+            )
+
+            // Navigating away and back restores the active Settings section
+            coordinator.navigate(OrbitNavKey.Budgets, fromTab = true)
+            assertEquals(3, controller.entries.size)
+            viewModels.settingsViewModel.openSection(null)
+            assertTrue(coordinator.popBack())
+            assertEquals(
+                app.overbay.orbit.ui.settings.SettingsSection.BANK_FEEDS,
+                viewModels.settingsViewModel.uiState.value.activeSection
+            )
+
+            // One more pop returns directly to Dashboard
+            assertTrue(coordinator.popBack())
+            assertEquals(OrbitNavKey.Dashboard, controller.currentKey)
+        } finally {
+            Dispatchers.resetMain()
+            storage.clear()
+        }
+    }
 }

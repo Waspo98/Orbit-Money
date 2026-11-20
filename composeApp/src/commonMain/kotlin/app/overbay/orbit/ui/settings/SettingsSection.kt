@@ -71,5 +71,17 @@ enum class SettingsSection(
         subtitle = "Version info, walkthrough tour, support & account",
         cluster = SettingsCluster.APP,
         searchKeywords = listOf("about", "version", "beta", "developer", "tour", "walkthrough", "onboarding", "support", "donate", "sign out", "logout")
-    )
+    );
+
+    companion object {
+        fun search(query: String): List<SettingsSection> {
+            val trimmed = query.trim()
+            if (trimmed.isBlank()) return entries
+            return entries.filter { section ->
+                section.title.contains(trimmed, ignoreCase = true) ||
+                    section.subtitle.contains(trimmed, ignoreCase = true) ||
+                    section.searchKeywords.any { it.contains(trimmed, ignoreCase = true) }
+            }
+        }
+    }
 }

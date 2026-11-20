@@ -9,6 +9,7 @@ import app.overbay.orbit.data.model.OrbitThemeMode
 import app.overbay.orbit.data.model.OrbitThemePreset
 import app.overbay.orbit.data.model.StorageMode
 import app.overbay.orbit.data.network.OrbitApiClient
+import app.overbay.orbit.data.network.SimpleFinDirectClient
 import app.overbay.orbit.util.PlatformStorage
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.HttpClientEngineBase
@@ -153,38 +154,16 @@ class SettingsViewModelTest {
         assertNull(viewModel.uiState.value.statusMessage)
     }
 
-    @Test
-    fun testSimpleFinToken_persistsToken() = runTest(testDispatcher) {
-        testScheduler.advanceUntilIdle()
-        viewModel.setSimpleFinToken("sfin_claim_token_123456")
-        testScheduler.advanceUntilIdle()
-
-        assertEquals("sfin_claim_token_123456", viewModel.uiState.value.preferences.simpleFinToken)
-        assertEquals("sfin_claim_token_123456", repository.preferences.value.simpleFinToken)
-    }
-
     @OptIn(InternalAPI::class)
-    @Test
-    fun testSetupSimpleFinBridge_failureDoesNotMarkConnected() = runTest(testDispatcher) {
-        val remoteStorage = PlatformStorage().apply { clear() }
-        LocalSnapshotEngine(remoteStorage).saveStartupPreferences(
-            OrbitPreferences(
-                storageMode = StorageMode.SELF_HOSTED,
-                selfHostedServerUrl = "https://orbit.example.com",
-                onboardingCompleted = true
-            )
-        )
+    private fun createJsonMockHttpClient(
+        handler: (String) -> Pair<HttpStatusCode, String>
+    ): HttpClient {
         val wireJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
-        val engine = object : HttpClientEngineBase("failing-simplefin-engine") {
+        val engine = object : HttpClientEngineBase("settings-mock-engine") {
             override val dispatcher: CoroutineDispatcher = testDispatcher
             override val config: HttpClientEngineConfig = HttpClientEngineConfig()
             override suspend fun execute(data: HttpRequestData): HttpResponseData {
-                val path = data.url.encodedPath
-                val (status, json) = if (path == "/api/simplefin/setup") {
-                    HttpStatusCode.BadRequest to """{"error":"Invalid SimpleFIN claim token"}"""
-                } else {
-                    HttpStatusCode.OK to """{"items":[]}"""
-                }
+                val (status, json) = handler(data.url.encodedPath)
                 return HttpResponseData(
                     statusCode = status,
                     requestTime = GMTDate(),
@@ -195,27 +174,166 @@ class SettingsViewModelTest {
                 )
             }
         }
+        return HttpClient(engine) { install(ContentNegotiation) { json(wireJson) } }
+    }
+
+    @Test
+    fun testSetupSimpleFinBridge_localModePersistsTokenAndDrafts() = runTest(testDispatcher) {
+        val localStorage = PlatformStorage().apply { clear() }
+        val localScope = CoroutineScope(SupervisorJob() + testDispatcher)
+        try {
+            val mockClient = createJsonMockHttpClient { HttpStatusCode.OK to """{"errors":[],"accounts":[]}""" }
+            val localRepo = OrbitRepository(
+                storage = localStorage,
+                scope = localScope,
+                customSimpleFinClient = SimpleFinDirectClient(mockClient)
+            )
+            localRepo.initialize()
+            val localVm = SettingsViewModel(localRepo, localScope)
+            testScheduler.advanceUntilIdle()
+
+            localVm.setupSimpleFinBridge("  https://user:pass@bridge.simplefin.org/simplefin  ", "2026-02-01")
+            testScheduler.advanceUntilIdle()
+
+            assertEquals("https://user:pass@bridge.simplefin.org/simplefin", localVm.uiState.value.preferences.simpleFinToken)
+            assertEquals("https://user:pass@bridge.simplefin.org/simplefin", localRepo.preferences.value.simpleFinToken)
+            assertEquals("2026-02-01", localVm.uiState.value.preferences.simpleFinCutoverDate)
+            assertEquals("https://user:pass@bridge.simplefin.org/simplefin", localVm.uiState.value.simpleFinTokenDraft)
+            assertFalse(localVm.uiState.value.isConnectingSimpleFin)
+        } finally {
+            localScope.cancel()
+            localStorage.clear()
+        }
+    }
+
+    @Test
+    fun testSettingsSectionSearch_matchesTitlesAndKeywords() {
+        val amoledMatches = SettingsSection.search("amoled")
+        assertTrue(SettingsSection.APPEARANCE in amoledMatches)
+        assertFalse(SettingsSection.BANK_FEEDS in amoledMatches)
+
+        val simpleFinMatches = SettingsSection.search("simplefin")
+        assertEquals(listOf(SettingsSection.BANK_FEEDS), simpleFinMatches)
+        assertEquals(SettingsSection.entries, SettingsSection.search("   "))
+    }
+
+    @Test
+    fun testBackupRestorePaste_invalidJsonSetsInlineSheetError() = runTest(testDispatcher) {
+        testScheduler.advanceUntilIdle()
+        viewModel.openRestorePasteDialog()
+        viewModel.updateRestorePasteDraft("{invalid-json")
+        viewModel.previewBackupForRestore("{invalid-json")
+
+        val dialog = viewModel.uiState.value.activeDialog
+        assertTrue(dialog is SettingsDialogState.BackupRestorePaste)
+        assertFalse(dialog.errorMessage.isNullOrBlank())
+
+        viewModel.updateRestorePasteDraft("{}")
+        val cleared = viewModel.uiState.value.activeDialog as SettingsDialogState.BackupRestorePaste
+        assertNull(cleared.errorMessage)
+    }
+
+    private suspend fun withSelfHostedTestHarness(
+        testScheduler: kotlinx.coroutines.test.TestCoroutineScheduler,
+        handler: (String) -> Pair<HttpStatusCode, String>,
+        block: suspend (OrbitRepository, SettingsViewModel) -> Unit
+    ) {
+        val remoteStorage = PlatformStorage().apply { clear() }
+        LocalSnapshotEngine(remoteStorage).saveStartupPreferences(
+            OrbitPreferences(
+                storageMode = StorageMode.SELF_HOSTED,
+                selfHostedServerUrl = "https://orbit.example.com",
+                onboardingCompleted = true
+            )
+        )
         val apiClient = OrbitApiClient(
             baseUrlProvider = { "https://orbit.example.com" },
             storage = remoteStorage,
-            customHttpClient = HttpClient(engine) { install(ContentNegotiation) { json(wireJson) } }
+            customHttpClient = createJsonMockHttpClient(handler)
         )
         val remoteScope = CoroutineScope(SupervisorJob() + testDispatcher)
-        val remoteRepo = OrbitRepository(remoteStorage, customApiClient = apiClient, scope = remoteScope)
-        remoteRepo.initialize()
-        val remoteViewModel = SettingsViewModel(remoteRepo, remoteScope)
+        try {
+            val remoteRepo = OrbitRepository(remoteStorage, customApiClient = apiClient, scope = remoteScope)
+            remoteRepo.initialize()
+            val remoteViewModel = SettingsViewModel(remoteRepo, remoteScope)
+            testScheduler.advanceUntilIdle()
+            block(remoteRepo, remoteViewModel)
+        } finally {
+            remoteScope.cancel()
+            remoteStorage.clear()
+        }
+    }
+
+    @Test
+    fun testSetupSimpleFinBridge_failureDoesNotMarkConnected() = runTest(testDispatcher) {
+        withSelfHostedTestHarness(
+            testScheduler = testScheduler,
+            handler = { path ->
+                if (path == "/api/simplefin/setup") {
+                    HttpStatusCode.BadRequest to """{"error":"Invalid SimpleFIN claim token"}"""
+                } else {
+                    HttpStatusCode.OK to """{"items":[]}"""
+                }
+            }
+        ) { remoteRepo, remoteViewModel ->
+            remoteViewModel.setupSimpleFinBridge("invalid_token", "2026-01-01")
+            testScheduler.advanceUntilIdle()
+
+            assertNull(remoteViewModel.uiState.value.preferences.simpleFinToken)
+            assertNull(remoteRepo.preferences.value.simpleFinToken)
+            assertFalse(remoteViewModel.uiState.value.isConnectingSimpleFin)
+            assertTrue(remoteViewModel.uiState.value.statusMessage?.contains("failed", ignoreCase = true) == true)
+        }
+    }
+
+    @Test
+    fun testRestoreAndPartnerInviteFailures_surfaceInlineDialogErrors() = runTest(testDispatcher) {
+        withSelfHostedTestHarness(
+            testScheduler = testScheduler,
+            handler = { path ->
+                when (path) {
+                    "/api/data/orbit-restore" -> HttpStatusCode.BadRequest to """{"error":"Backup rejected"}"""
+                    "/api/household-sharing/shares" -> HttpStatusCode.BadRequest to """{"error":"Invite limit reached"}"""
+                    else -> HttpStatusCode.OK to """{"items":[]}"""
+                }
+            }
+        ) { _, remoteViewModel ->
+            val validBackupJson = repository.exportBackupJson()
+            remoteViewModel.previewBackupForRestore(validBackupJson)
+            remoteViewModel.confirmRestoreBackup()
+            testScheduler.advanceUntilIdle()
+
+            val restoreDialog = remoteViewModel.uiState.value.activeDialog as SettingsDialogState.RestorePreview
+            assertFalse(restoreDialog.isRestoring)
+            assertTrue(restoreDialog.errorMessage?.contains("Restore failed", ignoreCase = true) == true)
+
+            remoteViewModel.showDialog(SettingsDialogState.PartnerInvite())
+            remoteViewModel.inviteHouseholdPartner("partner@example.com", "member", "write")
+            testScheduler.advanceUntilIdle()
+
+            val inviteDialog = remoteViewModel.uiState.value.activeDialog as SettingsDialogState.PartnerInvite
+            assertFalse(inviteDialog.isSending)
+            assertTrue(inviteDialog.errorMessage?.contains("Invite failed", ignoreCase = true) == true)
+
+            remoteViewModel.logout()
+            testScheduler.advanceUntilIdle()
+            assertTrue(remoteViewModel.uiState.value.simpleFinLogs.isEmpty())
+            assertNull(remoteViewModel.uiState.value.householdSharing)
+        }
+    }
+
+    @Test
+    fun testServerUrlDraft_debouncesAndPersistsAcrossReapplyRules() = runTest(testDispatcher) {
         testScheduler.advanceUntilIdle()
+        viewModel.updateServerUrlDraft("  https://orbit.example.org  ")
+        assertEquals("  https://orbit.example.org  ", viewModel.uiState.value.serverUrlDraft)
 
-        remoteViewModel.setupSimpleFinBridge("invalid_token", "2026-01-01")
         testScheduler.advanceUntilIdle()
+        assertEquals("https://orbit.example.org", repository.preferences.value.selfHostedServerUrl)
 
-        assertNull(remoteViewModel.uiState.value.preferences.simpleFinToken)
-        assertNull(remoteRepo.preferences.value.simpleFinToken)
-        assertFalse(remoteViewModel.uiState.value.isConnectingSimpleFin)
-        assertTrue(remoteViewModel.uiState.value.statusMessage?.contains("failed", ignoreCase = true) == true)
-
-        remoteScope.cancel()
-        remoteStorage.clear()
+        viewModel.reapplyAllRules()
+        testScheduler.advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.statusMessage?.contains("Reapplied rules", ignoreCase = true) == true)
     }
 
     @Test

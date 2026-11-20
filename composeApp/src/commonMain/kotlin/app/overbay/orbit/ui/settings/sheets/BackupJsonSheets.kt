@@ -99,6 +99,7 @@ fun BackupExportSheet(
 @Composable
 fun BackupRestorePasteSheet(
     jsonText: String,
+    errorMessage: String? = null,
     onTextChange: (String) -> Unit,
     onPreview: (String) -> Unit,
     onDismiss: () -> Unit,
@@ -109,6 +110,7 @@ fun BackupRestorePasteSheet(
         confirmText = "Preview Restore",
         onConfirm = { onPreview(jsonText) },
         confirmEnabled = jsonText.isNotBlank(),
+        errorBannerText = errorMessage,
         modifier = modifier,
         title = "Restore Workspace Backup",
         subtitle = "Paste your exported backup JSON below to preview and restore.",

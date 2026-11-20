@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Scaffold
@@ -37,6 +38,7 @@ import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.data.model.StorageMode
 import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.ui.components.CanopyActionPillButton
 import app.overbay.orbit.ui.components.CanopyIconButton
 import app.overbay.orbit.ui.components.HeroScrollState
 import app.overbay.orbit.ui.components.MorphingPageHero
@@ -51,6 +53,7 @@ import app.overbay.orbit.ui.transactions.components.TransactionsSearchBar
 import app.overbay.orbit.util.BackHandler
 import app.overbay.orbit.util.DevicePosture
 import app.overbay.orbit.util.LocalDevicePosture
+import app.overbay.orbit.util.PlatformRuntime
 
 @Composable
 fun SettingsScreen(
@@ -202,6 +205,18 @@ private fun SettingsHeroHeader(
         collapsedTitle = if (isShowingPhoneSubpage) activeDetailSection.shortTitle else null,
         subtitle = if (isShowingPhoneSubpage) activeDetailSection.subtitle else rootSubtitle,
         scrollState = heroScrollState,
+        actions = {
+            if (isShowingPhoneSubpage && PlatformRuntime.isWeb) {
+                CanopyActionPillButton(
+                    icon = Icons.AutoMirrored.Filled.ArrowBack,
+                    label = "Settings",
+                    compactLabel = "Back",
+                    isCompact = heroScrollState.collapseFraction > 0.45f,
+                    buttonSize = 36.dp,
+                    onClick = { viewModel.openSection(null) }
+                )
+            }
+        },
         canopyBar = if (isShowingPhoneSubpage) {
             null
         } else {

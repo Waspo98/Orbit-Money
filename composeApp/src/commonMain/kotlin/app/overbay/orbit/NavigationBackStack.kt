@@ -64,7 +64,9 @@ class OrbitBackStackController(initialKey: OrbitNavKey = OrbitNavKey.Dashboard) 
         val samePrimaryTab =
             destination.primaryTabIndex != null &&
                 destination.primaryTabIndex == top.key.primaryTabIndex
-        if (samePrimaryTab) {
+        val sameSettingsDestination =
+            destination is OrbitNavKey.Settings && top.key is OrbitNavKey.Settings
+        if (samePrimaryTab || sameSettingsDestination) {
             entries[entries.lastIndex] = top.copy(key = destination)
             if (fromTab) {
                 val entryScroll = scrollStateFor(top.id)

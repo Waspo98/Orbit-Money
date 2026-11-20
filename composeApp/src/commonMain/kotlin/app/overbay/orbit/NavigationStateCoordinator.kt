@@ -1,10 +1,15 @@
 package app.overbay.orbit
 
+import app.overbay.orbit.ui.settings.SettingsSection
 import app.overbay.orbit.ui.transactions.TransactionsNavSnapshot
 import app.overbay.orbit.ui.transactions.TransactionsViewModel
 
 internal data class AccountsNavSnapshot(
     val selectedAccountId: Long?
+)
+
+internal data class SettingsNavSnapshot(
+    val activeSection: SettingsSection?
 )
 
 /**
@@ -23,6 +28,8 @@ internal class OrbitNavigationCoordinator(
         val leavingEntry = backStackController.currentEntry
         val samePrimaryTab = destination.primaryTabIndex != null &&
             destination.primaryTabIndex == leavingEntry.key.primaryTabIndex
+        val sameSettingsDestination =
+            destination is OrbitNavKey.Settings && leavingEntry.key is OrbitNavKey.Settings
 
         if (destination != leavingEntry.key &&
             (leavingEntry.key is OrbitNavKey.Accounts || leavingEntry.key is OrbitNavKey.CardPerks)
@@ -30,7 +37,7 @@ internal class OrbitNavigationCoordinator(
             viewModels.accountsViewModel.dismissPerkUndo()
         }
 
-        if (samePrimaryTab) {
+        if (samePrimaryTab || sameSettingsDestination) {
             if (destination != leavingEntry.key) {
                 backStackController.clearEntryState(leavingEntry.id)
             }
@@ -62,6 +69,10 @@ internal class OrbitNavigationCoordinator(
                 entry.id,
                 AccountsNavSnapshot(viewModels.accountsViewModel.currentSelectedAccountId)
             )
+            is OrbitNavKey.Settings -> backStackController.saveEntryState(
+                entry.id,
+                SettingsNavSnapshot(viewModels.settingsViewModel.uiState.value.activeSection)
+            )
             else -> Unit
         }
     }
@@ -81,6 +92,10 @@ internal class OrbitNavigationCoordinator(
                         viewModels.accountsViewModel.dismissInspectorPane()
                     }
                 }
+                else -> applyDestinationViewModels(key)
+            }
+            is OrbitNavKey.Settings -> when (saved) {
+                is SettingsNavSnapshot -> viewModels.settingsViewModel.openSection(saved.activeSection)
                 else -> applyDestinationViewModels(key)
             }
             else -> Unit

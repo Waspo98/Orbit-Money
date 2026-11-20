@@ -24,11 +24,7 @@ fun LazyListScope.settingsIndexItems(
 ) {
     val query = uiState.searchQuery.trim()
     if (query.isNotBlank()) {
-        val matches = SettingsSection.entries.filter { section ->
-            section.title.contains(query, ignoreCase = true) ||
-                section.subtitle.contains(query, ignoreCase = true) ||
-                section.searchKeywords.any { it.contains(query, ignoreCase = true) }
-        }
+        val matches = SettingsSection.search(query)
         if (matches.isEmpty()) {
             item(key = "settings_search_empty") {
                 EmptyStateCard(

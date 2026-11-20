@@ -38,7 +38,30 @@ class SettingsViewModel(
     init {
         scope.launch {
             repository.preferences.collect { prefs ->
-                _uiState.update { it.copy(preferences = prefs) }
+                _uiState.update { current ->
+                    val previousPrefs = current.preferences
+                    val nextServerUrl = if (current.serverUrlDraft == previousPrefs.selfHostedServerUrl) {
+                        prefs.selfHostedServerUrl
+                    } else {
+                        current.serverUrlDraft
+                    }
+                    val nextSimpleFinToken = if (current.simpleFinTokenDraft == previousPrefs.simpleFinToken.orEmpty()) {
+                        prefs.simpleFinToken.orEmpty()
+                    } else {
+                        current.simpleFinTokenDraft
+                    }
+                    val nextCutover = if (current.simpleFinCutoverDateDraft == previousPrefs.simpleFinCutoverDate) {
+                        prefs.simpleFinCutoverDate
+                    } else {
+                        current.simpleFinCutoverDateDraft
+                    }
+                    current.copy(
+                        preferences = prefs,
+                        serverUrlDraft = nextServerUrl,
+                        simpleFinTokenDraft = nextSimpleFinToken,
+                        simpleFinCutoverDateDraft = nextCutover
+                    )
+                }
             }
         }
         scope.launch {
@@ -207,11 +230,17 @@ class SettingsViewModel(
     // Sync, SimpleFIN & Household Sharing Delegations
     fun setStorageMode(mode: StorageMode) = syncSharingController.setStorageMode(mode)
     fun setServerUrl(url: String) = syncSharingController.setServerUrl(url)
+    fun updateServerUrlDraft(url: String) = syncSharingController.updateServerUrlDraft(url)
+    fun setShowServerPasswordLogin(show: Boolean) = syncSharingController.setShowServerPasswordLogin(show)
+    fun updateServerUsernameDraft(username: String) = syncSharingController.updateServerUsernameDraft(username)
+    fun updateServerPasswordDraft(password: String) = syncSharingController.updateServerPasswordDraft(password)
+    fun updateSimpleFinTokenDraft(token: String) = syncSharingController.updateSimpleFinTokenDraft(token)
+    fun updateSimpleFinCutoverDateDraft(date: String?) = syncSharingController.updateSimpleFinCutoverDateDraft(date)
+    fun setShowSimpleFinReconnectEditor(show: Boolean) = syncSharingController.setShowSimpleFinReconnectEditor(show)
     fun loginToSelfHostedServer(username: String, password: String) =
         syncSharingController.loginToSelfHostedServer(username, password)
     fun triggerSync() = syncSharingController.triggerSync()
     fun logout() = syncSharingController.logout()
-    fun setSimpleFinToken(token: String?) = syncSharingController.setSimpleFinToken(token)
     fun setupSimpleFinBridge(token: String, cutoverDate: String?) =
         syncSharingController.setupSimpleFinBridge(token, cutoverDate)
     fun disconnectSimpleFin() = syncSharingController.disconnectSimpleFin()
@@ -238,7 +267,6 @@ class SettingsViewModel(
     fun updateRestorePasteDraft(text: String) = backupController.updateRestorePasteDraft(text)
     fun previewBackupForRestore(rawJson: String) = backupController.previewBackupForRestore(rawJson)
     fun confirmRestoreBackup() = backupController.confirmRestoreBackup()
-    fun restoreBackup(rawJson: String) = backupController.restoreBackup(rawJson)
     fun setGoogleDriveSync(enabled: Boolean) = backupController.setGoogleDriveSync(enabled)
     fun openGoogleDriveClientIdDialog() = backupController.openGoogleDriveClientIdDialog()
     fun saveGoogleDriveClientId(id: String) = backupController.saveGoogleDriveClientId(id)

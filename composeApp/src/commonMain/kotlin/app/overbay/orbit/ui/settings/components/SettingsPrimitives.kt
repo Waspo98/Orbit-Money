@@ -10,22 +10,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -210,60 +204,6 @@ fun SettingsDangerCard(title: String, subtitle: String, modifier: Modifier = Mod
         modifier = modifier,
         content = content
     )
-}
-
-@Composable
-fun SettingsActionRow(
-    title: String,
-    subtitle: String,
-    buttonLabel: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    isDestructive: Boolean = false,
-    isLoading: Boolean = false,
-    enabled: Boolean = true
-) {
-    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = if (isDestructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
-            )
-            Text(text = subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        val btnModifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
-        if (isDestructive) {
-            Button(
-                onClick = onClick,
-                enabled = enabled && !isLoading,
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error, contentColor = MaterialTheme.colorScheme.onError),
-                modifier = btnModifier
-            ) {
-                if (isLoading) {
-                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onError)
-                    Spacer(modifier = Modifier.width(8.dp))
-                }
-                Text(text = buttonLabel, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-        } else {
-            OutlinedButton(
-                onClick = onClick,
-                enabled = enabled && !isLoading,
-                shape = RoundedCornerShape(14.dp),
-                border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
-                modifier = btnModifier
-            ) {
-                if (isLoading) {
-                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
-                    Spacer(modifier = Modifier.width(8.dp))
-                }
-                Text(text = buttonLabel, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-        }
-    }
 }
 
 @Composable

@@ -17,6 +17,8 @@ import app.overbay.orbit.data.updatePartnerShareAccess
 import app.overbay.orbit.ui.settings.SettingsDialogState
 import app.overbay.orbit.ui.settings.SettingsUiState
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -26,21 +28,84 @@ class SettingsSyncSharingController(
     private val scope: CoroutineScope,
     private val uiState: MutableStateFlow<SettingsUiState>
 ) {
+    private var serverUrlSaveJob: Job? = null
+
     fun setStorageMode(mode: StorageMode) {
+        serverUrlSaveJob?.cancel()
         val updated = uiState.value.preferences.copy(storageMode = mode)
-        uiState.update { it.copy(preferences = updated, storageMode = mode) }
+        uiState.update {
+            it.copy(
+                preferences = updated,
+                storageMode = mode,
+                householdSharing = if (mode == StorageMode.LOCAL) null else it.householdSharing
+            )
+        }
         scope.launch {
             repository.setStorageMode(mode)
+            if (mode == StorageMode.SELF_HOSTED) {
+                loadHouseholdSharing()
+            }
         }
     }
 
     fun setServerUrl(url: String) {
+        serverUrlSaveJob?.cancel()
         val trimmed = url.trim()
         val updated = uiState.value.preferences.copy(selfHostedServerUrl = trimmed)
-        uiState.update { it.copy(preferences = updated) }
+        uiState.update { it.copy(preferences = updated, serverUrlDraft = url) }
         scope.launch {
             repository.updatePreferences(updated)
         }
+    }
+
+    fun updateServerUrlDraft(url: String) {
+        uiState.update { it.copy(serverUrlDraft = url) }
+        serverUrlSaveJob?.cancel()
+        serverUrlSaveJob = scope.launch {
+            delay(350)
+            val trimmed = url.trim()
+            if (trimmed != uiState.value.preferences.selfHostedServerUrl) {
+                val updated = uiState.value.preferences.copy(selfHostedServerUrl = trimmed)
+                uiState.update { it.copy(preferences = updated) }
+                repository.updatePreferences(updated)
+            }
+        }
+    }
+
+    fun setShowServerPasswordLogin(show: Boolean) {
+        uiState.update { it.copy(showServerPasswordLogin = show) }
+    }
+
+    fun updateServerUsernameDraft(username: String) {
+        uiState.update { it.copy(serverUsernameDraft = username) }
+    }
+
+    fun updateServerPasswordDraft(password: String) {
+        uiState.update { it.copy(serverPasswordDraft = password) }
+    }
+
+    fun updateSimpleFinTokenDraft(token: String) {
+        uiState.update { it.copy(simpleFinTokenDraft = token) }
+    }
+
+    fun updateSimpleFinCutoverDateDraft(date: String?) {
+        uiState.update { it.copy(simpleFinCutoverDateDraft = date) }
+    }
+
+    fun setShowSimpleFinReconnectEditor(show: Boolean) {
+        uiState.update { it.copy(showSimpleFinReconnectEditor = show) }
+    }
+
+    private suspend fun flushPendingServerUrl(): String {
+        serverUrlSaveJob?.cancel()
+        val draftTrimmed = uiState.value.serverUrlDraft.trim()
+        val targetRaw = draftTrimmed.ifBlank { uiState.value.preferences.selfHostedServerUrl }
+        if (draftTrimmed.isNotEmpty() && draftTrimmed != uiState.value.preferences.selfHostedServerUrl) {
+            val updated = uiState.value.preferences.copy(selfHostedServerUrl = draftTrimmed)
+            uiState.update { it.copy(preferences = updated) }
+            repository.updatePreferences(updated)
+        }
+        return ServerUrlNormalizer.normalize(targetRaw)
     }
 
     fun loginToSelfHostedServer(username: String, password: String) {
@@ -48,9 +113,9 @@ class SettingsSyncSharingController(
             uiState.update { it.copy(statusMessage = "Username and password required") }
             return
         }
-        val normalizedUrl = ServerUrlNormalizer.normalize(uiState.value.preferences.selfHostedServerUrl)
         uiState.update { it.copy(isSyncing = true, statusMessage = "Authenticating...") }
         scope.launch {
+            val normalizedUrl = flushPendingServerUrl()
             val client = repository.createApiClient(normalizedUrl)
             val loginRes = client.login(username.trim(), password)
             if (loginRes.isSuccess) {
@@ -59,6 +124,8 @@ class SettingsSyncSharingController(
                 uiState.update {
                     it.copy(
                         isSyncing = false,
+                        serverPasswordDraft = "",
+                        showServerPasswordLogin = false,
                         syncStatus = SyncResult.Success("Signed in as ${username.trim()} ($txCount transactions)"),
                         statusMessage = "Logged in as ${username.trim()}"
                     )
@@ -80,6 +147,7 @@ class SettingsSyncSharingController(
     fun triggerSync() {
         uiState.update { it.copy(isSyncing = true, statusMessage = "Syncing workspace...") }
         scope.launch {
+            flushPendingServerUrl()
             val res = repository.sync(force = true)
             uiState.update {
                 it.copy(
@@ -95,7 +163,14 @@ class SettingsSyncSharingController(
     }
 
     fun logout() {
-        uiState.update { it.copy(activeDialog = SettingsDialogState.None) }
+        serverUrlSaveJob?.cancel()
+        uiState.update {
+            it.copy(
+                activeDialog = SettingsDialogState.None,
+                serverPasswordDraft = "",
+                showServerPasswordLogin = false
+            )
+        }
         scope.launch {
             repository.logout()
             uiState.update {
@@ -103,16 +178,12 @@ class SettingsSyncSharingController(
                     isSyncing = false,
                     syncStatus = SyncResult.NoOp,
                     householdSharing = null,
+                    simpleFinLogs = emptyList(),
+                    isSimpleFinLogsExpanded = false,
                     statusMessage = "Signed out of server"
                 )
             }
         }
-    }
-
-    fun setSimpleFinToken(token: String?) {
-        val updated = uiState.value.preferences.copy(simpleFinToken = token?.trim())
-        uiState.update { it.copy(preferences = updated) }
-        scope.launch { repository.updatePreferences(updated) }
     }
 
     fun setupSimpleFinBridge(token: String, cutoverDate: String?) {
@@ -133,6 +204,9 @@ class SettingsSyncSharingController(
                 uiState.update {
                     it.copy(
                         preferences = updated,
+                        simpleFinTokenDraft = trimmedToken,
+                        simpleFinCutoverDateDraft = cutoverDate,
+                        showSimpleFinReconnectEditor = false,
                         isConnectingSimpleFin = false,
                         statusMessage = "SimpleFIN connected successfully"
                     )
@@ -157,7 +231,11 @@ class SettingsSyncSharingController(
             uiState.update {
                 it.copy(
                     statusMessage = "SimpleFIN disconnected",
-                    simpleFinLogs = emptyList()
+                    simpleFinLogs = emptyList(),
+                    isSimpleFinLogsExpanded = false,
+                    simpleFinTokenDraft = "",
+                    simpleFinCutoverDateDraft = null,
+                    showSimpleFinReconnectEditor = false
                 )
             }
         }
@@ -200,7 +278,16 @@ class SettingsSyncSharingController(
     }
 
     fun inviteHouseholdPartner(email: String, role: String, accessLevel: String) {
+        val currentDialog = uiState.value.activeDialog
+        if (currentDialog is SettingsDialogState.PartnerInvite && currentDialog.isSending) return
         val trimmedEmail = email.trim()
+        uiState.update {
+            if (it.activeDialog is SettingsDialogState.PartnerInvite) {
+                it.copy(activeDialog = SettingsDialogState.PartnerInvite(isSending = true, errorMessage = null))
+            } else {
+                it
+            }
+        }
         scope.launch {
             val res = repository.inviteHouseholdPartner(trimmedEmail, role, accessLevel)
             if (res.isSuccess) {
@@ -213,7 +300,14 @@ class SettingsSyncSharingController(
                 loadHouseholdSharing()
             } else {
                 val err = res.exceptionOrNull()?.message ?: "Unknown error"
-                uiState.update { it.copy(statusMessage = "Invite failed: $err") }
+                val message = "Invite failed: $err"
+                uiState.update { state ->
+                    if (state.activeDialog is SettingsDialogState.PartnerInvite) {
+                        state.copy(activeDialog = SettingsDialogState.PartnerInvite(isSending = false, errorMessage = message))
+                    } else {
+                        state.copy(statusMessage = message)
+                    }
+                }
             }
         }
     }
