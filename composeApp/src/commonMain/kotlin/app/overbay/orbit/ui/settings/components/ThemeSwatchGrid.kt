@@ -119,7 +119,7 @@ private fun ThemeSwatchCard(
                     .fillMaxWidth()
                     .height(36.dp)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(Brush.horizontalGradient(listOf(custom.canopyStart, custom.canopyEnd)))
+                    .background(Brush.horizontalGradient(listOf(custom.canopyStart, custom.canopyMid, custom.canopyEnd)))
                     .padding(horizontal = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween

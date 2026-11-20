@@ -176,7 +176,7 @@ fun MorphingPageHero(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 if (kicker != null) {
-                    val kickerTint = lerp(canopyColors.onCanopy, canopyColors.heroStatGood, 0.32f).copy(alpha = 0.84f)
+                    val kickerTint = lerp(canopyColors.onCanopy, canopyColors.canopyKicker, 0.32f).copy(alpha = 0.84f)
                     Text(
                         text = kicker.uppercase(),
                         style = kickerStyle,

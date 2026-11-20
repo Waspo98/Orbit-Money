@@ -41,7 +41,8 @@ data class CustomThemeColors(
     val chartNeutral: Color,
     val chartGrid: Color,
     val canopyMid: Color = canopyEnd,
-    val canopyGlow: Color = Color(0x474DD0E1),
+    val canopyGlow: Color = Color.Transparent,
+    val canopyKicker: Color = onCanopy,
     val heroStatGood: Color = Color(0xFF8FF0C9),
     val heroStatWarn: Color = Color(0xFFFFE28A),
     val heroStatCaution: Color = Color(0xFFFFB3A8)
@@ -74,6 +75,8 @@ fun emeraldCustomColors(isDark: Boolean): CustomThemeColors = if (isDark) {
         canopyStart = Color(0xFF04271D),
         canopyMid = Color(0xFF064E3B),
         canopyEnd = Color(0xFF084C36),
+        canopyGlow = Color(0x474DD0E1),
+        canopyKicker = Color(0xFF8FF0C9),
         onCanopy = Color(0xFFE8ECE6),
         cardBorder = Color(0xFF243330),
         chartPositive = FinanceIncomeDark,
@@ -104,6 +107,8 @@ fun emeraldCustomColors(isDark: Boolean): CustomThemeColors = if (isDark) {
         canopyStart = Color(0xFF052E24),
         canopyMid = Color(0xFF065F46),
         canopyEnd = Color(0xFF047857),
+        canopyGlow = Color(0x474DD0E1),
+        canopyKicker = Color(0xFF8FF0C9),
         onCanopy = Color.White,
         cardBorder = Color(0xFFE4E2D7),
         chartPositive = FinanceIncomeLight,
@@ -118,13 +123,19 @@ fun oceanSlateCustomColors(isDark: Boolean): CustomThemeColors {
     return if (isDark) {
         base.copy(
             canopyStart = Color(0xFF002025),
+            canopyMid = Color(0xFF003840),
             canopyEnd = Color(0xFF004F58),
+            canopyGlow = Color(0x384FD8EB),
+            canopyKicker = OceanDarkPrimary,
             onCanopy = Color(0xFFDEE3E5)
         )
     } else {
         base.copy(
             canopyStart = Color(0xFF00363D),
+            canopyMid = Color(0xFF004F59),
             canopyEnd = Color(0xFF006874),
+            canopyGlow = Color(0x3D4FD8EB),
+            canopyKicker = OceanLightPrimaryContainer,
             onCanopy = Color.White
         )
     }
@@ -135,13 +146,19 @@ fun warmTerracottaCustomColors(isDark: Boolean): CustomThemeColors {
     return if (isDark) {
         base.copy(
             canopyStart = Color(0xFF3E0A00),
+            canopyMid = Color(0xFF5C1909),
             canopyEnd = Color(0xFF7A2912),
+            canopyGlow = Color(0x38FFB4A2),
+            canopyKicker = TerracottaDarkPrimary,
             onCanopy = Color(0xFFEDE0DD)
         )
     } else {
         base.copy(
             canopyStart = Color(0xFF5C1603),
+            canopyMid = Color(0xFF802A13),
             canopyEnd = Color(0xFFA43E23),
+            canopyGlow = Color(0x38FFB4A2),
+            canopyKicker = TerracottaLightPrimaryContainer,
             onCanopy = Color.White
         )
     }
@@ -152,13 +169,19 @@ fun royalIndigoCustomColors(isDark: Boolean): CustomThemeColors {
     return if (isDark) {
         base.copy(
             canopyStart = Color(0xFF081452),
+            canopyMid = Color(0xFF192879),
             canopyEnd = Color(0xFF293CA0),
+            canopyGlow = Color(0x3DBAC3FF),
+            canopyKicker = IndigoDarkPrimary,
             onCanopy = Color(0xFFE3E1E9)
         )
     } else {
         base.copy(
             canopyStart = Color(0xFF0E2388),
+            canopyMid = Color(0xFF283CA1),
             canopyEnd = Color(0xFF4355B9),
+            canopyGlow = Color(0x3DBAC3FF),
+            canopyKicker = IndigoLightPrimaryContainer,
             onCanopy = Color.White
         )
     }
@@ -169,13 +192,19 @@ fun monochromeInkCustomColors(isDark: Boolean): CustomThemeColors {
     return if (isDark) {
         base.copy(
             canopyStart = Color(0xFF0A0A0C),
+            canopyMid = Color(0xFF141417),
             canopyEnd = Color(0xFF1E1E22),
+            canopyGlow = Color(0x1EFFFFFF),
+            canopyKicker = Color(0xFFD4D4D8),
             onCanopy = Color(0xFFE3E2E6)
         )
     } else {
         base.copy(
             canopyStart = Color(0xFF141416),
+            canopyMid = Color(0xFF212225),
             canopyEnd = Color(0xFF2E3033),
+            canopyGlow = Color(0x22FFFFFF),
+            canopyKicker = Color(0xFFE4E4E7),
             onCanopy = Color.White
         )
     }
@@ -183,9 +212,14 @@ fun monochromeInkCustomColors(isDark: Boolean): CustomThemeColors {
 
 fun dynamicCustomColors(scheme: ColorScheme, isDark: Boolean): CustomThemeColors {
     val base = emeraldCustomColors(isDark)
+    val start = if (isDark) scheme.surfaceContainerHigh else scheme.primary
+    val end = if (isDark) scheme.surfaceContainer else scheme.primaryContainer
     return base.copy(
-        canopyStart = if (isDark) scheme.surfaceContainerHigh else scheme.primary,
-        canopyEnd = if (isDark) scheme.surfaceContainer else scheme.primaryContainer,
+        canopyStart = start,
+        canopyMid = blendColors(start, end, 0.5f),
+        canopyEnd = end,
+        canopyGlow = (if (isDark) scheme.primary else scheme.tertiary).copy(alpha = if (isDark) 0.20f else 0.22f),
+        canopyKicker = if (isDark) scheme.primary else scheme.onPrimary,
         onCanopy = if (isDark) scheme.onSurface else scheme.onPrimary
     )
 }
@@ -265,9 +299,14 @@ fun createCustomColorScheme(
 fun createCustomThemeColors(preset: CustomThemePreset): CustomThemeColors {
     val base = emeraldCustomColors(preset.isDark)
     val accent = preset.accentColorHex.toComposeColor(EmeraldLightPrimary)
+    val start = if (preset.isDark) blendColors(accent, Color.Black, 0.4f) else accent
+    val end = if (preset.isDark) blendColors(accent, Color.Black, 0.2f) else blendColors(accent, Color.White, 0.15f)
     return base.copy(
-        canopyStart = if (preset.isDark) blendColors(accent, Color.Black, 0.4f) else accent,
-        canopyEnd = if (preset.isDark) blendColors(accent, Color.Black, 0.2f) else blendColors(accent, Color.White, 0.15f)
+        canopyStart = start,
+        canopyMid = blendColors(start, end, 0.5f),
+        canopyEnd = end,
+        canopyGlow = blendColors(accent, Color.White, 0.45f).copy(alpha = 0.24f),
+        canopyKicker = blendColors(accent, Color.White, 0.72f)
     )
 }
 

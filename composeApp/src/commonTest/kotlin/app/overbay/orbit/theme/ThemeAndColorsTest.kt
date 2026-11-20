@@ -4,6 +4,7 @@ import androidx.compose.ui.graphics.Color
 import app.overbay.orbit.data.model.OrbitThemePreset
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -34,6 +35,34 @@ class ThemeAndColorsTest {
             assertNotNull(customLight.canopyStart)
             assertNotNull(customDark.canopyEnd)
         }
+    }
+
+    @Test
+    fun testNonEmeraldPresetsDoNotInheritEmeraldCanopyMidGlowOrKicker() {
+        val emeraldLight = getPresetCustomColors(OrbitThemePreset.ORBIT_EMERALD, isDark = false)
+        val emeraldDark = getPresetCustomColors(OrbitThemePreset.ORBIT_EMERALD, isDark = true)
+
+        for (preset in OrbitThemePreset.entries) {
+            if (preset == OrbitThemePreset.ORBIT_EMERALD) continue
+            val customLight = getPresetCustomColors(preset, isDark = false)
+            val customDark = getPresetCustomColors(preset, isDark = true)
+
+            assertNotEquals(emeraldLight.canopyMid, customLight.canopyMid, "${preset.name} light canopyMid")
+            assertNotEquals(emeraldDark.canopyMid, customDark.canopyMid, "${preset.name} dark canopyMid")
+            assertNotEquals(emeraldLight.canopyGlow, customLight.canopyGlow, "${preset.name} light canopyGlow")
+            assertNotEquals(emeraldDark.canopyGlow, customDark.canopyGlow, "${preset.name} dark canopyGlow")
+            assertNotEquals(emeraldLight.canopyKicker, customLight.canopyKicker, "${preset.name} light canopyKicker")
+            assertNotEquals(emeraldDark.canopyKicker, customDark.canopyKicker, "${preset.name} dark canopyKicker")
+        }
+
+        val dynamicLight = dynamicCustomColors(TerracottaLightColorScheme, isDark = false)
+        val dynamicDark = dynamicCustomColors(TerracottaDarkColorScheme, isDark = true)
+        assertNotEquals(emeraldLight.canopyMid, dynamicLight.canopyMid)
+        assertNotEquals(emeraldDark.canopyMid, dynamicDark.canopyMid)
+        assertNotEquals(emeraldLight.canopyGlow, dynamicLight.canopyGlow)
+        assertNotEquals(emeraldDark.canopyGlow, dynamicDark.canopyGlow)
+        assertNotEquals(emeraldLight.canopyKicker, dynamicLight.canopyKicker)
+        assertNotEquals(emeraldDark.canopyKicker, dynamicDark.canopyKicker)
     }
 
     @Test
@@ -68,6 +97,10 @@ class ThemeAndColorsTest {
         val customColors = createCustomThemeColors(custom)
         assertNotNull(customColors.canopyStart)
         assertNotNull(customColors.canopyEnd)
+        val emeraldLight = emeraldCustomColors(isDark = false)
+        assertNotEquals(emeraldLight.canopyMid, customColors.canopyMid)
+        assertNotEquals(emeraldLight.canopyGlow, customColors.canopyGlow)
+        assertNotEquals(emeraldLight.canopyKicker, customColors.canopyKicker)
     }
 
     @Test
