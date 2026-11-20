@@ -179,7 +179,7 @@ sealed interface OrbitNavKey {
     data object Household : OrbitNavKey
 
     @Serializable
-    data object Settings : OrbitNavKey
+    data class Settings(val section: app.overbay.orbit.ui.settings.SettingsSection? = null) : OrbitNavKey
 
     /**
      * Left-to-right spatial index (0..3) for the 4 primary navigation tabs,
@@ -213,7 +213,7 @@ sealed interface OrbitNavKey {
             HousingCalculator -> "Housing Calculator"
             RetirementCalculator -> "Retirement Calculator"
             Household -> "Household"
-            Settings -> "Settings"
+            is Settings -> "Settings"
         }
 
     val routeName: String
@@ -235,6 +235,6 @@ sealed interface OrbitNavKey {
             HousingCalculator -> "housing_calculator"
             RetirementCalculator -> "retirement_calculator"
             Household -> "household"
-            Settings -> "settings"
+            is Settings -> "settings"
         }
 }

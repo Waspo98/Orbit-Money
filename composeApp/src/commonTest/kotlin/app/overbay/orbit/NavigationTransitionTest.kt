@@ -53,7 +53,7 @@ class NavigationTransitionTest {
             OrbitNavKey.HousingCalculator,
             OrbitNavKey.RetirementCalculator,
             OrbitNavKey.Household,
-            OrbitNavKey.Settings
+            OrbitNavKey.Settings()
         )
         secondaryKeys.forEach { key ->
             assertNull(key.primaryTabIndex, "Expected null primaryTabIndex for $key")
@@ -126,7 +126,7 @@ class NavigationTransitionTest {
     fun `more destinations use push and pop transitions instead of horizontal tab slide`() {
         assertEquals(
             OrbitTransitionDirection.MORE_PUSH,
-            resolveOrbitTransitionDirection(OrbitNavKey.Dashboard, OrbitNavKey.Settings)
+            resolveOrbitTransitionDirection(OrbitNavKey.Dashboard, OrbitNavKey.Settings())
         )
         assertEquals(
             OrbitTransitionDirection.MORE_PUSH,
@@ -138,7 +138,7 @@ class NavigationTransitionTest {
         )
         assertEquals(
             OrbitTransitionDirection.MORE_POP,
-            resolveOrbitTransitionDirection(OrbitNavKey.Settings, OrbitNavKey.Dashboard)
+            resolveOrbitTransitionDirection(OrbitNavKey.Settings(), OrbitNavKey.Dashboard)
         )
         assertEquals(
             OrbitTransitionDirection.MORE_POP,

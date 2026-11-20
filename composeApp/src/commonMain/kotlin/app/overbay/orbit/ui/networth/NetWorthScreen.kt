@@ -102,7 +102,7 @@ fun NetWorthScreen(
 
                         CanopySettingsButton(
                             buttonSize = barHeight,
-                            onClick = { onNavigate(OrbitNavKey.Settings) }
+                            onClick = { onNavigate(OrbitNavKey.Settings()) }
                         )
                     },
                     persistentBottomBar = {

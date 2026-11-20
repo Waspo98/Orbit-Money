@@ -42,5 +42,4 @@ sealed interface DashboardAction {
     data class MarkTransactionRecurring(val transactionId: Long) : DashboardAction
     data class ResetTransactionEdits(val transactionId: Long) : DashboardAction
     data class DeleteTransaction(val transactionId: Long) : DashboardAction
-    data object RequestOpenDataSettings : DashboardAction
 }

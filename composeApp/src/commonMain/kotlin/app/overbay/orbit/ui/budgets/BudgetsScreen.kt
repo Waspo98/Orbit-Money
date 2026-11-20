@@ -181,7 +181,7 @@ fun BudgetsScreen(
 
                         CanopySettingsButton(
                             buttonSize = barHeight,
-                            onClick = { onNavigate(OrbitNavKey.Settings) }
+                            onClick = { onNavigate(OrbitNavKey.Settings()) }
                         )
                     }
                 )

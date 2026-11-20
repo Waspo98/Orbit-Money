@@ -52,21 +52,31 @@ class SettingsViewModel(
                 _uiState.update { it.copy(accounts = accounts) }
             }
         }
-        scope.launch {
-            repository.pendingSettingsSubpage.collect { subpage ->
-                _uiState.update { it.copy(activeSubpage = subpage) }
-                if (subpage == "data") {
-                    loadSimpleFinLogs()
-                    loadHouseholdSharing()
-                } else if (subpage == "preferences") {
-                    loadPushConfig()
-                }
-            }
+    }
+
+    fun openSection(section: SettingsSection?) {
+        val mappedSubpage = when (section) {
+            SettingsSection.APPEARANCE,
+            SettingsSection.NOTIFICATIONS,
+            SettingsSection.WORKSPACE_NAVIGATION,
+            SettingsSection.SECURITY -> "preferences"
+            SettingsSection.SYNC_AND_SHARING,
+            SettingsSection.BANK_FEEDS,
+            SettingsSection.DATA_AND_BACKUPS -> "data"
+            SettingsSection.ABOUT,
+            null -> null
         }
+        setSubpage(mappedSubpage)
     }
 
     fun setSubpage(subpage: String?) {
-        repository.requestOpenSettingsSubpage(subpage)
+        _uiState.update { it.copy(activeSubpage = subpage) }
+        if (subpage == "data") {
+            loadSimpleFinLogs()
+            loadHouseholdSharing()
+        } else if (subpage == "preferences") {
+            loadPushConfig()
+        }
     }
 
     fun setStorageMode(mode: StorageMode) {

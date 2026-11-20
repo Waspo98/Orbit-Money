@@ -170,7 +170,7 @@ fun CategoriesScreen(
 
                                         CanopySettingsButton(
                                             buttonSize = restingHeight,
-                                            onClick = { onNavigate(OrbitNavKey.Settings) }
+                                            onClick = { onNavigate(OrbitNavKey.Settings()) }
                                         )
                                     }
                                 }

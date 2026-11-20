@@ -4,4 +4,5 @@ package app.overbay.orbit.util
 
 actual object PlatformRuntime {
     actual val isWeb: Boolean = true
+    actual var appVersionName: String = "0.8.0"
 }

@@ -79,7 +79,7 @@ fun GoalsScreen(
                         heroScrollState = heroScrollState,
                         onToggleReorder = viewModel::toggleReorderMode,
                         onToggleCompleted = viewModel::toggleCompletedGoals,
-                        onOpenSettings = { onNavigate(OrbitNavKey.Settings) }
+                        onOpenSettings = { onNavigate(OrbitNavKey.Settings()) }
                     )
 
                     val startPad = if (isTwoPane) 20.dp else 16.dp

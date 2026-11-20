@@ -17,6 +17,7 @@ import app.overbay.orbit.App
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.util.DisplayRefreshRateHelper
 import app.overbay.orbit.util.OidcCallbackBridge
+import app.overbay.orbit.util.PlatformRuntime
 import app.overbay.orbit.util.PlatformStorage
 
 class MainActivity : FragmentActivity() {
@@ -49,6 +50,9 @@ class MainActivity : FragmentActivity() {
         )
 
         PlatformStorage.baseDir = filesDir
+        PlatformRuntime.appVersionName = runCatching {
+            packageManager.getPackageInfo(packageName, 0).versionName
+        }.getOrNull().orEmpty().ifBlank { "0.8.0" }
 
         // Configure adaptive high refresh rate (120Hz) without battery-draining locked modes
         DisplayRefreshRateHelper.configureHighRefreshRate(window, display)

@@ -44,6 +44,7 @@ import app.overbay.orbit.ui.components.rememberOrbitLazyListState
 import app.overbay.orbit.ui.dashboard.cards.EmptyWorkspaceSetupCard
 import app.overbay.orbit.ui.dashboard.dialogs.DashboardCustomizeSheet
 import app.overbay.orbit.ui.dashboard.dialogs.TransactionReviewSheet
+import app.overbay.orbit.ui.settings.SettingsSection
 import app.overbay.orbit.ui.transactions.components.TransactionsSearchBar
 import app.overbay.orbit.util.LocalDevicePosture
 
@@ -125,7 +126,7 @@ fun DashboardScreen(
 
                     CanopySettingsButton(
                         buttonSize = barHeight,
-                        onClick = { onNavigate(OrbitNavKey.Settings) }
+                        onClick = { onNavigate(OrbitNavKey.Settings()) }
                     )
                 }
             )
@@ -197,12 +198,10 @@ fun DashboardScreen(
                             item(key = "empty_workspace_setup") {
                                 EmptyWorkspaceSetupCard(
                                     onImportCsv = {
-                                        onAction(DashboardAction.RequestOpenDataSettings)
-                                        onNavigate(OrbitNavKey.Settings)
+                                        onNavigate(OrbitNavKey.Settings(SettingsSection.DATA_AND_BACKUPS))
                                     },
                                     onConnectSimpleFin = {
-                                        onAction(DashboardAction.RequestOpenDataSettings)
-                                        onNavigate(OrbitNavKey.Settings)
+                                        onNavigate(OrbitNavKey.Settings(SettingsSection.BANK_FEEDS))
                                     },
                                     onAddManualAccount = {
                                         onNavigate(OrbitNavKey.Accounts())

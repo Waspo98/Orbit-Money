@@ -244,7 +244,7 @@ fun OrbitNavigation(
                             OrbitNavKey.HousingCalculator -> HousingCalculatorScreen(viewModels.housingViewModel, posture, navigateTo, Modifier.fillMaxSize())
                             OrbitNavKey.RetirementCalculator -> RetirementCalculatorScreen(viewModels.retirementViewModel, posture, navigateTo, Modifier.fillMaxSize())
                             OrbitNavKey.Household -> HouseholdScreen(viewModels.householdViewModel, posture, navigateTo, Modifier.fillMaxSize())
-                            OrbitNavKey.Settings -> SettingsScreen(viewModels.settingsViewModel, posture, navigateTo, Modifier.fillMaxSize())
+                            is OrbitNavKey.Settings -> SettingsScreen(viewModels.settingsViewModel, posture, navigateTo, Modifier.fillMaxSize())
                             else -> {
                                 Box(
                                     modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(24.dp),

@@ -24,6 +24,7 @@ import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.NetWorthEngine
 import app.overbay.orbit.ui.accounts.cards.CardEditorController
 import app.overbay.orbit.ui.accounts.cards.CardEditorTab
+import app.overbay.orbit.ui.settings.SettingsSection
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -389,8 +390,7 @@ class AccountsViewModel(
     }
 
     fun requestSnapshotReminder(onNavigate: ((OrbitNavKey) -> Unit)? = null) {
-        repository.requestOpenSettingsSubpage("preferences")
-        onNavigate?.invoke(OrbitNavKey.Settings)
+        onNavigate?.invoke(OrbitNavKey.Settings(SettingsSection.NOTIFICATIONS))
     }
 
     fun toggleGroupWideSpan(category: AccountTypeCategory) {

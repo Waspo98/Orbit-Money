@@ -110,7 +110,7 @@ fun TransactionsListPane(
                             TransactionsSearchTrailingControls(
                                 activeFilterCount = activeChips.size,
                                 onOpenFilter = { viewModel.openFilterSheet() },
-                                onOpenSettings = { onNavigate(OrbitNavKey.Settings) },
+                                onOpenSettings = { onNavigate(OrbitNavKey.Settings()) },
                                 buttonSize = buttonSize
                             )
                         }

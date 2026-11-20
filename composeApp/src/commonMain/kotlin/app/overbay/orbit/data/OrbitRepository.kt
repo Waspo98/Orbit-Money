@@ -81,9 +81,6 @@ class OrbitRepository(
     internal val _pendingBudgetMonth = MutableStateFlow<String?>(null)
     val pendingBudgetMonth: StateFlow<String?> = _pendingBudgetMonth.asStateFlow()
     fun requestOpenBudgetMonth(month: String?) { _pendingBudgetMonth.value = month }
-    internal val _pendingSettingsSubpage = MutableStateFlow<String?>(null)
-    val pendingSettingsSubpage: StateFlow<String?> = _pendingSettingsSubpage.asStateFlow()
-    fun requestOpenSettingsSubpage(subpage: String?) { _pendingSettingsSubpage.value = subpage }
 
     internal val json = Json { prettyPrint = true; ignoreUnknownKeys = true; isLenient = true }
     internal val snapshotMutex = Mutex()

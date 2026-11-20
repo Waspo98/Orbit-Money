@@ -4,4 +4,5 @@ package app.overbay.orbit.util
 
 expect object PlatformRuntime {
     val isWeb: Boolean
+    var appVersionName: String
 }

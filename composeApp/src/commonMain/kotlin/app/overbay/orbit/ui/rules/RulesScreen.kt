@@ -144,7 +144,7 @@ fun RulesScreen(
 
                             CanopySettingsButton(
                                 buttonSize = barHeight,
-                                onClick = { onNavigate(OrbitNavKey.Settings) }
+                                onClick = { onNavigate(OrbitNavKey.Settings()) }
                             )
                         }
                     )

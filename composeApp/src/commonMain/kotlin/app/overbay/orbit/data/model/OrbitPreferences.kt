@@ -12,10 +12,10 @@ enum class OrbitThemePreset(val displayName: String) {
 }
 
 @Serializable
-enum class OrbitThemeMode(val displayName: String, val emoji: String) {
-    SYSTEM("System Default", "💻"),
-    LIGHT("Light", "☀️"),
-    DARK("Dark", "🌙");
+enum class OrbitThemeMode(val displayName: String, val shortLabel: String, val emoji: String) {
+    SYSTEM("System Default", "System", "💻"),
+    LIGHT("Light", "Light", "☀️"),
+    DARK("Dark", "Dark", "🌙");
 
     val labelWithEmoji: String get() = "$emoji $displayName"
 }

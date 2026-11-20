@@ -142,7 +142,7 @@ fun MhaTrackerScreen(
                             onToggleConfigSheet = {
                                 if (state.showConfigSheet) viewModel.closeConfigSheet() else viewModel.openConfigSheet()
                             },
-                            onOpenSettings = { onNavigate(OrbitNavKey.Settings) }
+                            onOpenSettings = { onNavigate(OrbitNavKey.Settings()) }
                         )
                     }
                 )

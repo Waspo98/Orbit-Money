@@ -125,7 +125,7 @@ fun HouseholdScreen(
 
                         CanopySettingsButton(
                             buttonSize = barHeight,
-                            onClick = { onNavigate(OrbitNavKey.Settings) }
+                            onClick = { onNavigate(OrbitNavKey.Settings()) }
                         )
                     }
                 )

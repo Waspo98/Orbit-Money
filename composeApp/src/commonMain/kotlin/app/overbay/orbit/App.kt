@@ -116,7 +116,7 @@ fun App(
     val lifecycleOwner = LocalLifecycleOwner.current
     var backgroundedTimestamp by remember { mutableStateOf<Long?>(null) }
 
-    DisposableEffect(lifecycleOwner, preferences.biometricLockEnabled) {
+    DisposableEffect(lifecycleOwner, preferences.biometricLockEnabled, preferences.biometricTimeoutSeconds) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_STOP) {
                 backgroundedTimestamp = Clock.System.now().toEpochMilliseconds()
@@ -124,7 +124,8 @@ fun App(
                 val bgTime = backgroundedTimestamp
                 if (bgTime != null && preferences.biometricLockEnabled) {
                     val elapsed = Clock.System.now().toEpochMilliseconds() - bgTime
-                    if (elapsed >= 30_000L) {
+                    val timeoutMs = preferences.biometricTimeoutSeconds.coerceAtLeast(0) * 1000L
+                    if (elapsed >= timeoutMs) {
                         isBiometricLocked = true
                     }
                 }

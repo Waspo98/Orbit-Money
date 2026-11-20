@@ -104,7 +104,7 @@ internal class OrbitNavigationCoordinator(
                     viewModels.accountsViewModel.dismissInspectorPane()
                 }
             }
-            OrbitNavKey.Settings -> viewModels.settingsViewModel.setSubpage(null)
+            is OrbitNavKey.Settings -> viewModels.settingsViewModel.openSection(destination.section)
             else -> Unit
         }
     }

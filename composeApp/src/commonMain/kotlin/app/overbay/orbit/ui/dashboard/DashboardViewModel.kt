@@ -515,7 +515,6 @@ class DashboardViewModel(
             is DashboardAction.MarkTransactionRecurring -> viewModelScope.launch { repository.createUpcomingFromTransaction(action.transactionId) }
             is DashboardAction.ResetTransactionEdits -> viewModelScope.launch { repository.resetTransaction(action.transactionId) }
             is DashboardAction.DeleteTransaction -> viewModelScope.launch { repository.deleteTransaction(action.transactionId) }
-            DashboardAction.RequestOpenDataSettings -> repository.requestOpenSettingsSubpage("data")
         }
     }
 

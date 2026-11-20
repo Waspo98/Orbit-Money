@@ -52,6 +52,7 @@ import app.overbay.orbit.data.muteSimpleFinAccountWarnings
 import app.overbay.orbit.domain.SimpleFinWarningParser
 import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.ui.settings.SettingsSection
 import app.overbay.orbit.util.LocalOrbitHaptics
 import kotlinx.coroutines.launch
 
@@ -210,8 +211,7 @@ fun GlobalStatusBanners(
                         haptics.tick()
                         commitMuteIfChecked()
                         dismissedSimpleFin = true
-                        repository.requestOpenSettingsSubpage("data")
-                        onNavigate(OrbitNavKey.Settings)
+                        onNavigate(OrbitNavKey.Settings(SettingsSection.BANK_FEEDS))
                     }
                 ) {
                     Text("Manage Sync")

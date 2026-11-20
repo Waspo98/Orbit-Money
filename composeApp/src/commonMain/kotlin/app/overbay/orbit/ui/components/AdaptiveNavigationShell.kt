@@ -79,7 +79,7 @@ fun AdaptiveNavigationShell(
     val isSecondaryRoute = remember(currentKey) {
         when (currentKey) {
             OrbitNavKey.Onboarding, OrbitNavKey.Dashboard, is OrbitNavKey.Transactions,
-            OrbitNavKey.Budgets, is OrbitNavKey.Accounts, OrbitNavKey.Settings -> false
+            OrbitNavKey.Budgets, is OrbitNavKey.Accounts, is OrbitNavKey.Settings -> false
             else -> true
         }
     }
@@ -217,7 +217,7 @@ private fun DesktopSidebar(
             Spacer(modifier = Modifier.height(8.dp))
             HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
             Spacer(modifier = Modifier.height(8.dp))
-            SidebarRow("Settings", OrbitIcons.Settings, currentKey == OrbitNavKey.Settings) { onNavigate(OrbitNavKey.Settings) }
+            SidebarRow("Settings", OrbitIcons.Settings, currentKey is OrbitNavKey.Settings) { onNavigate(OrbitNavKey.Settings()) }
         }
     }
 }
