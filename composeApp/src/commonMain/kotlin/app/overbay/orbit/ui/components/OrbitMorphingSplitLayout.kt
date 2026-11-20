@@ -39,12 +39,13 @@ fun OrbitMorphingSplitLayout(
     masterWeightWhenOpen: Float = 0.55f,
     paneSpacing: Dp = 16.dp,
     maxContainerWidth: Dp = 1440.dp,
+    handleBackPress: Boolean = true,
     masterContent: @Composable () -> Unit,
     detailContent: @Composable () -> Unit
 ) {
     val haptics = LocalOrbitHaptics.current
 
-    BackHandler(enabled = isDetailOpen) {
+    BackHandler(enabled = handleBackPress && isDetailOpen) {
         haptics.tick()
         onDismissDetail()
     }

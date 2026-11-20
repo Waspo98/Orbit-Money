@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Scaffold
@@ -38,7 +37,6 @@ import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.data.model.StorageMode
 import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
-import app.overbay.orbit.ui.components.CanopyActionPillButton
 import app.overbay.orbit.ui.components.CanopyIconButton
 import app.overbay.orbit.ui.components.HeroScrollState
 import app.overbay.orbit.ui.components.MorphingPageHero
@@ -122,6 +120,7 @@ fun SettingsScreen(
                         isDetailOpen = true,
                         onDismissDetail = {},
                         masterWeightWhenOpen = 0.38f,
+                        handleBackPress = false,
                         modifier = Modifier.fillMaxSize(),
                         masterContent = {
                             LazyColumn(
@@ -203,31 +202,10 @@ private fun SettingsHeroHeader(
         collapsedTitle = if (isShowingPhoneSubpage) activeDetailSection.shortTitle else null,
         subtitle = if (isShowingPhoneSubpage) activeDetailSection.subtitle else rootSubtitle,
         scrollState = heroScrollState,
-        canopyBar = { _, isCompact, barHeight ->
-            if (isShowingPhoneSubpage) {
-                CanopyActionPillButton(
-                    icon = Icons.AutoMirrored.Filled.ArrowBack,
-                    label = "Settings",
-                    compactLabel = "Back",
-                    isCompact = isCompact,
-                    buttonSize = barHeight,
-                    onClick = { viewModel.openSection(null) }
-                )
-                Spacer(modifier = Modifier.weight(1f))
-                val showSubpageSync = (activeDetailSection == SettingsSection.SYNC_AND_SHARING ||
-                    activeDetailSection == SettingsSection.BANK_FEEDS) &&
-                    (uiState.storageMode == StorageMode.SELF_HOSTED || !uiState.preferences.simpleFinToken.isNullOrBlank())
-                if (showSubpageSync) {
-                    CanopyIconButton(
-                        icon = Icons.Default.Refresh,
-                        contentDescription = "Sync Now",
-                        onClick = viewModel::triggerSync,
-                        buttonSize = barHeight,
-                        isActive = uiState.isSyncing,
-                        enabled = !uiState.isSyncing
-                    )
-                }
-            } else {
+        canopyBar = if (isShowingPhoneSubpage) {
+            null
+        } else {
+            { _, isCompact, barHeight ->
                 TransactionsSearchBar(
                     searchQuery = uiState.searchQuery,
                     onSearchQueryChange = viewModel::setSearchQuery,

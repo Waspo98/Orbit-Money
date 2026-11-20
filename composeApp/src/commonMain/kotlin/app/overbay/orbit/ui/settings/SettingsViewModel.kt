@@ -59,7 +59,7 @@ class SettingsViewModel(
     }
 
     fun openSection(section: SettingsSection?) {
-        _uiState.update { it.copy(activeSection = section) }
+        _uiState.update { it.copy(activeSection = section, isSearchActive = false) }
         when (section) {
             SettingsSection.NOTIFICATIONS -> loadPushConfig()
             SettingsSection.BANK_FEEDS -> loadSimpleFinLogs()
