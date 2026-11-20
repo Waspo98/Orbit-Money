@@ -39,6 +39,7 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.overbay.orbit.data.model.StorageMode
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.ui.components.DateFieldButton
@@ -70,19 +71,22 @@ fun LazyListScope.bankFeedsSectionItems(
     val isLogsExpanded = uiState.isSimpleFinLogsExpanded
     val isConnecting = uiState.isConnectingSimpleFin
     val isSyncing = uiState.isSyncing
-    val isConnected = !preferences.simpleFinToken.isNullOrBlank()
+    val isConnected = uiState.simpleFinStatus.connected ||
+        (uiState.storageMode == StorageMode.LOCAL && !preferences.simpleFinToken.isNullOrBlank())
+    val activeCutoverDate = uiState.simpleFinStatus.cutoverDate ?: preferences.simpleFinCutoverDate
 
     item(key = "bank_feeds_connection") {
         val uriHandler = LocalUriHandler.current
         val rawToken = uiState.simpleFinTokenDraft
         val showReconnectEditor = uiState.showSimpleFinReconnectEditor
-        val selectedCutoverDate = remember(uiState.simpleFinCutoverDateDraft) {
-            uiState.simpleFinCutoverDateDraft?.takeIf { it.isNotBlank() }?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+        val selectedCutoverDate = remember(uiState.simpleFinCutoverDateDraft, activeCutoverDate) {
+            (uiState.simpleFinCutoverDateDraft?.takeIf { it.isNotBlank() } ?: activeCutoverDate)
+                ?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
         } ?: Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
         val btnShape = RoundedCornerShape(14.dp)
 
         OrbitSectionCard(
-            title = "SimpleFIN Bank Feeds",
+            title = "SimpleFIN Sync",
             subtitle = "Connect read-only bank feeds without third-party aggregators"
         ) {
             Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -113,8 +117,8 @@ fun LazyListScope.bankFeedsSectionItems(
                     ) {
                         Row(modifier = Modifier.fillMaxWidth().padding(14.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                Text("Bank Feed Active", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                                Text("Cutover: ${preferences.simpleFinCutoverDate ?: "Not set"}", style = TabularNumStyle.copy(fontSize = MaterialTheme.typography.bodySmall.fontSize), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("SimpleFIN Connected", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                                Text("Cutover: ${activeCutoverDate ?: "Not set"}", style = TabularNumStyle.copy(fontSize = MaterialTheme.typography.bodySmall.fontSize), color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             Icon(Icons.Default.Check, contentDescription = "Active", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
                         }

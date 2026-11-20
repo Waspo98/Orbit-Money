@@ -52,6 +52,7 @@ fun RuleItemCard(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     matchCount: Int = 0,
+    mhaEnabled: Boolean = false,
     accountMap: Map<Long, String> = emptyMap(),
     isInspected: Boolean = false,
     onClick: (() -> Unit)? = null,
@@ -226,14 +227,15 @@ fun RuleItemCard(
                     .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                if (rule.actions.isEmpty()) {
+                val visibleActions = if (mhaEnabled) rule.actions else rule.actions.filterNot { it.type == RuleActionType.SET_MHA_ELIGIBLE }
+                if (visibleActions.isEmpty()) {
                     Text(
                         text = "No actions defined",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline
                     )
                 } else {
-                    rule.actions.forEach { act ->
+                    visibleActions.forEach { act ->
                         OrbitBadge(
                             text = formatRuleAction(act, categoryMap),
                             containerColor = MaterialTheme.colorScheme.secondaryContainer,

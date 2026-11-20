@@ -17,11 +17,11 @@ enum class SettingsSection(
     val searchKeywords: List<String>
 ) {
     APPEARANCE(
-        title = "Appearance",
-        shortTitle = "Appearance",
-        subtitle = "Theme mode, AMOLED dark, color palettes & wallpaper colors",
+        title = "Look and Feel",
+        shortTitle = "Look & Feel",
+        subtitle = "Theme mode, AMOLED dark, color palettes & haptics",
         cluster = SettingsCluster.PERSONALIZE,
-        searchKeywords = listOf("theme", "dark", "light", "system", "amoled", "black", "color", "palette", "emerald", "slate", "terracotta", "indigo", "monochrome", "wallpaper", "dynamic", "material you")
+        searchKeywords = listOf("look", "feel", "theme", "dark", "light", "system", "amoled", "black", "color", "palette", "emerald", "slate", "terracotta", "indigo", "monochrome", "wallpaper", "dynamic", "material you", "haptics", "vibration", "touch", "feedback")
     ),
     NOTIFICATIONS(
         title = "Notifications",
@@ -31,30 +31,23 @@ enum class SettingsSection(
         searchKeywords = listOf("notifications", "push", "alerts", "reminders", "weekly", "summary", "paycheck", "income", "amounts", "schedule", "test", "snapshot")
     ),
     WORKSPACE_NAVIGATION(
-        title = "Workspace & Navigation",
-        shortTitle = "Workspace",
-        subtitle = "Optional tools, transaction quick actions & More menu order",
+        title = "Turn On/Off App Features",
+        shortTitle = "App Features",
+        subtitle = "More menu destinations, MHA tracker & transaction quick actions",
         cluster = SettingsCluster.PERSONALIZE,
-        searchKeywords = listOf("navigation", "more", "menu", "reorder", "hide", "quick actions", "buttons", "mha", "ministerial", "housing", "clergy", "rewards", "credit card", "5/24", "strategy")
-    ),
-    SECURITY(
-        title = "Security & Feedback",
-        shortTitle = "Security",
-        subtitle = "Biometric app lock, auto-lock timeout & haptics",
-        cluster = SettingsCluster.PERSONALIZE,
-        searchKeywords = listOf("security", "biometric", "fingerprint", "face", "lock", "timeout", "haptics", "vibration", "touch")
+        searchKeywords = listOf("features", "navigation", "more", "menu", "reorder", "hide", "quick actions", "buttons", "mha", "ministerial", "housing", "clergy", "credit card", "goals", "upcoming", "household")
     ),
     SYNC_AND_SHARING(
         title = "Storage, Sync & Sharing",
         shortTitle = "Sync & Sharing",
-        subtitle = "Local or self-hosted server, SSO login & household partner access",
+        subtitle = "App lock, local or self-hosted server, SSO login & partner sharing",
         cluster = SettingsCluster.CONNECTIONS_DATA,
-        searchKeywords = listOf("storage", "local", "offline", "self-hosted", "server", "url", "sync", "sso", "oidc", "login", "password", "sign out", "migrate", "partner", "sharing", "household", "invite", "permissions", "read only")
+        searchKeywords = listOf("security", "biometric", "fingerprint", "face", "lock", "app lock", "timeout", "storage", "local", "offline", "self-hosted", "server", "url", "sync", "sso", "oidc", "login", "password", "sign out", "migrate", "partner", "sharing", "household", "invite", "permissions", "read only")
     ),
     BANK_FEEDS(
-        title = "Bank Feeds",
-        shortTitle = "Bank Feeds",
-        subtitle = "SimpleFIN bridge connection, sync cutover, logs & muted warnings",
+        title = "SimpleFIN Sync",
+        shortTitle = "SimpleFIN Sync",
+        subtitle = "Bank feed bridge connection, sync cutover, logs & muted warnings",
         cluster = SettingsCluster.CONNECTIONS_DATA,
         searchKeywords = listOf("simplefin", "bank", "feeds", "bridge", "token", "cutover", "sync", "history", "logs", "muted", "warnings", "accounts")
     ),

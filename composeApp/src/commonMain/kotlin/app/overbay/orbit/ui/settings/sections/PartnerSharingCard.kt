@@ -61,7 +61,7 @@ fun PartnerSharingCard(
                 )
             }
 
-            isLoading -> {
+            isLoading && sharingState == null -> {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),

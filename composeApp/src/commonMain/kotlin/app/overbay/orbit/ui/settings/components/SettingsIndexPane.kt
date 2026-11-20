@@ -58,32 +58,6 @@ fun LazyListScope.settingsIndexItems(
         return
     }
 
-    item(key = "settings_workspace_strip") {
-        val isSelfHosted = uiState.storageMode == StorageMode.SELF_HOSTED
-        val hostLabel = cleanHostLabel(uiState.preferences.selfHostedServerUrl)
-        val (badgeText, badgeIsError) = when {
-            !isSelfHosted -> "Offline" to false
-            uiState.isSyncing -> "Syncing" to false
-            uiState.syncStatus is SyncResult.Error -> "Error" to true
-            else -> "Synced" to false
-        }
-        SettingsGroupCard {
-            SettingsNavRow(
-                icon = OrbitIcons.CloudSync,
-                title = if (isSelfHosted) "Self-Hosted Server" else "On This Device",
-                valueSummary = if (isSelfHosted) {
-                    "Self-Hosted Server · $hostLabel"
-                } else {
-                    "On This Device · Offline"
-                },
-                badgeText = badgeText,
-                badgeIsError = badgeIsError,
-                isSelected = selectedSection == SettingsSection.SYNC_AND_SHARING,
-                onClick = { onSelectSection(SettingsSection.SYNC_AND_SHARING) }
-            )
-        }
-    }
-
     SettingsCluster.entries.forEach { cluster ->
         val sections = SettingsSection.entries.filter { it.cluster == cluster }
         item(key = "cluster_header_${cluster.name}") {
@@ -125,7 +99,8 @@ fun LazyListScope.settingsIndexItems(
 private fun sectionSummary(section: SettingsSection, uiState: SettingsUiState): String {
     val prefs = uiState.preferences
     return when (section) {
-        SettingsSection.APPEARANCE -> "${prefs.themePreset.displayName} · ${prefs.themeMode.shortLabel}"
+        SettingsSection.APPEARANCE ->
+            "${prefs.themePreset.displayName} · ${prefs.themeMode.shortLabel} · ${if (prefs.hapticsEnabled) "Haptics On" else "Haptics Off"}"
         SettingsSection.NOTIFICATIONS -> {
             val notif = prefs.notificationPreferences
             if (!notif.enabled) {
@@ -141,44 +116,40 @@ private fun sectionSummary(section: SettingsSection, uiState: SettingsUiState): 
             }
         }
         SettingsSection.WORKSPACE_NAVIGATION -> {
-            val hiddenCount = prefs.hiddenRouteNames.size
+            val hiddenCount = prefs.hiddenRouteNames.filterNot { it == "mha" }.size
             if (hiddenCount == 0) "Quick actions & More menu" else "$hiddenCount hidden in More menu"
-        }
-        SettingsSection.SECURITY -> {
-            val hapticsLabel = if (prefs.hapticsEnabled) "Haptics On" else "Haptics Off"
-            if (PlatformRuntime.isWeb) {
-                hapticsLabel
-            } else {
-                val lockLabel = if (prefs.biometricLockEnabled) "App Lock On" else "App Lock Off"
-                "$lockLabel · $hapticsLabel"
-            }
         }
         SettingsSection.SYNC_AND_SHARING -> {
             if (uiState.storageMode == StorageMode.LOCAL) {
                 "On This Device · Offline"
             } else {
+                val authTag = when (uiState.authMethod?.lowercase()) {
+                    "oidc" -> "OIDC"
+                    "password", "local" -> "Password"
+                    "sample" -> "Sample"
+                    else -> null
+                }
                 val statusLabel = when {
+                    !uiState.isAuthenticated -> "Sign in required"
                     uiState.isSyncing -> "Syncing"
                     uiState.syncStatus is SyncResult.Error -> "Error"
                     else -> "Synced"
                 }
-                "Self-Hosted · $statusLabel"
+                if (authTag != null) "Self-Hosted · $authTag · $statusLabel" else "Self-Hosted · $statusLabel"
             }
         }
         SettingsSection.BANK_FEEDS -> {
-            if (!prefs.simpleFinToken.isNullOrBlank()) "Connected" else "Not connected"
+            val isSimpleFinConnected = uiState.simpleFinStatus.connected ||
+                (uiState.storageMode == StorageMode.LOCAL && !prefs.simpleFinToken.isNullOrBlank())
+            when {
+                !isSimpleFinConnected -> "Not connected"
+                uiState.simpleFinStatus.lastSyncStatus.equals("error", ignoreCase = true) -> "Connected · Sync issue"
+                else -> "Connected"
+            }
         }
         SettingsSection.DATA_AND_BACKUPS -> {
             if (prefs.googleDriveSyncEnabled) "Drive sync on · Exports & rules" else "Exports, Drive & rules"
         }
         SettingsSection.ABOUT -> "v${PlatformRuntime.appVersionName}"
     }
-}
-
-private fun cleanHostLabel(rawUrl: String): String {
-    val cleaned = rawUrl.trim()
-        .removePrefix("https://")
-        .removePrefix("http://")
-        .trimEnd('/')
-    return cleaned.ifBlank { "Same Origin" }
 }

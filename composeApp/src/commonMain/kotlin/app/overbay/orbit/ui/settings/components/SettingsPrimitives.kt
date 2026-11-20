@@ -44,7 +44,6 @@ fun SettingsSection.icon(): ImageVector = when (this) {
     SettingsSection.APPEARANCE -> OrbitIcons.Palette
     SettingsSection.NOTIFICATIONS -> OrbitIcons.Notifications
     SettingsSection.WORKSPACE_NAVIGATION -> OrbitIcons.ViewSliders
-    SettingsSection.SECURITY -> OrbitIcons.ShieldLock
     SettingsSection.SYNC_AND_SHARING -> OrbitIcons.CloudSync
     SettingsSection.BANK_FEEDS -> OrbitIcons.BankLink
     SettingsSection.DATA_AND_BACKUPS -> OrbitIcons.BackupArchive

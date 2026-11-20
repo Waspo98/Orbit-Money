@@ -103,6 +103,7 @@ fun RuleDetailInspectorPane(
                         rule = rule,
                         categoryMap = state.categoryMap,
                         accountMap = accountMap,
+                        mhaEnabled = state.mhaEnabled,
                         isApplyingRules = state.isApplyingRules,
                         onToggleEnabled = { enabled -> onToggleEnabled(rule.id, enabled) },
                         onOpenEdit = { onOpenEdit(rule) },
@@ -123,6 +124,7 @@ private fun RuleInspectorDetailView(
     rule: TransactionRule,
     categoryMap: Map<Long, Category>,
     accountMap: Map<Long, String>,
+    mhaEnabled: Boolean,
     isApplyingRules: Boolean,
     onToggleEnabled: (Boolean) -> Unit,
     onOpenEdit: () -> Unit,
@@ -279,21 +281,22 @@ private fun RuleInspectorDetailView(
                 modifier = Modifier.padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                val visibleActions = if (mhaEnabled) rule.actions else rule.actions.filterNot { it.type == app.overbay.orbit.data.model.RuleActionType.SET_MHA_ELIGIBLE }
                 Text(
-                    text = "THEN PERFORM ACTIONS (${rule.actions.size})",
+                    text = "THEN PERFORM ACTIONS (${visibleActions.size})",
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.secondary
                 )
 
-                if (rule.actions.isEmpty()) {
+                if (visibleActions.isEmpty()) {
                     Text(
                         text = "No actions defined",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline
                     )
                 } else {
-                    rule.actions.forEach { act ->
+                    visibleActions.forEach { act ->
                         Surface(
                             shape = RoundedCornerShape(10.dp),
                             color = MaterialTheme.colorScheme.secondaryContainer,

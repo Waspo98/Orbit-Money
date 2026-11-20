@@ -8,6 +8,7 @@ import app.overbay.orbit.data.model.NotificationPreferencesConfig
 import app.overbay.orbit.data.model.OrbitThemeMode
 import app.overbay.orbit.data.model.OrbitThemePreset
 import app.overbay.orbit.data.model.StorageMode
+import app.overbay.orbit.data.refreshSimpleFinStatus
 import app.overbay.orbit.data.sendTestNotification
 import app.overbay.orbit.data.setMhaEnabled
 import app.overbay.orbit.data.updateNotificationPreferences
@@ -79,13 +80,36 @@ class SettingsViewModel(
                 _uiState.update { it.copy(accounts = accounts) }
             }
         }
+        scope.launch {
+            repository.simpleFinStatus.collect { status ->
+                _uiState.update { it.copy(simpleFinStatus = status) }
+            }
+        }
+        scope.launch {
+            repository.isAuthenticated.collect { authed ->
+                _uiState.update { it.copy(isAuthenticated = authed) }
+            }
+        }
+        scope.launch {
+            repository.currentUser.collect { user ->
+                _uiState.update { it.copy(currentUser = user) }
+            }
+        }
+        scope.launch {
+            repository.authMethod.collect { method ->
+                _uiState.update { it.copy(authMethod = method) }
+            }
+        }
     }
 
     fun openSection(section: SettingsSection?) {
         _uiState.update { it.copy(activeSection = section, isSearchActive = false) }
         when (section) {
             SettingsSection.NOTIFICATIONS -> loadPushConfig()
-            SettingsSection.BANK_FEEDS -> loadSimpleFinLogs()
+            SettingsSection.BANK_FEEDS -> {
+                refreshSimpleFinStatus()
+                loadSimpleFinLogs()
+            }
             SettingsSection.SYNC_AND_SHARING -> loadHouseholdSharing()
             else -> Unit
         }
@@ -155,15 +179,19 @@ class SettingsViewModel(
     }
 
     fun setMhaTrackerEnabled(enabled: Boolean) {
-        val updated = _uiState.value.preferences.copy(mhaTrackerEnabled = enabled)
+        val currentHidden = _uiState.value.preferences.hiddenRouteNames
+        val cleanedHidden = if (enabled) currentHidden.filterNot { it == "mha" } else currentHidden
+        val updated = _uiState.value.preferences.copy(
+            mhaTrackerEnabled = enabled,
+            hiddenRouteNames = cleanedHidden
+        )
         _uiState.update { it.copy(preferences = updated) }
-        scope.launch { repository.setMhaEnabled(enabled) }
-    }
-
-    fun setCardRewardsToolsEnabled(enabled: Boolean?) {
-        val updated = _uiState.value.preferences.copy(cardRewardsToolsEnabled = enabled)
-        _uiState.update { it.copy(preferences = updated) }
-        scope.launch { repository.updatePreferences(updated) }
+        scope.launch {
+            if (cleanedHidden != currentHidden) {
+                repository.updatePreferences(updated)
+            }
+            repository.setMhaEnabled(enabled)
+        }
     }
 
     fun toggleRouteHidden(routeName: String) {
@@ -231,6 +259,7 @@ class SettingsViewModel(
     fun setStorageMode(mode: StorageMode) = syncSharingController.setStorageMode(mode)
     fun setServerUrl(url: String) = syncSharingController.setServerUrl(url)
     fun updateServerUrlDraft(url: String) = syncSharingController.updateServerUrlDraft(url)
+    fun setShowReauthOptions(show: Boolean) = syncSharingController.setShowReauthOptions(show)
     fun setShowServerPasswordLogin(show: Boolean) = syncSharingController.setShowServerPasswordLogin(show)
     fun updateServerUsernameDraft(username: String) = syncSharingController.updateServerUsernameDraft(username)
     fun updateServerPasswordDraft(password: String) = syncSharingController.updateServerPasswordDraft(password)
@@ -243,6 +272,9 @@ class SettingsViewModel(
     fun logout() = syncSharingController.logout()
     fun setupSimpleFinBridge(token: String, cutoverDate: String?) =
         syncSharingController.setupSimpleFinBridge(token, cutoverDate)
+    fun refreshSimpleFinStatus() {
+        scope.launch { repository.refreshSimpleFinStatus() }
+    }
     fun disconnectSimpleFin() = syncSharingController.disconnectSimpleFin()
     fun loadSimpleFinLogs() = syncSharingController.loadSimpleFinLogs()
     fun toggleSimpleFinLogsExpanded() = syncSharingController.toggleSimpleFinLogsExpanded()

@@ -40,6 +40,7 @@ function setSessionIdentity(req, identity) {
     ? 'write'
     : identity.accessLevel || 'write';
   req.session.householdName = identity.householdName || null;
+  req.session.authMethod = identity.authMethod || null;
 }
 
 function currentSessionPayload(req) {
@@ -49,6 +50,7 @@ function currentSessionPayload(req) {
     email: req.session.email || null,
     displayName: req.session.displayName || req.session.username,
     authProvider: authProvider(),
+    authMethod: req.session.authMethod || null,
     household: {
       id: req.session.householdId || 1,
       name: req.session.householdName || null,
@@ -119,7 +121,8 @@ router.post('/login', (req, res) => {
       householdId: membership?.household_id || 1,
       role: membership?.role || 'owner',
       accessLevel: membership?.access_level || 'write',
-      householdName: membership?.name || 'My Household'
+      householdName: membership?.name || 'My Household',
+      authMethod: 'password'
     });
     return sendOk(res, { success: true, ...currentSessionPayload(req) });
   }
@@ -185,7 +188,8 @@ router.post('/sample', (req, res) => {
       householdId: membership.household_id,
       role: membership.role || 'owner',
       accessLevel: membership.access_level || 'write',
-      householdName: membership.name || 'Sample Data'
+      householdName: membership.name || 'Sample Data',
+      authMethod: 'sample'
     });
     return sendOk(res, { success: true, sample: true, ...currentSessionPayload(req) });
   } catch (err) {
@@ -277,7 +281,7 @@ router.get('/oidc/callback', async (req, res) => {
 </html>`);
     }
 
-    setSessionIdentity(req, identity);
+    setSessionIdentity(req, { ...identity, authMethod: 'oidc' });
     res.redirect('/');
   } catch (err) {
     console.error('OIDC callback failed:', err);
@@ -296,7 +300,7 @@ router.post('/oidc/native-exchange', (req, res) => {
     return sendUnauthorized(res, 'Invalid or expired exchange code');
   }
 
-  setSessionIdentity(req, exchange.identity);
+  setSessionIdentity(req, { ...exchange.identity, authMethod: 'oidc' });
   return sendOk(res, { success: true, ...currentSessionPayload(req) });
 });
 

@@ -311,7 +311,7 @@ class LoginViewModel(
             if (result.isSuccess) {
                 val me = result.getOrThrow()
                 val userLabel = me.displayName ?: me.username ?: state.username.trim()
-                repository.markAuthenticated(normalizedUrl, userLabel)
+                repository.markAuthenticated(normalizedUrl, userLabel, me.authMethod ?: "password")
                 modifyState { it.copy(isSubmitting = false, isAuthenticated = true) }
             } else {
                 val msg = result.exceptionOrNull()?.message ?: "Invalid username or password"
@@ -348,7 +348,7 @@ class LoginViewModel(
             if (result.isSuccess) {
                 val me = result.getOrThrow()
                 val userLabel = me.displayName ?: "Sample Data"
-                repository.markAuthenticated(normalizedUrl, userLabel)
+                repository.markAuthenticated(normalizedUrl, userLabel, me.authMethod ?: "sample")
                 modifyState { it.copy(isSampleLoading = false, isAuthenticated = true) }
             } else {
                 modifyState {

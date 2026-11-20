@@ -17,6 +17,7 @@ data class RulesUiState(
     val showWipeAllRulesDialog: Boolean = false,
     val searchQuery: String = "",
     val ruleMatchCounts: Map<Long, Int> = emptyMap(),
+    val mhaEnabled: Boolean = false,
     val isLoading: Boolean = false
 ) {
     val enabledRulesCount: Int get() = rules.count { it.enabled }

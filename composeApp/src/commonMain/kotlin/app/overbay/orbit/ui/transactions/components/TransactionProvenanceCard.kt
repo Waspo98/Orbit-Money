@@ -52,6 +52,7 @@ fun TransactionProvenanceCard(
     transaction: Transaction,
     onResetToOriginal: (Long) -> Unit,
     modifier: Modifier = Modifier,
+    mhaEnabled: Boolean = false,
     onResetField: ((String) -> Unit)? = null,
     onViewRule: ((Long) -> Unit)? = null,
     onViewBudgetMonth: ((String) -> Unit)? = null,
@@ -104,15 +105,20 @@ fun TransactionProvenanceCard(
             isEdited = transaction.editedIsIgnored != null,
             source = transaction.editedIsIgnoredSource,
             originalText = if (transaction.isIgnored) "Yes" else "No"
-        ),
-        FieldProvenanceInfo(
-            fieldKey = "mha",
-            label = "MHA",
-            isEdited = transaction.editedMhaEligibleSource != null,
-            source = transaction.editedMhaEligibleSource,
-            originalText = "Default"
         )
-    )
+    ) + if (mhaEnabled) {
+        listOf(
+            FieldProvenanceInfo(
+                fieldKey = "mha",
+                label = "MHA",
+                isEdited = transaction.editedMhaEligibleSource != null,
+                source = transaction.editedMhaEligibleSource,
+                originalText = "Default"
+            )
+        )
+    } else {
+        emptyList()
+    }
 
     val editedFields = fields.filter { it.isEdited }
     val hasEdits = editedFields.isNotEmpty() || transaction.editSource == EditSource.USER

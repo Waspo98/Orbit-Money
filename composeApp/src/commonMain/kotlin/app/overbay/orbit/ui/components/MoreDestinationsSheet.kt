@@ -81,22 +81,6 @@ fun MoreDestinationsSheet(
         visibleSecondary
     }
 
-    val planningGroup = orderedSecondary.filter {
-        it.key is OrbitNavKey.CardPerks || it.key in listOf(OrbitNavKey.Upcoming, OrbitNavKey.Goals, OrbitNavKey.Categories, OrbitNavKey.Rules)
-    }
-
-    val insightsGroup = orderedSecondary.filter {
-        it.key in listOf(OrbitNavKey.SpendingTrends, OrbitNavKey.NetWorth, OrbitNavKey.MhaTracker)
-    }
-
-    val calculatorsGroup = orderedSecondary.filter {
-        it.key in listOf(OrbitNavKey.HousingCalculator, OrbitNavKey.RetirementCalculator)
-    }
-
-    val householdGroup = orderedSecondary.filter {
-        it.key == OrbitNavKey.Household
-    }
-
     val systemGroup = listOf(
         DestinationItem(OrbitNavKey.Settings(), "Settings", "Preferences, sync connections & backups", OrbitIcons.Settings)
     )
@@ -120,23 +104,8 @@ fun MoreDestinationsSheet(
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
-            if (planningGroup.isNotEmpty()) {
-                DestinationSection("Planning & Tracking", planningGroup, currentKey, onNavigate, onDismiss, haptics::tick)
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-
-            if (insightsGroup.isNotEmpty()) {
-                DestinationSection("Reports & Trends", insightsGroup, currentKey, onNavigate, onDismiss, haptics::tick)
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-
-            if (calculatorsGroup.isNotEmpty()) {
-                DestinationSection("Calculators", calculatorsGroup, currentKey, onNavigate, onDismiss, haptics::tick)
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-
-            if (householdGroup.isNotEmpty()) {
-                DestinationSection("Household", householdGroup, currentKey, onNavigate, onDismiss, haptics::tick)
+            if (orderedSecondary.isNotEmpty()) {
+                DestinationSection("More Tools", orderedSecondary, currentKey, onNavigate, onDismiss, haptics::tick)
                 Spacer(modifier = Modifier.height(16.dp))
             }
 

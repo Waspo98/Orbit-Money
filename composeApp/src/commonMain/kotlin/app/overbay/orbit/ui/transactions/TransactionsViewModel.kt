@@ -47,6 +47,16 @@ class TransactionsViewModel(
     private val _isSyncing = MutableStateFlow(false)
     private val _syncToastMessage = MutableStateFlow<String?>(null)
 
+    init {
+        viewModelScope.launch {
+            repository.preferences.collect { prefs ->
+                if (!prefs.mhaTrackerEnabled && _quickFilter.value == QuickFilter.MHA) {
+                    _quickFilter.value = QuickFilter.ALL
+                }
+            }
+        }
+    }
+
     private val dataFlow = combine(
         repository.transactions,
         repository.categories,

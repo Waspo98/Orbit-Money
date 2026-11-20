@@ -43,7 +43,8 @@ class RulesViewModel(
         val categories: List<Category>,
         val accounts: List<Account>,
         val categoryMap: Map<Long, Category>,
-        val matchCounts: Map<Long, Int>
+        val matchCounts: Map<Long, Int>,
+        val mhaEnabled: Boolean
     )
 
     init {
@@ -64,8 +65,9 @@ class RulesViewModel(
         repository.rules,
         repository.categories,
         repository.accounts,
-        repository.transactions
-    ) { rules, categories, accounts, transactions ->
+        repository.transactions,
+        repository.preferences
+    ) { rules, categories, accounts, transactions, preferences ->
         val sorted = rules.sortedWith(
             compareByDescending<TransactionRule> { it.priority }.thenBy { it.id }
         )
@@ -73,7 +75,7 @@ class RulesViewModel(
         val matchCounts = sorted.associate { rule ->
             rule.id to transactions.count { txn -> RuleMatcherEngine.matchesRule(txn, rule) }
         }
-        RulesDataSnapshot(sorted, categories, accounts, categoryMap, matchCounts)
+        RulesDataSnapshot(sorted, categories, accounts, categoryMap, matchCounts, preferences.mhaTrackerEnabled)
     }
 
     private val editorFlow = combine(
@@ -124,6 +126,7 @@ class RulesViewModel(
             accounts = dataSnap.accounts,
             categoryMap = dataSnap.categoryMap,
             ruleMatchCounts = dataSnap.matchCounts,
+            mhaEnabled = dataSnap.mhaEnabled,
             searchQuery = query
         )
     }.flowOn(computeDispatcher).stateIn(

@@ -72,6 +72,10 @@ class SettingsSyncSharingController(
         }
     }
 
+    fun setShowReauthOptions(show: Boolean) {
+        uiState.update { it.copy(showReauthOptions = show) }
+    }
+
     fun setShowServerPasswordLogin(show: Boolean) {
         uiState.update { it.copy(showServerPasswordLogin = show) }
     }
@@ -119,15 +123,19 @@ class SettingsSyncSharingController(
             val client = repository.createApiClient(normalizedUrl)
             val loginRes = client.login(username.trim(), password)
             if (loginRes.isSuccess) {
-                repository.setStorageMode(StorageMode.SELF_HOSTED, normalizedUrl)
+                val me = loginRes.getOrNull()
+                val userLabel = me?.displayName ?: me?.username ?: username.trim()
+                val authMethod = me?.authMethod ?: "password"
+                repository.markAuthenticated(normalizedUrl, userLabel, authMethod)
                 val txCount = repository.transactions.value.size
                 uiState.update {
                     it.copy(
                         isSyncing = false,
                         serverPasswordDraft = "",
+                        showReauthOptions = false,
                         showServerPasswordLogin = false,
-                        syncStatus = SyncResult.Success("Signed in as ${username.trim()} ($txCount transactions)"),
-                        statusMessage = "Logged in as ${username.trim()}"
+                        syncStatus = SyncResult.Success("Signed in as $userLabel ($txCount transactions)"),
+                        statusMessage = "Logged in as $userLabel"
                     )
                 }
                 loadHouseholdSharing()
@@ -168,6 +176,7 @@ class SettingsSyncSharingController(
             it.copy(
                 activeDialog = SettingsDialogState.None,
                 serverPasswordDraft = "",
+                showReauthOptions = false,
                 showServerPasswordLogin = false
             )
         }
@@ -264,13 +273,15 @@ class SettingsSyncSharingController(
         }
     }
 
-    fun loadHouseholdSharing() {
-        uiState.update { it.copy(isLoadingSharing = true) }
+    fun loadHouseholdSharing(showLoading: Boolean = uiState.value.householdSharing == null) {
+        if (showLoading) {
+            uiState.update { it.copy(isLoadingSharing = true) }
+        }
         scope.launch {
             val res = repository.fetchHouseholdSharing()
             uiState.update {
                 it.copy(
-                    householdSharing = res.getOrNull(),
+                    householdSharing = res.getOrNull() ?: it.householdSharing,
                     isLoadingSharing = false
                 )
             }
@@ -297,7 +308,7 @@ class SettingsSyncSharingController(
                         statusMessage = "Invitation sent to $trimmedEmail"
                     )
                 }
-                loadHouseholdSharing()
+                loadHouseholdSharing(showLoading = false)
             } else {
                 val err = res.exceptionOrNull()?.message ?: "Unknown error"
                 val message = "Invite failed: $err"
@@ -313,16 +324,48 @@ class SettingsSyncSharingController(
     }
 
     fun updatePartnerAccess(shareId: Long, accessLevel: String) {
+        val previous = uiState.value.householdSharing
+        if (previous != null) {
+            val optimisticShares = previous.shares.map {
+                if (it.id == shareId) it.copy(accessLevel = accessLevel) else it
+            }
+            uiState.update { it.copy(householdSharing = previous.copy(shares = optimisticShares)) }
+        }
         scope.launch {
-            repository.updatePartnerShareAccess(shareId, accessLevel)
-            loadHouseholdSharing()
+            val res = repository.updatePartnerShareAccess(shareId, accessLevel)
+            if (res.isSuccess) {
+                loadHouseholdSharing(showLoading = false)
+            } else {
+                uiState.update {
+                    it.copy(
+                        householdSharing = previous,
+                        statusMessage = "Could not update share access"
+                    )
+                }
+            }
         }
     }
 
     fun updateHouseholdMemberAccess(userId: Long, accessLevel: String) {
+        val previous = uiState.value.householdSharing
+        if (previous != null) {
+            val optimisticUsers = previous.users.map {
+                if (it.id == userId) it.copy(accessLevel = accessLevel) else it
+            }
+            uiState.update { it.copy(householdSharing = previous.copy(users = optimisticUsers)) }
+        }
         scope.launch {
-            repository.updateHouseholdMemberUserAccess(userId, accessLevel)
-            loadHouseholdSharing()
+            val res = repository.updateHouseholdMemberUserAccess(userId, accessLevel)
+            if (res.isSuccess) {
+                loadHouseholdSharing(showLoading = false)
+            } else {
+                uiState.update {
+                    it.copy(
+                        householdSharing = previous,
+                        statusMessage = "Could not update member access"
+                    )
+                }
+            }
         }
     }
 
@@ -330,7 +373,7 @@ class SettingsSyncSharingController(
         uiState.update { it.copy(activeDialog = SettingsDialogState.None) }
         scope.launch {
             repository.revokePartnerShare(shareId)
-            loadHouseholdSharing()
+            loadHouseholdSharing(showLoading = false)
         }
     }
 
@@ -338,7 +381,7 @@ class SettingsSyncSharingController(
         uiState.update { it.copy(activeDialog = SettingsDialogState.None) }
         scope.launch {
             repository.removeHouseholdMemberUser(userId)
-            loadHouseholdSharing()
+            loadHouseholdSharing(showLoading = false)
         }
     }
 }

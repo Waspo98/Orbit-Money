@@ -493,6 +493,7 @@ data class AuthMeResponseDto(
     val email: String? = null,
     val displayName: String? = null,
     val authProvider: String? = null,
+    val authMethod: String? = null,
     val user: UserDto? = null,
     val household: HouseholdDto? = null
 )

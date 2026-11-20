@@ -8,6 +8,7 @@ import app.overbay.orbit.data.model.HouseholdSharingState
 import app.overbay.orbit.data.model.HouseholdUserAccess
 import app.overbay.orbit.data.model.OrbitPreferences
 import app.overbay.orbit.data.model.PushNotificationConfigInfo
+import app.overbay.orbit.data.model.SimpleFinStatusInfo
 import app.overbay.orbit.data.model.SimpleFinSyncLogEntry
 import app.overbay.orbit.data.model.StorageMode
 
@@ -60,6 +61,9 @@ data class SettingsUiState(
     val storageMode: StorageMode = StorageMode.LOCAL,
     val syncStatus: SyncResult = SyncResult.NoOp,
     val isSyncing: Boolean = false,
+    val isAuthenticated: Boolean = true,
+    val currentUser: String? = null,
+    val authMethod: String? = null,
     val activeSection: SettingsSection? = null,
     val searchQuery: String = "",
     val isSearchActive: Boolean = false,
@@ -67,11 +71,13 @@ data class SettingsUiState(
     val accounts: List<Account> = emptyList(),
     val pushConfig: PushNotificationConfigInfo = PushNotificationConfigInfo(),
     val isPushTesting: Boolean = false,
+    val simpleFinStatus: SimpleFinStatusInfo = SimpleFinStatusInfo(),
     val simpleFinLogs: List<SimpleFinSyncLogEntry> = emptyList(),
     val isSimpleFinLogsExpanded: Boolean = false,
     val isLoadingSimpleFinLogs: Boolean = false,
     val isConnectingSimpleFin: Boolean = false,
     val serverUrlDraft: String = "",
+    val showReauthOptions: Boolean = false,
     val showServerPasswordLogin: Boolean = false,
     val serverUsernameDraft: String = "",
     val serverPasswordDraft: String = "",

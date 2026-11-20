@@ -70,6 +70,8 @@ class OrbitRepository(
     val isAuthenticated: StateFlow<Boolean> = _isAuthenticated.asStateFlow()
     internal val _currentUser = MutableStateFlow<String?>(null)
     val currentUser: StateFlow<String?> = _currentUser.asStateFlow()
+    internal val _authMethod = MutableStateFlow<String?>(null)
+    val authMethod: StateFlow<String?> = _authMethod.asStateFlow()
 
     internal val _isOffline = MutableStateFlow(false)
     val isOffline: StateFlow<Boolean> = _isOffline.asStateFlow()
@@ -129,57 +131,23 @@ class OrbitRepository(
             val cachedSnap = remoteEngine.loadCachedSnapshot()?.copy(preferences = pref) ?: (localSnap ?: localEngine.loadSnapshot()).copy(preferences = pref)
             val hasSession = !client.sessionCookie.isNullOrBlank() || cachedSnap.accounts.isNotEmpty() || cachedSnap.transactions.isNotEmpty()
             _isAuthenticated.value = hasSession
+            _authMethod.value = if (hasSession) storage.loadString(AUTH_METHOD_STORAGE_KEY) else null
             updateMemoryState(cachedSnap)
-            if (customApiClient == null) scope.launch { refreshSelfHostedSession(client, remoteEngine, pref, pendingOidcUrl, hasSession) }
-            else refreshSelfHostedSession(client, remoteEngine, pref, pendingOidcUrl, hasSession)
+            if (customApiClient == null) scope.launch { refreshSelfHostedSessionImpl(client, remoteEngine, pref, hasSession) }
+            else refreshSelfHostedSessionImpl(client, remoteEngine, pref, hasSession)
         } else {
             _isAuthenticated.value = true
+            _authMethod.value = null
             activeEngine = localEngine
             val rawLocal = (localSnap ?: localEngine.loadSnapshot()).copy(preferences = pref)
             val hydratedLocal = BalanceHistoryEngine.ensureDailySnapshotCheckpoints(rawLocal, LocalDateUtils.todayIsoDate())
+            _simpleFinStatus.value = SimpleFinStatusInfo(
+                configured = !pref.simpleFinToken.isNullOrBlank(),
+                connected = !pref.simpleFinToken.isNullOrBlank(),
+                cutoverDate = pref.simpleFinCutoverDate
+            )
             updateMemoryState(hydratedLocal)
             if (hydratedLocal.balanceRecords !== rawLocal.balanceRecords) localEngine.saveSnapshot(hydratedLocal)
-        }
-    }
-
-    private suspend fun refreshSelfHostedSession(
-        client: OrbitApiClient,
-        remoteEngine: SelfHostedApiEngine,
-        pref: OrbitPreferences,
-        pendingOidcUrl: String?,
-        hadCachedSession: Boolean
-    ) {
-        val meResult = client.getMe()
-        val me = meResult.getOrNull()
-        if (me != null && me.authenticated) {
-            _isOffline.value = false
-            storage.delete(OidcCallbackBridge.PENDING_SERVER_URL_KEY)
-            _isAuthenticated.value = true
-            _currentUser.value = me.displayName ?: me.username ?: me.email
-            val loaded = remoteEngine.loadSnapshot(preFetchedMe = me)
-            val existing = _snapshot.value
-            val sameData = loaded.copy(preferences = loaded.preferences.copy(sharedSessionCachedAtEpochMs = existing.preferences.sharedSessionCachedAtEpochMs)) == existing
-            if (!sameData) updateMemoryState(loaded) else _preferences.value = loaded.preferences
-            localEngine.saveStartupPreferences(loaded.preferences)
-        } else {
-            val errMsg = meResult.exceptionOrNull()?.message.orEmpty()
-            val is401 = (me != null && !me.authenticated) || errMsg.contains("401") || !hadCachedSession
-            if (is401) {
-                _isOffline.value = false
-                _isAuthenticated.value = false
-                _currentUser.value = null
-            } else if (hadCachedSession) {
-                _isOffline.value = true
-                val cachedEpoch = pref.sharedSessionCachedAtEpochMs
-                if (pref.isSharedNonOwnerSession && cachedEpoch != null) {
-                    val ageMs = Clock.System.now().toEpochMilliseconds() - cachedEpoch
-                    if (ageMs > 7L * 24 * 3600 * 1000L) {
-                        _isAuthenticated.value = false
-                        _currentUser.value = null
-                        activeEngine.clear()
-                    }
-                }
-            }
         }
     }
 
@@ -209,7 +177,10 @@ class OrbitRepository(
         val updatedPref = _preferences.value.copy(storageMode = mode, selfHostedServerUrl = normalizedUrl)
         _storageMode.value = mode
         _preferences.value = updatedPref
-        if (mode == StorageMode.LOCAL) _isAuthenticated.value = true
+        if (mode == StorageMode.LOCAL) {
+            _isAuthenticated.value = true
+            _authMethod.value = null
+        }
         activeEngine = if (mode == StorageMode.SELF_HOSTED) {
             SelfHostedApiEngine(createApiClient(normalizedUrl), storage) { _preferences.value }
         } else localEngine
@@ -219,6 +190,15 @@ class OrbitRepository(
             selfHostedServerUrl = if (serverUrl != null) normalizedUrl else _preferences.value.selfHostedServerUrl
         )
         commitSnapshot(loaded.copy(preferences = latestPref), immediate = true)
+        if (mode == StorageMode.SELF_HOSTED) {
+            refreshSimpleFinStatus()
+        } else {
+            _simpleFinStatus.value = SimpleFinStatusInfo(
+                configured = !latestPref.simpleFinToken.isNullOrBlank(),
+                connected = !latestPref.simpleFinToken.isNullOrBlank(),
+                cutoverDate = latestPref.simpleFinCutoverDate
+            )
+        }
     }
 
     suspend fun prepareForOidcLogin(serverUrl: String) {
@@ -228,27 +208,34 @@ class OrbitRepository(
         _preferences.value = updatedPref
         _storageMode.value = StorageMode.SELF_HOSTED
         _isAuthenticated.value = false
+        persistAuthMethod(null)
         localEngine.saveStartupPreferences(updatedPref)
     }
 
-    suspend fun markAuthenticated(serverUrl: String, userLabel: String) {
+    suspend fun markAuthenticated(serverUrl: String, userLabel: String, authMethod: String? = null) {
         val normalizedUrl = ServerUrlNormalizer.normalize(serverUrl)
         val updatedPref = _preferences.value.copy(storageMode = StorageMode.SELF_HOSTED, selfHostedServerUrl = normalizedUrl, onboardingCompleted = true)
         _preferences.value = updatedPref
         _storageMode.value = StorageMode.SELF_HOSTED
         _isAuthenticated.value = true
         _currentUser.value = userLabel
+        if (!authMethod.isNullOrBlank()) {
+            persistAuthMethod(authMethod)
+        }
         localEngine.saveStartupPreferences(updatedPref)
         activeEngine = SelfHostedApiEngine(createApiClient(normalizedUrl), storage) { _preferences.value }
         val fresh = activeEngine.loadSnapshot()
         commitSnapshot(fresh, immediate = true)
+        refreshSimpleFinStatus()
         _syncStatus.value = SyncResult.Success("Signed in as $userLabel (${fresh.transactions.size} transactions)")
     }
 
     suspend fun logout() {
         _isAuthenticated.value = false
         _currentUser.value = null
+        persistAuthMethod(null)
         _syncStatus.value = SyncResult.NoOp
+        _simpleFinStatus.value = SimpleFinStatusInfo()
         val clearedPrefs = _preferences.value.copy(handledReviewTransactionIds = emptyList())
         _preferences.value = clearedPrefs
         localEngine.saveStartupPreferences(clearedPrefs)
@@ -264,7 +251,7 @@ class OrbitRepository(
         val client = createApiClient(serverUrl)
         val authMe = client.exchangeOidcCode(code).getOrThrow()
         val userLabel = authMe.displayName ?: authMe.username ?: authMe.email ?: "SSO User"
-        markAuthenticated(serverUrl, userLabel)
+        markAuthenticated(serverUrl, userLabel, authMe.authMethod ?: "oidc")
         userLabel
     }
 
@@ -576,6 +563,9 @@ class OrbitRepository(
         if (result is SyncResult.Success) {
             val fresh = (activeEngine as? SelfHostedApiEngine)?.consumeLastSyncedSnapshot() ?: activeEngine.loadSnapshot()
             commitSnapshot(fresh, immediate = true)
+            if (_storageMode.value == StorageMode.SELF_HOSTED) {
+                refreshSimpleFinStatus()
+            }
         }
         return result
     }

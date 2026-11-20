@@ -22,7 +22,8 @@ fun LazyListScope.settingsSectionItems(
             onThemeModeChange = viewModel::setThemeMode,
             onAmoledDarkChange = viewModel::setAmoledDark,
             onPresetChange = viewModel::setThemePreset,
-            onDynamicColorChange = viewModel::setDynamicColor
+            onDynamicColorChange = viewModel::setDynamicColor,
+            onHapticsChange = viewModel::setHapticsEnabled
         )
         SettingsSection.NOTIFICATIONS -> notificationsSectionItems(
             preferences = uiState.preferences,
@@ -35,22 +36,18 @@ fun LazyListScope.settingsSectionItems(
         SettingsSection.WORKSPACE_NAVIGATION -> workspaceNavigationSectionItems(
             preferences = uiState.preferences,
             onMhaTrackerChange = viewModel::setMhaTrackerEnabled,
-            onCardRewardsToolsChange = viewModel::setCardRewardsToolsEnabled,
             onOpenTransactionActions = { viewModel.showDialog(SettingsDialogState.TransactionQuickActions) },
             onToggleRouteHidden = viewModel::toggleRouteHidden,
             onMoveRoute = viewModel::moveRouteOrder
         )
-        SettingsSection.SECURITY -> securitySectionItems(
-            preferences = uiState.preferences,
-            onBiometricLockChange = viewModel::setBiometricLock,
-            onBiometricTimeoutChange = viewModel::setBiometricTimeoutSeconds,
-            onHapticsChange = viewModel::setHapticsEnabled
-        )
         SettingsSection.SYNC_AND_SHARING -> syncAndSharingSectionItems(
             uiState = uiState,
+            onBiometricLockChange = viewModel::setBiometricLock,
+            onBiometricTimeoutChange = viewModel::setBiometricTimeoutSeconds,
             onStorageModeChange = viewModel::setStorageMode,
             onServerUrlDraftChange = viewModel::updateServerUrlDraft,
             onCommitServerUrl = viewModel::setServerUrl,
+            onToggleReauthOptions = viewModel::setShowReauthOptions,
             onTogglePasswordAuth = viewModel::setShowServerPasswordLogin,
             onUsernameDraftChange = viewModel::updateServerUsernameDraft,
             onPasswordDraftChange = viewModel::updateServerPasswordDraft,

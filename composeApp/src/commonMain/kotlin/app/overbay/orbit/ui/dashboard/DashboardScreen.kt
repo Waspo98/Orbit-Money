@@ -294,8 +294,13 @@ fun DashboardScreen(
 
         // Customization Bottom Sheet
         if (uiState.customization.isCustomizing) {
+            val customizableCards = remember(uiState.customization.cardConfigs, uiState.mhaEnabled) {
+                uiState.customization.cardConfigs.filter {
+                    it.type != DashboardCardType.MHA_SUMMARY || uiState.mhaEnabled
+                }
+            }
             DashboardCustomizeSheet(
-                cards = uiState.customization.cardConfigs,
+                cards = customizableCards,
                 onAction = onAction,
                 onDismiss = { onAction(DashboardAction.CloseCustomizeSheet) }
             )

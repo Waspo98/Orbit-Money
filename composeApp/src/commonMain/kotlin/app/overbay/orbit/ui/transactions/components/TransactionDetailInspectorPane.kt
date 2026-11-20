@@ -258,6 +258,7 @@ private fun TransactionReadOnlyDetailContent(
         TransactionProvenanceCard(
             transaction = transaction,
             onResetToOriginal = { onResetAll() },
+            mhaEnabled = mhaEnabled,
             onResetField = onResetField,
             onViewRule = onViewRule,
             onViewBudgetMonth = onViewBudgetMonth,

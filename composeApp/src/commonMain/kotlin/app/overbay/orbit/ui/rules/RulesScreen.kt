@@ -231,6 +231,7 @@ fun RulesScreen(
                                                 categoryMap = state.categoryMap,
                                                 accountMap = accountMap,
                                                 matchCount = state.ruleMatchCounts[rule.id] ?: 0,
+                                                mhaEnabled = state.mhaEnabled,
                                                 isInspected = isTwoPane && state.inspectingRuleId == rule.id,
                                                 onClick = if (isTwoPane) {
                                                     { viewModel.selectRuleForInspect(rule.id) }

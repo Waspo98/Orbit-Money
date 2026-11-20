@@ -102,6 +102,7 @@ fun CategoryDetailInspectorPane(
                     CategoryInspectorDetailView(
                         summary = summary,
                         groupTitle = state.inspectingGroupTitle ?: "Category Cluster",
+                        showMhaOption = state.mhaEnabled,
                         onOpenEdit = { onOpenEdit(summary.category) },
                         onDeleteCategory = { onDeleteCategory(summary.category.id) },
                         onViewTransactions = onViewTransactions,
@@ -118,6 +119,7 @@ fun CategoryDetailInspectorPane(
 private fun CategoryInspectorDetailView(
     summary: CategorySummary,
     groupTitle: String,
+    showMhaOption: Boolean,
     onOpenEdit: () -> Unit,
     onDeleteCategory: () -> Unit,
     onViewTransactions: () -> Unit,
@@ -297,14 +299,16 @@ private fun CategoryInspectorDetailView(
                         else -> "Expense"
                     }
                 )
-                CategoryMetadataRow(
-                    label = "MHA Status",
-                    value = when {
-                        cat.mhaDefaultEligible -> "MHA Eligible (Parsonage)"
-                        cat.mhaDefaultIgnored -> "MHA Ignored"
-                        else -> "Standard"
-                    }
-                )
+                if (showMhaOption) {
+                    CategoryMetadataRow(
+                        label = "MHA Status",
+                        value = when {
+                            cat.mhaDefaultEligible -> "MHA Eligible (Parsonage)"
+                            cat.mhaDefaultIgnored -> "MHA Ignored"
+                            else -> "Standard"
+                        }
+                    )
+                }
             }
         }
 

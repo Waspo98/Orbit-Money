@@ -212,9 +212,39 @@ class SettingsViewModelTest {
         assertTrue(SettingsSection.APPEARANCE in amoledMatches)
         assertFalse(SettingsSection.BANK_FEEDS in amoledMatches)
 
+        val hapticsMatches = SettingsSection.search("haptics")
+        assertEquals(listOf(SettingsSection.APPEARANCE), hapticsMatches)
+        assertEquals("Look and Feel", SettingsSection.APPEARANCE.title)
+
+        val appLockMatches = SettingsSection.search("app lock")
+        assertEquals(listOf(SettingsSection.SYNC_AND_SHARING), appLockMatches)
+
+        val featuresMatches = SettingsSection.search("features")
+        assertEquals(listOf(SettingsSection.WORKSPACE_NAVIGATION), featuresMatches)
+        assertEquals("Turn On/Off App Features", SettingsSection.WORKSPACE_NAVIGATION.title)
+
         val simpleFinMatches = SettingsSection.search("simplefin")
         assertEquals(listOf(SettingsSection.BANK_FEEDS), simpleFinMatches)
+        assertEquals("SimpleFIN Sync", SettingsSection.BANK_FEEDS.title)
         assertEquals(SettingsSection.entries, SettingsSection.search("   "))
+    }
+
+    @Test
+    fun testMhaTrackerEnabled_clearsHiddenMhaRoute() = runTest(testDispatcher) {
+        testScheduler.advanceUntilIdle()
+        repository.updatePreferences(repository.preferences.value.copy(hiddenRouteNames = listOf("mha", "goals")))
+        testScheduler.advanceUntilIdle()
+
+        viewModel.setMhaTrackerEnabled(true)
+        testScheduler.advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.preferences.mhaTrackerEnabled)
+        assertFalse("mha" in viewModel.uiState.value.preferences.hiddenRouteNames)
+        assertTrue("goals" in viewModel.uiState.value.preferences.hiddenRouteNames)
+
+        viewModel.setMhaTrackerEnabled(false)
+        testScheduler.advanceUntilIdle()
+        assertFalse(viewModel.uiState.value.preferences.mhaTrackerEnabled)
     }
 
     @Test
@@ -397,5 +427,45 @@ class SettingsViewModelTest {
 
         assertTrue(repository.accounts.value.isEmpty())
         assertEquals(SettingsDialogState.None, viewModel.uiState.value.activeDialog)
+    }
+
+    @Test
+    fun testSelfHostedSimpleFinAuthAndSharingOptimisticUpdate() = runTest(testDispatcher) {
+        withSelfHostedTestHarness(
+            testScheduler = testScheduler,
+            handler = { path ->
+                when (path) {
+                    "/api/auth/me" -> HttpStatusCode.OK to """{"authenticated":true,"username":"neal@example.com","displayName":"Neal","authProvider":"both","authMethod":"oidc","household":{"id":1,"name":"Home","role":"owner"}}"""
+                    "/api/simplefin/status" -> HttpStatusCode.OK to """{"connected":true,"syncEnabled":true,"cutoverDate":"2026-01-15"}"""
+                    "/api/household-sharing" -> HttpStatusCode.OK to """{"householdId":1,"householdName":"Home","currentUserId":1,"currentUserRole":"owner","currentUserAccessLevel":"write","canManageSharing":true,"canRemoveUsers":true,"users":[{"id":2,"displayName":"Partner","role":"member","accessLevel":"write"}],"shares":[{"id":10,"invited_email":"guest@example.com","role":"member","access_level":"write","status":"pending"}]}"""
+                    "/api/household-sharing/users/2/access" -> HttpStatusCode.OK to """{"success":true}"""
+                    "/api/household-sharing/shares/10/access" -> HttpStatusCode.OK to """{"success":true}"""
+                    else -> HttpStatusCode.OK to """{"items":[]}"""
+                }
+            }
+        ) { _, remoteViewModel ->
+            assertEquals("oidc", remoteViewModel.uiState.value.authMethod)
+            assertEquals("Neal", remoteViewModel.uiState.value.currentUser)
+
+            remoteViewModel.openSection(SettingsSection.BANK_FEEDS)
+            testScheduler.advanceUntilIdle()
+            assertTrue(remoteViewModel.uiState.value.simpleFinStatus.connected)
+            assertEquals("2026-01-15", remoteViewModel.uiState.value.simpleFinStatus.cutoverDate)
+            assertNull(remoteViewModel.uiState.value.preferences.simpleFinToken)
+
+            remoteViewModel.openSection(SettingsSection.SYNC_AND_SHARING)
+            testScheduler.advanceUntilIdle()
+            assertFalse(remoteViewModel.uiState.value.isLoadingSharing)
+            assertEquals("write", remoteViewModel.uiState.value.householdSharing?.users?.firstOrNull()?.accessLevel)
+
+            remoteViewModel.updateHouseholdMemberAccess(2L, "read")
+            assertFalse(remoteViewModel.uiState.value.isLoadingSharing)
+            assertEquals("read", remoteViewModel.uiState.value.householdSharing?.users?.firstOrNull()?.accessLevel)
+
+            remoteViewModel.updatePartnerAccess(10L, "read")
+            assertFalse(remoteViewModel.uiState.value.isLoadingSharing)
+            assertEquals("read", remoteViewModel.uiState.value.householdSharing?.shares?.firstOrNull()?.accessLevel)
+            testScheduler.advanceUntilIdle()
+        }
     }
 }

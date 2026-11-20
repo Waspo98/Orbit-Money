@@ -1,6 +1,7 @@
 package app.overbay.orbit
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -67,7 +68,6 @@ fun App(
     modifier: Modifier = Modifier,
     onInitialized: (() -> Unit)? = null
 ) {
-    val haptics = rememberOrbitHaptics()
     val biometricHelper = rememberBiometricAuthHelper()
     val fileHelper = rememberFileImportExportHelper()
     val oidcLauncher = rememberOidcAuthLauncher()
@@ -103,9 +103,22 @@ fun App(
     }
 
     val preferences by repo.preferences.collectAsStateWithLifecycle()
+    val haptics = rememberOrbitHaptics(enabled = preferences.hapticsEnabled)
     val isAuthenticated by repo.isAuthenticated.collectAsStateWithLifecycle()
-    var isBiometricLocked by remember(preferences.biometricLockEnabled) {
-        mutableStateOf(preferences.biometricLockEnabled)
+    var hasEvaluatedInitialLock by remember(repo) { mutableStateOf(false) }
+    var isBiometricLocked by remember(repo) { mutableStateOf(false) }
+    var hasUnlockedThisSession by remember(repo) { mutableStateOf(false) }
+
+    if (isInitialized && !hasEvaluatedInitialLock) {
+        hasEvaluatedInitialLock = true
+        isBiometricLocked = preferences.biometricLockEnabled
+        if (!preferences.biometricLockEnabled) {
+            hasUnlockedThisSession = true
+        }
+    }
+    if (!preferences.biometricLockEnabled && isBiometricLocked) {
+        isBiometricLocked = false
+        if (isInitialized) hasUnlockedThisSession = true
     }
 
     BindPlatformGoogleDriveClient(
@@ -170,7 +183,7 @@ fun App(
             ) {
                 val appStage = when {
                     !isInitialized -> AppShellStage.LOADING
-                    isBiometricLocked && preferences.biometricLockEnabled -> AppShellStage.LOCKED
+                    !hasUnlockedThisSession && isBiometricLocked && preferences.biometricLockEnabled -> AppShellStage.LOCKED
                     else -> AppShellStage.READY
                 }
 
@@ -198,14 +211,29 @@ fun App(
                         }
                         AppShellStage.LOCKED -> {
                             BiometricLockOverlay(
-                                onUnlock = { isBiometricLocked = false }
+                                onUnlock = {
+                                    isBiometricLocked = false
+                                    hasUnlockedThisSession = true
+                                }
                             )
                         }
                         AppShellStage.READY -> {
-                            OrbitNavigation(
-                                repository = repo,
-                                initialKey = targetInitialNavKey
-                            )
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                OrbitNavigation(
+                                    repository = repo,
+                                    initialKey = targetInitialNavKey
+                                )
+                                AnimatedVisibility(
+                                    visible = isBiometricLocked && preferences.biometricLockEnabled,
+                                    enter = fadeIn(OrbitSprings.FloatEffectsDefault) +
+                                        scaleIn(initialScale = 0.985f, animationSpec = OrbitSprings.FloatSpatialDefault),
+                                    exit = fadeOut(OrbitSprings.FloatEffectsFast)
+                                ) {
+                                    BiometricLockOverlay(
+                                        onUnlock = { isBiometricLocked = false }
+                                    )
+                                }
+                            }
                         }
                     }
                 }

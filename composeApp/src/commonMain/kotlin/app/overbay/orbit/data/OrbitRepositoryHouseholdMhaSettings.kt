@@ -311,9 +311,11 @@ suspend fun OrbitRepository.refreshSimpleFinStatus(): Result<SimpleFinStatusInfo
 
 suspend fun OrbitRepository.setupSimpleFinBridge(setupToken: String, cutoverDate: String? = null): Result<SimpleFinStatusInfo> = runCatching {
     if (storageMode.value == StorageMode.SELF_HOSTED) {
-        val res = createApiClient().setupSimpleFin(setupToken, cutoverDate).getOrThrow()
-        _simpleFinStatus.value = res
-        res
+        createApiClient().setupSimpleFin(setupToken, cutoverDate).getOrThrow()
+        val refreshed = createApiClient().getSimpleFinStatus().getOrNull()
+            ?: SimpleFinStatusInfo(configured = true, connected = true, syncEnabled = true, cutoverDate = cutoverDate)
+        _simpleFinStatus.value = refreshed
+        refreshed
     } else {
         val updatedPref = preferences.value.copy(simpleFinToken = setupToken, simpleFinCutoverDate = cutoverDate)
         updatePreferences(updatedPref)

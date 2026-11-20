@@ -25,7 +25,8 @@ fun LazyListScope.appearanceSectionItems(
     onThemeModeChange: (OrbitThemeMode) -> Unit,
     onAmoledDarkChange: (Boolean) -> Unit,
     onPresetChange: (OrbitThemePreset) -> Unit,
-    onDynamicColorChange: (Boolean) -> Unit
+    onDynamicColorChange: (Boolean) -> Unit,
+    onHapticsChange: (Boolean) -> Unit
 ) {
     item(key = "appearance_display_mode") {
         OrbitSectionCard(
@@ -96,6 +97,21 @@ fun LazyListScope.appearanceSectionItems(
                     showContainer = false
                 )
             }
+        }
+    }
+
+    item(key = "look_and_feel_haptics") {
+        OrbitSectionCard(
+            title = "Touch Feedback",
+            subtitle = "Tactile response across controls and chart scrubbers"
+        ) {
+            OrbitSwitchRow(
+                title = "Haptic Feedback",
+                subtitle = "Subtle vibrations when adjusting sliders, scrubbing charts, and tapping controls",
+                checked = preferences.hapticsEnabled,
+                onCheckedChange = onHapticsChange,
+                showContainer = false
+            )
         }
     }
 }
