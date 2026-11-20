@@ -3,15 +3,16 @@ package app.overbay.orbit.ui.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.overbay.orbit.data.OrbitRepository
-import app.overbay.orbit.data.*
-import app.overbay.orbit.data.engine.SyncResult
+import app.overbay.orbit.data.fetchPushNotificationConfig
 import app.overbay.orbit.data.model.NotificationPreferencesConfig
-import app.overbay.orbit.data.model.OrbitPreferences
 import app.overbay.orbit.data.model.OrbitThemeMode
 import app.overbay.orbit.data.model.OrbitThemePreset
-import app.overbay.orbit.data.model.OrbitWorkspaceSnapshot
 import app.overbay.orbit.data.model.StorageMode
-import app.overbay.orbit.data.network.ServerUrlNormalizer
+import app.overbay.orbit.data.sendTestNotification
+import app.overbay.orbit.data.setMhaEnabled
+import app.overbay.orbit.data.updateNotificationPreferences
+import app.overbay.orbit.ui.settings.controllers.SettingsBackupController
+import app.overbay.orbit.ui.settings.controllers.SettingsSyncSharingController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,6 +31,9 @@ class SettingsViewModel(
 
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
+
+    private val syncSharingController = SettingsSyncSharingController(repository, scope, _uiState)
+    private val backupController = SettingsBackupController(repository, scope, _uiState)
 
     init {
         scope.launch {
@@ -55,106 +59,36 @@ class SettingsViewModel(
     }
 
     fun openSection(section: SettingsSection?) {
-        val mappedSubpage = when (section) {
-            SettingsSection.APPEARANCE,
-            SettingsSection.NOTIFICATIONS,
-            SettingsSection.WORKSPACE_NAVIGATION,
-            SettingsSection.SECURITY -> "preferences"
-            SettingsSection.SYNC_AND_SHARING,
-            SettingsSection.BANK_FEEDS,
-            SettingsSection.DATA_AND_BACKUPS -> "data"
-            SettingsSection.ABOUT,
-            null -> null
-        }
-        setSubpage(mappedSubpage)
-    }
-
-    fun setSubpage(subpage: String?) {
-        _uiState.update { it.copy(activeSubpage = subpage) }
-        if (subpage == "data") {
-            loadSimpleFinLogs()
-            loadHouseholdSharing()
-        } else if (subpage == "preferences") {
-            loadPushConfig()
+        _uiState.update { it.copy(activeSection = section) }
+        when (section) {
+            SettingsSection.NOTIFICATIONS -> loadPushConfig()
+            SettingsSection.BANK_FEEDS -> loadSimpleFinLogs()
+            SettingsSection.SYNC_AND_SHARING -> loadHouseholdSharing()
+            else -> Unit
         }
     }
 
-    fun setStorageMode(mode: StorageMode) {
-        val updated = _uiState.value.preferences.copy(storageMode = mode)
-        _uiState.update { it.copy(preferences = updated, storageMode = mode) }
-        scope.launch {
-            repository.setStorageMode(mode)
-        }
+    fun setSearchQuery(query: String) {
+        _uiState.update { it.copy(searchQuery = query) }
     }
 
-    fun setServerUrl(url: String) {
-        val trimmed = url.trim()
-        val updated = _uiState.value.preferences.copy(selfHostedServerUrl = trimmed)
-        _uiState.update { it.copy(preferences = updated) }
-        scope.launch {
-            repository.updatePreferences(updated)
-        }
+    fun setSearchActive(active: Boolean) {
+        _uiState.update { it.copy(isSearchActive = active) }
     }
 
-    fun loginToSelfHostedServer(username: String, password: String) {
-        if (username.isBlank() || password.isBlank()) {
-            _uiState.update { it.copy(statusMessage = "Username and password required") }
-            return
-        }
-        val normalizedUrl = ServerUrlNormalizer.normalize(_uiState.value.preferences.selfHostedServerUrl)
-        _uiState.update { it.copy(isSyncing = true, statusMessage = "Authenticating...") }
-        scope.launch {
-            val client = repository.createApiClient(normalizedUrl)
-            val loginRes = client.login(username.trim(), password)
-            if (loginRes.isSuccess) {
-                repository.setStorageMode(StorageMode.SELF_HOSTED, normalizedUrl)
-                val txCount = repository.transactions.value.size
-                _uiState.update {
-                    it.copy(
-                        isSyncing = false,
-                        syncStatus = SyncResult.Success("Signed in as ${username.trim()} ($txCount transactions)"),
-                        statusMessage = "Logged in as ${username.trim()}"
-                    )
-                }
-            } else {
-                val errMsg = loginRes.exceptionOrNull()?.message ?: "Authentication failed"
-                _uiState.update {
-                    it.copy(
-                        isSyncing = false,
-                        syncStatus = SyncResult.Error(errMsg),
-                        statusMessage = "Login failed: $errMsg"
-                    )
-                }
-            }
-        }
+    fun clearStatusMessage() {
+        _uiState.update { it.copy(statusMessage = null) }
     }
 
-    fun triggerSync() {
-        _uiState.update { it.copy(isSyncing = true, statusMessage = "Syncing workspace...") }
-        scope.launch {
-            val res = repository.sync(force = true)
-            _uiState.update {
-                it.copy(
-                    isSyncing = false,
-                    statusMessage = if (res is SyncResult.Success) "Sync completed successfully" else "Sync completed with status: $res"
-                )
-            }
-        }
+    fun showDialog(dialog: SettingsDialogState) {
+        _uiState.update { it.copy(activeDialog = dialog) }
     }
 
-    fun logout() {
-        scope.launch {
-            repository.logout()
-            _uiState.update {
-                it.copy(
-                    isSyncing = false,
-                    syncStatus = SyncResult.NoOp,
-                    statusMessage = "Signed out of server"
-                )
-            }
-        }
+    fun dismissDialog() {
+        _uiState.update { it.copy(activeDialog = SettingsDialogState.None) }
     }
 
+    // Appearance, Workspace & Security Preferences
     fun setThemePreset(preset: OrbitThemePreset) {
         val updated = _uiState.value.preferences.copy(themePreset = preset)
         _uiState.update { it.copy(preferences = updated) }
@@ -181,6 +115,12 @@ class SettingsViewModel(
 
     fun setBiometricLock(enabled: Boolean) {
         val updated = _uiState.value.preferences.copy(biometricLockEnabled = enabled)
+        _uiState.update { it.copy(preferences = updated) }
+        scope.launch { repository.updatePreferences(updated) }
+    }
+
+    fun setBiometricTimeoutSeconds(seconds: Int) {
+        val updated = _uiState.value.preferences.copy(biometricTimeoutSeconds = seconds.coerceAtLeast(0))
         _uiState.update { it.copy(preferences = updated) }
         scope.launch { repository.updatePreferences(updated) }
     }
@@ -221,20 +161,17 @@ class SettingsViewModel(
         scope.launch { repository.updatePreferences(updated) }
     }
 
-    fun openTransactionActionsSheet() {
-        _uiState.update { it.copy(showTransactionActionsSheet = true) }
-    }
-
-    fun closeTransactionActionsSheet() {
-        _uiState.update { it.copy(showTransactionActionsSheet = false) }
-    }
-
     fun saveTransactionQuickActions(pinnedIds: List<String>, orderIds: List<String>) {
         val updated = _uiState.value.preferences.copy(
             transactionPinnedActions = pinnedIds,
             transactionActionOrder = orderIds
         )
-        _uiState.update { it.copy(preferences = updated, showTransactionActionsSheet = false) }
+        _uiState.update {
+            it.copy(
+                preferences = updated,
+                activeDialog = SettingsDialogState.None
+            )
+        }
         scope.launch { repository.updatePreferences(updated) }
     }
 
@@ -267,329 +204,51 @@ class SettingsViewModel(
         scope.launch { repository.updateNotificationPreferences(config) }
     }
 
-    // SimpleFIN
-    fun setSimpleFinToken(token: String?) {
-        val updated = _uiState.value.preferences.copy(simpleFinToken = token?.trim())
-        _uiState.update { it.copy(preferences = updated) }
-        scope.launch { repository.updatePreferences(updated) }
-    }
+    // Sync, SimpleFIN & Household Sharing Delegations
+    fun setStorageMode(mode: StorageMode) = syncSharingController.setStorageMode(mode)
+    fun setServerUrl(url: String) = syncSharingController.setServerUrl(url)
+    fun loginToSelfHostedServer(username: String, password: String) =
+        syncSharingController.loginToSelfHostedServer(username, password)
+    fun triggerSync() = syncSharingController.triggerSync()
+    fun logout() = syncSharingController.logout()
+    fun setSimpleFinToken(token: String?) = syncSharingController.setSimpleFinToken(token)
+    fun setupSimpleFinBridge(token: String, cutoverDate: String?) =
+        syncSharingController.setupSimpleFinBridge(token, cutoverDate)
+    fun disconnectSimpleFin() = syncSharingController.disconnectSimpleFin()
+    fun loadSimpleFinLogs() = syncSharingController.loadSimpleFinLogs()
+    fun toggleSimpleFinLogsExpanded() = syncSharingController.toggleSimpleFinLogsExpanded()
+    fun unmuteSimpleFinAccount(label: String) = syncSharingController.unmuteSimpleFinAccount(label)
+    fun loadHouseholdSharing() = syncSharingController.loadHouseholdSharing()
+    fun inviteHouseholdPartner(email: String, role: String, accessLevel: String) =
+        syncSharingController.inviteHouseholdPartner(email, role, accessLevel)
+    fun updatePartnerAccess(shareId: Long, accessLevel: String) =
+        syncSharingController.updatePartnerAccess(shareId, accessLevel)
+    fun updateHouseholdMemberAccess(userId: Long, accessLevel: String) =
+        syncSharingController.updateHouseholdMemberAccess(userId, accessLevel)
+    fun revokePartnerShare(shareId: Long) = syncSharingController.revokePartnerShare(shareId)
+    fun removeHouseholdUser(userId: Long) = syncSharingController.removeHouseholdUser(userId)
 
-    fun setupSimpleFinBridge(token: String, cutoverDate: String?) {
-        scope.launch {
-            val res = repository.setupSimpleFinBridge(token.trim(), cutoverDate)
-            if (res.isSuccess) {
-                _uiState.update { it.copy(statusMessage = "SimpleFIN connected successfully") }
-                loadSimpleFinLogs()
-            } else {
-                _uiState.update { it.copy(statusMessage = "SimpleFIN setup failed: ${res.exceptionOrNull()?.message}") }
-            }
-        }
-    }
-
-    fun disconnectSimpleFin() {
-        scope.launch {
-            repository.disconnectSimpleFinBridge()
-            _uiState.update { it.copy(statusMessage = "SimpleFIN disconnected", simpleFinLogs = emptyList()) }
-        }
-    }
-
-    fun loadSimpleFinLogs() {
-        _uiState.update { it.copy(isLoadingSimpleFinLogs = true) }
-        scope.launch {
-            val res = repository.fetchSimpleFinSyncLogs()
-            _uiState.update {
-                it.copy(
-                    simpleFinLogs = res.getOrDefault(emptyList()),
-                    isLoadingSimpleFinLogs = false
-                )
-            }
-        }
-    }
-
-    fun toggleSimpleFinLogsExpanded() {
-        _uiState.update { it.copy(isSimpleFinLogsExpanded = !it.isSimpleFinLogsExpanded) }
-    }
-
-    fun unmuteSimpleFinAccount(label: String) {
-        scope.launch {
-            repository.unmuteSimpleFinAccountWarning(label)
-        }
-    }
-
-    // Household Partner Sharing
-    fun loadHouseholdSharing() {
-        _uiState.update { it.copy(isLoadingSharing = true) }
-        scope.launch {
-            val res = repository.fetchHouseholdSharing()
-            _uiState.update {
-                it.copy(
-                    householdSharing = res.getOrNull(),
-                    isLoadingSharing = false
-                )
-            }
-        }
-    }
-
-    fun openInvitePartnerDialog(show: Boolean) {
-        _uiState.update { it.copy(showInvitePartnerDialog = show) }
-    }
-
-    fun inviteHouseholdPartner(email: String, role: String, accessLevel: String) {
-        scope.launch {
-            val res = repository.inviteHouseholdPartner(email.trim(), role, accessLevel)
-            if (res.isSuccess) {
-                _uiState.update { it.copy(showInvitePartnerDialog = false, statusMessage = "Invitation sent to $email") }
-                loadHouseholdSharing()
-            } else {
-                _uiState.update { it.copy(statusMessage = "Invite failed: ${res.exceptionOrNull()?.message}") }
-            }
-        }
-    }
-
-    fun updatePartnerAccess(shareId: Long, accessLevel: String) {
-        scope.launch {
-            repository.updatePartnerShareAccess(shareId, accessLevel)
-            loadHouseholdSharing()
-        }
-    }
-
-    fun updateHouseholdMemberAccess(userId: Long, accessLevel: String) {
-        scope.launch {
-            repository.updateHouseholdMemberUserAccess(userId, accessLevel)
-            loadHouseholdSharing()
-        }
-    }
-
-    fun revokePartnerShare(shareId: Long) {
-        scope.launch {
-            repository.revokePartnerShare(shareId)
-            loadHouseholdSharing()
-        }
-    }
-
-    fun removeHouseholdUser(userId: Long) {
-        scope.launch {
-            repository.removeHouseholdMemberUser(userId)
-            loadHouseholdSharing()
-        }
-    }
-
-    // Rules & Maintenance
-    fun reapplyAllRules() {
-        _uiState.update { it.copy(statusMessage = "Reapplying rules across all transactions...") }
-        scope.launch {
-            val initialTx = repository.transactions.value
-            val beforeById = initialTx.associateBy { it.id }
-            val processed = initialTx.size
-            repository.runRulesOnAllTransactions()
-            val afterTx = repository.transactions.value
-            val updated = afterTx.count { after -> beforeById[after.id] != after }
-            _uiState.update { it.copy(statusMessage = "Reapplied rules to $processed transactions ($updated updated)") }
-        }
-    }
-
-    // Import / Export & Backup
-    suspend fun exportCsv(): String = repository.exportBudgetingCsv().getOrDefault("")
-
-    suspend fun exportBudgetingJson(): String = repository.exportBudgetingJson().getOrDefault("")
-
-    fun exportBackup(): String {
-        val fallbackJson = repository.exportBackupJson()
-        if (_uiState.value.storageMode == StorageMode.SELF_HOSTED) {
-            scope.launch {
-                val payload = repository.exportBackupPayload()
-                _uiState.update { it.copy(backupExportJson = payload, showBackupExportDialog = true) }
-            }
-        } else {
-            _uiState.update { it.copy(backupExportJson = fallbackJson, showBackupExportDialog = true) }
-        }
-        return fallbackJson
-    }
-
-    fun closeBackupExportDialog() {
-        _uiState.update { it.copy(showBackupExportDialog = false, backupExportJson = null) }
-    }
-
-    fun openRestoreDialog() {
-        _uiState.update { it.copy(showRestoreDialog = true) }
-    }
-
-    fun closeRestoreDialog() {
-        _uiState.update { it.copy(showRestoreDialog = false, restoreJsonText = "") }
-    }
-
-    fun setRestoreJsonText(text: String) {
-        _uiState.update { it.copy(restoreJsonText = text) }
-    }
-
-    fun previewBackupForRestore(rawJson: String) {
-        val preview = repository.previewBackupJson(rawJson)
-        if (preview.isSuccess) {
-            _uiState.update {
-                it.copy(
-                    restoreJsonText = rawJson,
-                    restorePreviewStats = preview.getOrNull(),
-                    showRestoreDialog = false,
-                    showRestorePreviewDialog = true
-                )
-            }
-        } else {
-            _uiState.update { it.copy(statusMessage = "Could not read backup file. Please make sure it is a valid Orbit Money backup.") }
-        }
-    }
-
-    fun closeRestorePreviewDialog() {
-        _uiState.update { it.copy(showRestorePreviewDialog = false, restorePreviewStats = null) }
-    }
-
-    fun confirmRestoreBackup() {
-        val jsonText = _uiState.value.restoreJsonText
-        restoreBackup(jsonText)
-    }
-
-    fun restoreBackup(rawJson: String) {
-        scope.launch {
-            val result = repository.restoreBackupJson(rawJson)
-            if (result.isSuccess) {
-                _uiState.update {
-                    it.copy(
-                        showRestoreDialog = false,
-                        showRestorePreviewDialog = false,
-                        restorePreviewStats = null,
-                        restoreJsonText = "",
-                        statusMessage = "Backup restored successfully"
-                    )
-                }
-            } else {
-                _uiState.update { it.copy(statusMessage = "Restore failed: ${result.exceptionOrNull()?.message}") }
-            }
-        }
-    }
-
-    // Google Drive
-    fun setGoogleDriveSync(enabled: Boolean) {
-        val updated = _uiState.value.preferences.copy(googleDriveSyncEnabled = enabled)
-        _uiState.update { it.copy(preferences = updated) }
-        scope.launch { repository.updatePreferences(updated) }
-    }
-
-    fun openGoogleDriveClientIdDialog(show: Boolean) {
-        _uiState.update {
-            it.copy(
-                showGoogleDriveClientIdDialog = show,
-                googleDriveClientIdDraft = if (show) it.preferences.googleDriveClientId else ""
-            )
-        }
-    }
-
-    fun setGoogleDriveClientIdDraft(id: String) {
-        _uiState.update { it.copy(googleDriveClientIdDraft = id) }
-    }
-
-    fun saveGoogleDriveClientId(id: String) {
-        val updated = _uiState.value.preferences.copy(googleDriveClientId = id.trim())
-        _uiState.update { it.copy(preferences = updated, showGoogleDriveClientIdDialog = false) }
-        scope.launch { repository.updatePreferences(updated) }
-    }
-
-    fun backupToGoogleDrive() {
-        _uiState.update { it.copy(isSyncing = true, statusMessage = "Backing up to Google Drive...") }
-        scope.launch {
-            val res = repository.cloudSyncManager.backupSnapshot(repository.snapshot.value)
-            _uiState.update {
-                it.copy(
-                    isSyncing = false,
-                    statusMessage = if (res is SyncResult.Success) "Google Drive backup complete" else "Backup failed: $res"
-                )
-            }
-        }
-    }
-
-    fun restoreFromGoogleDrive() {
-        _uiState.update { it.copy(isSyncing = true, statusMessage = "Restoring from Google Drive...") }
-        scope.launch {
-            val snap = repository.cloudSyncManager.restoreSnapshot()
-            if (snap != null) {
-                if (_uiState.value.storageMode == StorageMode.SELF_HOSTED) {
-                    val snapshotJson = repository.json.encodeToString(OrbitWorkspaceSnapshot.serializer(), snap)
-                    val remoteResult = repository.restoreBackupJson(snapshotJson)
-                    if (remoteResult.isSuccess) {
-                        _uiState.update { it.copy(isSyncing = false, statusMessage = "Restored from Google Drive") }
-                    } else {
-                        _uiState.update { it.copy(isSyncing = false, statusMessage = "Restore failed: ${remoteResult.exceptionOrNull()?.message}") }
-                    }
-                } else {
-                    repository.commitSnapshot(snap, immediate = true)
-                    _uiState.update { it.copy(isSyncing = false, statusMessage = "Restored from Google Drive") }
-                }
-            } else {
-                _uiState.update { it.copy(isSyncing = false, statusMessage = "Restore failed: No Google Drive backup found") }
-            }
-        }
-    }
-
-    fun disconnectGoogleDrive() {
-        scope.launch {
-            repository.cloudSyncManager.disconnect()
-            val updated = _uiState.value.preferences.copy(googleDriveSyncEnabled = false)
-            _uiState.update { it.copy(preferences = updated, statusMessage = "Disconnected from Google Drive") }
-            repository.updatePreferences(updated)
-        }
-    }
-
-    // Migration
-    fun openMigrateDialog(show: Boolean) {
-        _uiState.update { it.copy(showMigrateDialog = show, migrateMessage = null) }
-    }
-
-    fun setMigrateServerUrl(url: String) {
-        _uiState.update { it.copy(migrateServerUrl = url) }
-    }
-
-    fun executeMigration(url: String) {
-        _uiState.update { it.copy(isMigrating = true, migrateMessage = "Migrating workspace to server...") }
-        scope.launch {
-            val res = repository.migrateLocalWorkspaceToSelfHosted(url.trim())
-            if (res.isSuccess) {
-                _uiState.update { it.copy(isMigrating = false, migrateMessage = "Migration completed successfully!", showMigrateDialog = false) }
-            } else {
-                _uiState.update { it.copy(isMigrating = false, migrateMessage = "Migration failed: ${res.exceptionOrNull()?.message}") }
-            }
-        }
-    }
-
-    // Walkthrough & Reset
-    fun replayWalkthrough(onNavigateToOnboarding: () -> Unit) {
-        scope.launch {
-            val updated = _uiState.value.preferences.copy(onboardingCompleted = false)
-            repository.updatePreferences(updated)
-            onNavigateToOnboarding()
-        }
-    }
-
-    fun openResetConfirmation() {
-        _uiState.update { it.copy(showResetConfirmation = true) }
-    }
-
-    fun closeResetConfirmation() {
-        _uiState.update { it.copy(showResetConfirmation = false) }
-    }
-
-    fun resetToDemoData() {
-        scope.launch {
-            repository.loadDemoData(OrbitWorkspaceSnapshot.empty())
-            _uiState.update { it.copy(showResetConfirmation = false, statusMessage = "Reset to clean workspace") }
-        }
-    }
-
-    fun loadSampleDemoData() {
-        scope.launch {
-            repository.loadDemoData(app.overbay.orbit.domain.DemoSeedGenerator.generateDemoSnapshot())
-            _uiState.update { it.copy(statusMessage = "Loaded sample household workspace") }
-        }
-    }
-
-    fun setShowDonateDialog(show: Boolean) {
-        _uiState.update { it.copy(showDonateDialog = show) }
-    }
+    // Backup, Exports, Google Drive, Migration & Maintenance Delegations
+    fun reapplyAllRules() = backupController.reapplyAllRules()
+    suspend fun exportCsv(): String = backupController.exportCsv()
+    suspend fun exportBudgetingJson(): String = backupController.exportBudgetingJson()
+    fun exportBackupToFile(onReady: (String) -> Unit) = backupController.exportBackupToFile(onReady)
+    fun openBackupExportJsonDialog(): String = backupController.openBackupExportJsonDialog()
+    fun openRestorePasteDialog() = backupController.openRestorePasteDialog()
+    fun updateRestorePasteDraft(text: String) = backupController.updateRestorePasteDraft(text)
+    fun previewBackupForRestore(rawJson: String) = backupController.previewBackupForRestore(rawJson)
+    fun confirmRestoreBackup() = backupController.confirmRestoreBackup()
+    fun restoreBackup(rawJson: String) = backupController.restoreBackup(rawJson)
+    fun setGoogleDriveSync(enabled: Boolean) = backupController.setGoogleDriveSync(enabled)
+    fun openGoogleDriveClientIdDialog() = backupController.openGoogleDriveClientIdDialog()
+    fun saveGoogleDriveClientId(id: String) = backupController.saveGoogleDriveClientId(id)
+    fun backupToGoogleDrive() = backupController.backupToGoogleDrive()
+    fun restoreFromGoogleDrive() = backupController.restoreFromGoogleDrive()
+    fun disconnectGoogleDrive() = backupController.disconnectGoogleDrive()
+    fun openMigrateDialog() = backupController.openMigrateDialog()
+    fun executeMigration(url: String) = backupController.executeMigration(url)
+    fun replayWalkthrough(onNavigateToOnboarding: () -> Unit) =
+        backupController.replayWalkthrough(onNavigateToOnboarding)
+    fun resetToDemoData() = backupController.resetToDemoData()
+    fun loadSampleDemoData(onCompleted: () -> Unit = {}) = backupController.loadSampleDemoData(onCompleted)
 }
