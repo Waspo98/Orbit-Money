@@ -6,6 +6,7 @@ import app.overbay.orbit.data.engine.SyncResult
 import app.overbay.orbit.data.fetchHouseholdSharing
 import app.overbay.orbit.data.fetchSimpleFinSyncLogs
 import app.overbay.orbit.data.inviteHouseholdPartner
+import app.overbay.orbit.data.model.HouseholdSharingState
 import app.overbay.orbit.data.model.StorageMode
 import app.overbay.orbit.data.network.ServerUrlNormalizer
 import app.overbay.orbit.data.removeHouseholdMemberUser
@@ -323,65 +324,73 @@ class SettingsSyncSharingController(
         }
     }
 
-    fun updatePartnerAccess(shareId: Long, accessLevel: String) {
+    private fun runSharingMutation(
+        errorMessage: String,
+        dismissDialog: Boolean = false,
+        optimisticTransform: (HouseholdSharingState) -> HouseholdSharingState,
+        action: suspend () -> Result<Boolean>
+    ) {
         val previous = uiState.value.householdSharing
-        if (previous != null) {
-            val optimisticShares = previous.shares.map {
-                if (it.id == shareId) it.copy(accessLevel = accessLevel) else it
-            }
-            uiState.update { it.copy(householdSharing = previous.copy(shares = optimisticShares)) }
+        uiState.update { current ->
+            current.copy(
+                activeDialog = if (dismissDialog) SettingsDialogState.None else current.activeDialog,
+                householdSharing = current.householdSharing?.let(optimisticTransform)
+            )
         }
         scope.launch {
-            val res = repository.updatePartnerShareAccess(shareId, accessLevel)
+            val res = action()
             if (res.isSuccess) {
                 loadHouseholdSharing(showLoading = false)
             } else {
                 uiState.update {
                     it.copy(
                         householdSharing = previous,
-                        statusMessage = "Could not update share access"
+                        statusMessage = errorMessage
                     )
                 }
             }
         }
+    }
+
+    fun updatePartnerAccess(shareId: Long, accessLevel: String) {
+        runSharingMutation(
+            errorMessage = "Could not update share access",
+            optimisticTransform = { state ->
+                state.copy(shares = state.shares.map { if (it.id == shareId) it.copy(accessLevel = accessLevel) else it })
+            },
+            action = { repository.updatePartnerShareAccess(shareId, accessLevel) }
+        )
     }
 
     fun updateHouseholdMemberAccess(userId: Long, accessLevel: String) {
-        val previous = uiState.value.householdSharing
-        if (previous != null) {
-            val optimisticUsers = previous.users.map {
-                if (it.id == userId) it.copy(accessLevel = accessLevel) else it
-            }
-            uiState.update { it.copy(householdSharing = previous.copy(users = optimisticUsers)) }
-        }
-        scope.launch {
-            val res = repository.updateHouseholdMemberUserAccess(userId, accessLevel)
-            if (res.isSuccess) {
-                loadHouseholdSharing(showLoading = false)
-            } else {
-                uiState.update {
-                    it.copy(
-                        householdSharing = previous,
-                        statusMessage = "Could not update member access"
-                    )
-                }
-            }
-        }
+        runSharingMutation(
+            errorMessage = "Could not update member access",
+            optimisticTransform = { state ->
+                state.copy(users = state.users.map { if (it.id == userId) it.copy(accessLevel = accessLevel) else it })
+            },
+            action = { repository.updateHouseholdMemberUserAccess(userId, accessLevel) }
+        )
     }
 
     fun revokePartnerShare(shareId: Long) {
-        uiState.update { it.copy(activeDialog = SettingsDialogState.None) }
-        scope.launch {
-            repository.revokePartnerShare(shareId)
-            loadHouseholdSharing(showLoading = false)
-        }
+        runSharingMutation(
+            errorMessage = "Could not revoke share",
+            dismissDialog = true,
+            optimisticTransform = { state ->
+                state.copy(shares = state.shares.filterNot { it.id == shareId })
+            },
+            action = { repository.revokePartnerShare(shareId) }
+        )
     }
 
     fun removeHouseholdUser(userId: Long) {
-        uiState.update { it.copy(activeDialog = SettingsDialogState.None) }
-        scope.launch {
-            repository.removeHouseholdMemberUser(userId)
-            loadHouseholdSharing(showLoading = false)
-        }
+        runSharingMutation(
+            errorMessage = "Could not remove member",
+            dismissDialog = true,
+            optimisticTransform = { state ->
+                state.copy(users = state.users.filterNot { it.id == userId })
+            },
+            action = { repository.removeHouseholdMemberUser(userId) }
+        )
     }
 }

@@ -466,7 +466,8 @@ object DashboardDataTransform {
             } ?: txn.effectiveDate
 
             val hasEdits = txn.editedDate != null || txn.editedMerchant != null || txn.editedAmountCents != null ||
-                txn.editedCategoryIdSource != null || txn.editedIsTransfer != null || txn.editedIsIgnored != null || txn.editedMhaEligible != null
+                txn.editedCategoryIdSource != null || txn.editedIsTransfer != null || txn.editedIsIgnored != null ||
+                (snapshot.preferences.mhaTrackerEnabled && txn.editedMhaEligible != null)
 
             DashboardRecentTransactionItem(
                 id = txn.id,

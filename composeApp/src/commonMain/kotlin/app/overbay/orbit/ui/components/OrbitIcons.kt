@@ -212,13 +212,6 @@ object OrbitIcons {
         )
     }
 
-    val ShieldLock: ImageVector by lazy {
-        strokeIcon(
-            name = "ShieldLock",
-            pathData = "M12 2.8L4.5 5.8V11.5C4.5 16.2 7.7 20.1 12 21.4C16.3 20.1 19.5 16.2 19.5 11.5V5.8L12 2.8Z M9.5 12L11.2 13.7L14.8 10.1"
-        )
-    }
-
     val CloudSync: ImageVector by lazy {
         strokeIcon(
             name = "CloudSync",

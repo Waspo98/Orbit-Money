@@ -76,7 +76,11 @@ fun TransactionAccordionContent(
     val categoryProv = parseFieldProvenance(categoryEdited, transaction.editedCategoryIdSource)
     val amountProv = parseFieldProvenance(transaction.editedAmountCents != null, "user")
     val transferProv = parseFieldProvenance(transaction.editedIsTransfer != null, transaction.editedIsTransferSource)
-    val mhaProv = parseFieldProvenance(transaction.editedMhaEligibleSource != null, transaction.editedMhaEligibleSource)
+    val mhaProv = if (mhaEnabled) {
+        parseFieldProvenance(transaction.editedMhaEligibleSource != null, transaction.editedMhaEligibleSource)
+    } else {
+        FieldEditProvenance.None
+    }
     val ignoreProv = parseFieldProvenance(transaction.editedIsIgnored != null, transaction.editedIsIgnoredSource)
 
     val hasManualEdits = transaction.editSource == EditSource.USER || listOf(

@@ -127,7 +127,7 @@ fun TransactionEditorContent(
             transaction.editedCategoryId != null ||
             transaction.editedIsTransfer != null ||
             transaction.editedIsIgnored != null ||
-            transaction.editedMhaEligibleSource != null
+            (showMhaOption && transaction.editedMhaEligibleSource != null)
         )
 
     val statementSubtitle = remember(transaction, accounts) {

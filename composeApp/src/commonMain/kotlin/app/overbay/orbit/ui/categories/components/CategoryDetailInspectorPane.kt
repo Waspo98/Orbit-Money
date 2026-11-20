@@ -177,13 +177,13 @@ private fun CategoryInspectorDetailView(
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
-                        if (cat.mhaDefaultEligible) {
+                        if (showMhaOption && cat.mhaDefaultEligible) {
                             OrbitBadge(
                                 text = "MHA",
                                 containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.6f),
                                 contentColor = MaterialTheme.colorScheme.onTertiaryContainer
                             )
-                        } else if (cat.mhaDefaultIgnored) {
+                        } else if (showMhaOption && cat.mhaDefaultIgnored) {
                             OrbitBadge(
                                 text = "MHA Ignored",
                                 containerColor = MaterialTheme.colorScheme.surfaceVariant,

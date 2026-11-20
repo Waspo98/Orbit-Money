@@ -468,4 +468,37 @@ class SettingsViewModelTest {
             testScheduler.advanceUntilIdle()
         }
     }
+
+    @Test
+    fun testSelfHostedSharingRevokeAndRemoveFailure_rollsBackAndSetsStatus() = runTest(testDispatcher) {
+        withSelfHostedTestHarness(
+            testScheduler = testScheduler,
+            handler = { path ->
+                when (path) {
+                    "/api/auth/me" -> HttpStatusCode.OK to """{"authenticated":true,"username":"neal@example.com","displayName":"Neal","authProvider":"both","authMethod":"oidc","household":{"id":1,"name":"Home","role":"owner"}}"""
+                    "/api/household-sharing" -> HttpStatusCode.OK to """{"householdId":1,"householdName":"Home","currentUserId":1,"currentUserRole":"owner","currentUserAccessLevel":"write","canManageSharing":true,"canRemoveUsers":true,"users":[{"id":2,"displayName":"Partner","role":"member","accessLevel":"write"}],"shares":[{"id":10,"invited_email":"guest@example.com","role":"member","access_level":"write","status":"pending"}]}"""
+                    "/api/household-sharing/shares/10" -> HttpStatusCode.InternalServerError to """{"error":"boom"}"""
+                    "/api/household-sharing/users/2" -> HttpStatusCode.InternalServerError to """{"error":"boom"}"""
+                    else -> HttpStatusCode.OK to """{"items":[]}"""
+                }
+            }
+        ) { _, remoteViewModel ->
+            remoteViewModel.openSection(SettingsSection.SYNC_AND_SHARING)
+            testScheduler.advanceUntilIdle()
+            assertEquals(1, remoteViewModel.uiState.value.householdSharing?.shares?.size)
+            assertEquals(1, remoteViewModel.uiState.value.householdSharing?.users?.size)
+
+            remoteViewModel.revokePartnerShare(10L)
+            assertEquals(0, remoteViewModel.uiState.value.householdSharing?.shares?.size)
+            testScheduler.advanceUntilIdle()
+            assertEquals(1, remoteViewModel.uiState.value.householdSharing?.shares?.size)
+            assertEquals("Could not revoke share", remoteViewModel.uiState.value.statusMessage)
+
+            remoteViewModel.removeHouseholdUser(2L)
+            assertEquals(0, remoteViewModel.uiState.value.householdSharing?.users?.size)
+            testScheduler.advanceUntilIdle()
+            assertEquals(1, remoteViewModel.uiState.value.householdSharing?.users?.size)
+            assertEquals("Could not remove member", remoteViewModel.uiState.value.statusMessage)
+        }
+    }
 }

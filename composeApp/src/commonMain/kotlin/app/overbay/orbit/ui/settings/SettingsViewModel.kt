@@ -187,10 +187,7 @@ class SettingsViewModel(
         )
         _uiState.update { it.copy(preferences = updated) }
         scope.launch {
-            if (cleanedHidden != currentHidden) {
-                repository.updatePreferences(updated)
-            }
-            repository.setMhaEnabled(enabled)
+            repository.setMhaEnabled(enabled, cleanedHidden.takeIf { it != currentHidden })
         }
     }
 

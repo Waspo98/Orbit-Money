@@ -71,8 +71,15 @@ internal suspend fun OrbitRepository.deleteHouseholdShareImpl(id: Long) = commit
 // MHA Extension Methods
 // =============================================================================
 
-suspend fun OrbitRepository.setMhaEnabled(enabled: Boolean) {
-    val updatedPref = preferences.value.copy(mhaTrackerEnabled = enabled)
+suspend fun OrbitRepository.setMhaEnabled(
+    enabled: Boolean,
+    hiddenRouteNames: List<String>? = null
+) {
+    val current = preferences.value
+    val updatedPref = current.copy(
+        mhaTrackerEnabled = enabled,
+        hiddenRouteNames = hiddenRouteNames ?: current.hiddenRouteNames
+    )
     updatePreferences(updatedPref)
     if (storageMode.value == StorageMode.SELF_HOSTED) {
         createApiClient().putMhaSettings(enabled)

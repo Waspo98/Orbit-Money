@@ -35,6 +35,7 @@ import app.overbay.orbit.data.sync.BindPlatformGoogleDriveClient
 import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.BiometricLockOverlay
+import app.overbay.orbit.util.BackHandler
 import app.overbay.orbit.util.DevicePosture
 import app.overbay.orbit.util.LocalBiometricAuthHelper
 import app.overbay.orbit.util.LocalDevicePosture
@@ -109,16 +110,17 @@ fun App(
     var isBiometricLocked by remember(repo) { mutableStateOf(false) }
     var hasUnlockedThisSession by remember(repo) { mutableStateOf(false) }
 
-    if (isInitialized && !hasEvaluatedInitialLock) {
-        hasEvaluatedInitialLock = true
-        isBiometricLocked = preferences.biometricLockEnabled
-        if (!preferences.biometricLockEnabled) {
-            hasUnlockedThisSession = true
+    LaunchedEffect(repo, isInitialized, preferences.biometricLockEnabled) {
+        if (isInitialized && !hasEvaluatedInitialLock) {
+            hasEvaluatedInitialLock = true
+            isBiometricLocked = preferences.biometricLockEnabled
+            if (!preferences.biometricLockEnabled) {
+                hasUnlockedThisSession = true
+            }
+        } else if (!preferences.biometricLockEnabled && isBiometricLocked) {
+            isBiometricLocked = false
+            if (isInitialized) hasUnlockedThisSession = true
         }
-    }
-    if (!preferences.biometricLockEnabled && isBiometricLocked) {
-        isBiometricLocked = false
-        if (isInitialized) hasUnlockedThisSession = true
     }
 
     BindPlatformGoogleDriveClient(
@@ -182,7 +184,7 @@ fun App(
                 color = MaterialTheme.colorScheme.background
             ) {
                 val appStage = when {
-                    !isInitialized -> AppShellStage.LOADING
+                    !isInitialized || !hasEvaluatedInitialLock -> AppShellStage.LOADING
                     !hasUnlockedThisSession && isBiometricLocked && preferences.biometricLockEnabled -> AppShellStage.LOCKED
                     else -> AppShellStage.READY
                 }
@@ -223,6 +225,9 @@ fun App(
                                     repository = repo,
                                     initialKey = targetInitialNavKey
                                 )
+                                BackHandler(enabled = isBiometricLocked && preferences.biometricLockEnabled) {
+                                    // Absorb Back presses while the re-lock overlay is active.
+                                }
                                 AnimatedVisibility(
                                     visible = isBiometricLocked && preferences.biometricLockEnabled,
                                     enter = fadeIn(OrbitSprings.FloatEffectsDefault) +
