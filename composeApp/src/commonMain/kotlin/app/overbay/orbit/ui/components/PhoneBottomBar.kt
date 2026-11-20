@@ -5,7 +5,10 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.indication
+import androidx.compose.foundation.interaction.Interaction
+import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,8 +36,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -42,11 +48,14 @@ import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 
 internal data class NavTabItem(val key: OrbitNavKey, val title: String, val icon: ImageVector)
 
@@ -120,6 +129,11 @@ private fun BottomNavTabItem(
     modifier: Modifier = Modifier
 ) {
     val interactionSource = remember { MutableInteractionSource() }
+    val tabOrigin = remember { OffsetRef() }
+    val pillOrigin = remember { OffsetRef() }
+    val pillInteractionSource = remember(interactionSource) {
+        MappedInteractionSource(interactionSource) { pillOrigin.value - tabOrigin.value }
+    }
     val indicatorAlpha by animateFloatAsState(
         targetValue = if (selected) 1f else 0f,
         animationSpec = OrbitSprings.FloatEffectsFast,
@@ -135,11 +149,12 @@ private fun BottomNavTabItem(
         animationSpec = OrbitSprings.ColorEffectsFast,
         label = "bottomNavContentColor"
     )
+    val fontScale = LocalDensity.current.fontScale
     val labelStyle = MaterialTheme.typography.labelSmall.copy(
-        fontSize = 10.sp,
-        lineHeight = 13.sp,
+        fontSize = cappedNavLabelSp(10f, fontScale),
+        lineHeight = cappedNavLabelSp(13f, fontScale),
         fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-        letterSpacing = 0.2.sp,
+        letterSpacing = cappedNavLabelSp(0.2f, fontScale),
         textAlign = TextAlign.Center,
         lineHeightStyle = LineHeightStyle(
             alignment = LineHeightStyle.Alignment.Center,
@@ -150,6 +165,7 @@ private fun BottomNavTabItem(
     Column(
         modifier = modifier
             .defaultMinSize(minHeight = 72.dp)
+            .onGloballyPositioned { tabOrigin.value = it.positionInRoot() }
             .selectable(
                 selected = selected,
                 onClick = onClick,
@@ -163,7 +179,9 @@ private fun BottomNavTabItem(
         verticalArrangement = Arrangement.Center
     ) {
         Box(
-            modifier = Modifier.size(width = 64.dp, height = 32.dp),
+            modifier = Modifier
+                .size(width = 64.dp, height = 32.dp)
+                .onGloballyPositioned { pillOrigin.value = it.positionInRoot() },
             contentAlignment = Alignment.Center
         ) {
             if (indicatorAlpha > 0.01f) {
@@ -181,7 +199,7 @@ private fun BottomNavTabItem(
                 modifier = Modifier
                     .matchParentSize()
                     .clip(CircleShape)
-                    .indication(interactionSource, LocalIndication.current)
+                    .indication(pillInteractionSource, LocalIndication.current)
             )
             Icon(
                 imageVector = icon,
@@ -191,7 +209,7 @@ private fun BottomNavTabItem(
             )
         }
         Spacer(modifier = Modifier.height(4.dp))
-        // Unbounded center wrap ensures long labels (e.g. TRANSACTIONS) stay centered under their icon even under font scaling.
+        // Unbounded center wrap keeps wide labels (e.g. TRANSACTIONS) centered while font-scale capping prevents neighbor overlap.
         Text(
             text = title.uppercase(),
             style = labelStyle,
@@ -202,6 +220,52 @@ private fun BottomNavTabItem(
             modifier = Modifier.wrapContentWidth(align = Alignment.CenterHorizontally, unbounded = true)
         )
     }
+}
+
+private class OffsetRef(var value: Offset = Offset.Zero)
+
+/**
+ * Translates [PressInteraction] coordinates from the full-slot tab container into the
+ * centered indicator pill's local coordinate space so ripples originate under the tap.
+ */
+internal class MappedInteractionSource(
+    private val underlying: InteractionSource,
+    private val deltaProvider: () -> Offset
+) : InteractionSource {
+    override val interactions: Flow<Interaction> = flow {
+        val mappedPresses = mutableMapOf<PressInteraction.Press, PressInteraction.Press>()
+        underlying.interactions.collect { interaction ->
+            emit(
+                when (interaction) {
+                    is PressInteraction.Press -> {
+                        val mapped = PressInteraction.Press(interaction.pressPosition - deltaProvider())
+                        mappedPresses[interaction] = mapped
+                        mapped
+                    }
+                    is PressInteraction.Release -> {
+                        mappedPresses.remove(interaction.press)?.let { PressInteraction.Release(it) } ?: interaction
+                    }
+                    is PressInteraction.Cancel -> {
+                        mappedPresses.remove(interaction.press)?.let { PressInteraction.Cancel(it) } ?: interaction
+                    }
+                    else -> interaction
+                }
+            )
+        }
+    }
+}
+
+/**
+ * Caps bottom-bar label font scaling so wide uppercase labels stay legible without overlapping adjacent tabs.
+ */
+internal fun cappedNavLabelSp(
+    baseSp: Float,
+    fontScale: Float,
+    maxFontScale: Float = 1.15f
+): TextUnit {
+    val safeScale = if (fontScale > 0f) fontScale else 1f
+    val effectiveScale = safeScale.coerceAtMost(maxFontScale)
+    return (baseSp * (effectiveScale / safeScale)).sp
 }
 
 internal fun isTabSelected(tabKey: OrbitNavKey, currentKey: OrbitNavKey): Boolean = when (tabKey) {

@@ -40,3 +40,6 @@ local.properties
 .kotlin/
 kotlin-js-store/
 .agents/
+.impeccable/
+DESIGN.md
+PRODUCT.md
