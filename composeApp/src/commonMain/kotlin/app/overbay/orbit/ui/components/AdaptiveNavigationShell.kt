@@ -20,9 +20,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.Scaffold
@@ -38,15 +35,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.util.LocalOrbitHaptics
 import app.overbay.orbit.util.PlatformRuntime
-
-private data class NavTabItem(val key: OrbitNavKey, val title: String, val icon: ImageVector)
 
 /**
  * Adaptive navigation shell:
@@ -250,72 +243,4 @@ private fun SidebarRow(title: String, icon: ImageVector, selected: Boolean, onCl
             unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
         )
     )
-}
-
-@Composable
-private fun PhoneBottomBar(
-    primaryTabs: List<NavTabItem>,
-    currentKey: OrbitNavKey,
-    isSecondaryRoute: Boolean,
-    onTabSelected: (OrbitNavKey) -> Unit,
-    onOpenMore: () -> Unit
-) {
-    val itemColors = NavigationBarItemDefaults.colors(
-        selectedIconColor = MaterialTheme.colorScheme.primary,
-        selectedTextColor = MaterialTheme.colorScheme.primary,
-        indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
-    )
-    Column(modifier = Modifier.fillMaxWidth()) {
-        HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
-        NavigationBar(containerColor = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxWidth()) {
-            primaryTabs.forEach { tab ->
-                val selected = isTabSelected(tab.key, currentKey)
-                NavigationBarItem(
-                    selected = selected,
-                    onClick = { onTabSelected(tab.key) },
-                    icon = { Icon(imageVector = tab.icon, contentDescription = tab.title, modifier = Modifier.size(24.dp)) },
-                    label = {
-                        Text(
-                            text = tab.title.uppercase(),
-                            style = MaterialTheme.typography.labelSmall,
-                            maxLines = 1,
-                            softWrap = false,
-                            overflow = TextOverflow.Visible,
-                            fontSize = 10.5.sp,
-                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                            letterSpacing = 0.3.sp
-                        )
-                    },
-                    colors = itemColors
-                )
-            }
-            NavigationBarItem(
-                selected = isSecondaryRoute,
-                onClick = onOpenMore,
-                icon = { Icon(imageVector = OrbitIcons.MoreHoriz, contentDescription = "More", modifier = Modifier.size(24.dp)) },
-                label = {
-                    Text(
-                        text = "MORE",
-                        style = MaterialTheme.typography.labelSmall,
-                        maxLines = 1,
-                        softWrap = false,
-                        overflow = TextOverflow.Visible,
-                        fontSize = 10.5.sp,
-                        fontWeight = if (isSecondaryRoute) FontWeight.SemiBold else FontWeight.Medium,
-                        letterSpacing = 0.3.sp
-                    )
-                },
-                colors = itemColors
-            )
-        }
-    }
-}
-
-private fun isTabSelected(tabKey: OrbitNavKey, currentKey: OrbitNavKey): Boolean = when (tabKey) {
-    is OrbitNavKey.Transactions -> currentKey is OrbitNavKey.Transactions
-    is OrbitNavKey.Accounts -> currentKey is OrbitNavKey.Accounts
-    is OrbitNavKey.CardPerks -> currentKey is OrbitNavKey.CardPerks
-    else -> currentKey == tabKey
 }
