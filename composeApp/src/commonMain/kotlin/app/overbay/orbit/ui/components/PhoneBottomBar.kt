@@ -11,6 +11,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -85,34 +86,42 @@ internal fun PhoneBottomBar(
             modifier = Modifier.fillMaxWidth()
         ) {
             // Equal 1/5th weight slots avoid M3 NavigationBar's spacedBy(8.dp) outer edge shift and label width loss.
-            Row(
+            BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxWidth()
                     .windowInsetsPadding(navInsets)
-                    .defaultMinSize(minHeight = 72.dp)
-                    .selectableGroup(),
-                verticalAlignment = Alignment.CenterVertically
             ) {
-                primaryTabs.forEach { tab ->
+                val labelWidthScale = navLabelWidthScale(maxWidth.value)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .defaultMinSize(minHeight = 72.dp)
+                        .selectableGroup(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    primaryTabs.forEach { tab ->
+                        BottomNavTabItem(
+                            title = tab.title,
+                            icon = tab.icon,
+                            selected = isTabSelected(tab.key, currentKey),
+                            topPadding = topPadding,
+                            bottomPadding = bottomPadding,
+                            labelWidthScale = labelWidthScale,
+                            onClick = { onTabSelected(tab.key) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                     BottomNavTabItem(
-                        title = tab.title,
-                        icon = tab.icon,
-                        selected = isTabSelected(tab.key, currentKey),
+                        title = "More",
+                        icon = OrbitIcons.MoreHoriz,
+                        selected = isSecondaryRoute,
                         topPadding = topPadding,
                         bottomPadding = bottomPadding,
-                        onClick = { onTabSelected(tab.key) },
+                        labelWidthScale = labelWidthScale,
+                        onClick = onOpenMore,
                         modifier = Modifier.weight(1f)
                     )
                 }
-                BottomNavTabItem(
-                    title = "More",
-                    icon = OrbitIcons.MoreHoriz,
-                    selected = isSecondaryRoute,
-                    topPadding = topPadding,
-                    bottomPadding = bottomPadding,
-                    onClick = onOpenMore,
-                    modifier = Modifier.weight(1f)
-                )
             }
         }
     }
@@ -125,6 +134,7 @@ private fun BottomNavTabItem(
     selected: Boolean,
     topPadding: Dp,
     bottomPadding: Dp,
+    labelWidthScale: Float,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -151,10 +161,10 @@ private fun BottomNavTabItem(
     )
     val fontScale = LocalDensity.current.fontScale
     val labelStyle = MaterialTheme.typography.labelSmall.copy(
-        fontSize = cappedNavLabelSp(10f, fontScale),
-        lineHeight = cappedNavLabelSp(13f, fontScale),
+        fontSize = cappedNavLabelSp(10f * labelWidthScale, fontScale),
+        lineHeight = cappedNavLabelSp(13f * labelWidthScale, fontScale),
         fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-        letterSpacing = cappedNavLabelSp(0.2f, fontScale),
+        letterSpacing = cappedNavLabelSp(0.2f * labelWidthScale, fontScale),
         textAlign = TextAlign.Center,
         lineHeightStyle = LineHeightStyle(
             alignment = LineHeightStyle.Alignment.Center,
@@ -253,6 +263,19 @@ internal class MappedInteractionSource(
             )
         }
     }
+}
+
+/**
+ * Scales bottom-bar label typography down slightly on ultra-narrow viewports (< 360dp,
+ * e.g. split-screen or narrow foldable cover screens) so wide adjacent labels never collide.
+ */
+internal fun navLabelWidthScale(
+    barWidthDp: Float,
+    standardMinWidthDp: Float = 360f,
+    minScale: Float = 0.82f
+): Float {
+    if (barWidthDp <= 0f || barWidthDp >= standardMinWidthDp) return 1f
+    return (barWidthDp / standardMinWidthDp).coerceIn(minScale, 1f)
 }
 
 /**

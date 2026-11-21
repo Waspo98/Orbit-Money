@@ -44,7 +44,7 @@ All server state lives in Docker named volume `orbit-money-data` mounted at `/ap
 
 ### Web PWA Service Worker and Caching
 
-`composeApp/src/wasmJsMain/resources/sw.js` (`CACHE_NAME = 'orbit-money-kmp-v2'`):
+`composeApp/src/wasmJsMain/resources/sw.js` (`CACHE_NAME = 'orbit-money-kmp-v3'`):
 
 - Pre-caches `/`, `/index.html`, `/manifest.webmanifest`, `/orbitApp.js`, and app icons on install.
 - Uses network-first for page navigations and cache-first for static assets, including Webpack's content-hashed `.wasm` chunks.
@@ -293,8 +293,8 @@ All `/api/*` endpoints except `/api/auth/*` and `/api/health` require authentica
 
 ### Android Wrapper (`androidApp/src/`)
 
-- `main/`: `AndroidManifest.xml`, `MainActivity.kt`, launcher icons, splash assets, `res/xml/shortcuts.xml`, backup and file-provider configs
-- `beta/`: Beta-only icon and splash overlays (`app.overbay.orbit.beta`)
+- `main/`: `AndroidManifest.xml`, `MainActivity.kt`, adaptive/legacy launcher icons, splash screen theme, `res/xml/shortcuts.xml`, backup and file-provider configs
+- `beta/`: Beta-only icon, string, and shortcut overlays (`app.overbay.orbit.beta`)
 
 ### Backend (`backend/src/`)
 

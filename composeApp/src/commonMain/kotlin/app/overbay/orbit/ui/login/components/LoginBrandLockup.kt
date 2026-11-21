@@ -17,7 +17,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.SpanStyle
@@ -26,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.overbay.orbit.theme.EmeraldLightPrimary
 import app.overbay.orbit.theme.OrbitSprings
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -127,7 +127,7 @@ private fun LoginBrandIcon(
     Surface(
         modifier = modifier,
         shape = shape,
-        color = Color(0xFF059669)
+        color = EmeraldLightPrimary
     ) {
         Image(
             painter = painterResource(Res.drawable.orbit_logo),

@@ -56,6 +56,17 @@ class PhoneBottomBarTest {
     }
 
     @Test
+    fun navLabelWidthScale_keepsStandardWidthsUnchangedAndScalesUltraNarrowViewports() {
+        assertClose(1f, navLabelWidthScale(360f))
+        assertClose(1f, navLabelWidthScale(412f))
+        assertClose(1f, navLabelWidthScale(0f))
+        assertClose(1f, navLabelWidthScale(-10f))
+        assertClose(320f / 360f, navLabelWidthScale(320f))
+        assertClose(344f / 360f, navLabelWidthScale(344f))
+        assertClose(0.82f, navLabelWidthScale(240f))
+    }
+
+    @Test
     fun mappedInteractionSource_offsetsPressCoordinatesAndPairsReleaseCancel() = runTest {
         val base = MutableInteractionSource()
         val mapped = MappedInteractionSource(base) { Offset(8f, 18f) }
