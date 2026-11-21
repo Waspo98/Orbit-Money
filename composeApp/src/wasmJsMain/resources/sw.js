@@ -2,7 +2,7 @@
 // Orbit Money — Compose Multiplatform Wasm Service Worker
 // =============================================================================
 
-const CACHE_NAME = 'orbit-money-kmp-v3';
+const CACHE_NAME = 'orbit-money-kmp-v4';
 
 // Core app shell assets pre-cached during install.
 // Note: Webpack emits content-hashed Wasm chunks (e.g. <hash>.wasm), which are
