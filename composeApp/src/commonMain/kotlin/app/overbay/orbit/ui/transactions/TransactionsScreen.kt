@@ -184,6 +184,9 @@ fun TransactionsScreen(
             onImportBatch = { fileName, rawCsv, txns, rules ->
                 viewModel.importCsvBatch(fileName, rawCsv, txns, rules)
             },
+            onImportPreview = { fileName, preview, fallbackAcctId, includeRules ->
+                viewModel.importCsvPreview(fileName, preview, fallbackAcctId, includeRules)
+            },
             importBatches = viewModel.getImportBatches(),
             onUndoBatch = { batchId -> viewModel.undoImportBatch(batchId) },
             onDismiss = { viewModel.closeCsvImportSheet() }

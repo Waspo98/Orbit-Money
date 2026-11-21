@@ -7,6 +7,7 @@ import { createMemoryUpload } from '../lib/uploads.js';
 import {
   applyRocketMoneyImportBatch,
   createRocketMoneyImportBatch,
+  importNormalizedCsvTransactions,
   importRocketMoneyCSV,
   undoImportBatch
 } from '../services/csvImport.js';
@@ -71,6 +72,17 @@ router.post('/rocket-money/:id/commit', requireAuth, (req, res) => {
   } catch (err) {
     console.error('CSV import commit failed:', err);
     sendBadRequest(res, err.message || 'Import failed');
+  }
+});
+
+router.post('/csv', requireAuth, (req, res) => {
+  const householdId = requireHouseholdId(req);
+  try {
+    const summary = importNormalizedCsvTransactions(db, householdId, req.body || {});
+    sendOk(res, { success: true, ...summary });
+  } catch (err) {
+    console.error('Normalized CSV import failed:', err);
+    sendBadRequest(res, err.message || 'CSV import failed');
   }
 });
 

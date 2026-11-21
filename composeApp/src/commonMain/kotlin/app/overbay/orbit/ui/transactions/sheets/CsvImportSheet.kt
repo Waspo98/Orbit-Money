@@ -14,10 +14,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import app.overbay.orbit.data.*
 import app.overbay.orbit.data.model.*
+import app.overbay.orbit.domain.CsvColumnMapping
 import app.overbay.orbit.domain.CsvImportEngine
+import app.overbay.orbit.domain.CsvImportFormat
 import app.overbay.orbit.domain.CsvImportPreview
+import app.overbay.orbit.domain.CsvInspectionResult
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.OrbitAccordionVisibility
 import app.overbay.orbit.ui.components.OrbitModalFooter
@@ -37,6 +39,7 @@ fun CsvImportSheet(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
     onImportBatch: ((fileName: String, rawCsv: String, transactions: List<Transaction>, rules: List<TransactionRule>) -> Unit)? = null,
+    onImportPreview: ((fileName: String, preview: CsvImportPreview, fallbackAccountId: Long?, includeRules: Boolean) -> Unit)? = null,
     importBatches: List<ImportBatchRecord> = emptyList(),
     onUndoBatch: ((Long) -> Unit)? = null
 ) {
@@ -44,7 +47,11 @@ fun CsvImportSheet(
     val fileHelper = LocalFileImportExportHelper.current
 
     var csvText by remember { mutableStateOf("") }
-    var selectedAccountId by remember { mutableStateOf(accounts.firstOrNull()?.id ?: 1L) }
+    var fileName by remember { mutableStateOf("import.csv") }
+    var selectedAccountId by remember { mutableStateOf(accounts.firstOrNull()?.id) }
+    var inspection by remember { mutableStateOf<CsvInspectionResult?>(null) }
+    var activeMapping by remember { mutableStateOf<CsvColumnMapping?>(null) }
+    var mapperExpanded by remember { mutableStateOf(false) }
     var previewResult by remember { mutableStateOf<CsvImportPreview?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var includeRules by remember { mutableStateOf(true) }
@@ -56,16 +63,24 @@ fun CsvImportSheet(
         "2026-10-18,Checking,Everyday Checking,Chase,Direct Deposit,2500.00,PAYROLL DEPOSIT,Income"
     }
 
-    fun parseCsv() {
+    fun parseCsv(overrideMap: CsvColumnMapping? = null) {
         if (csvText.isBlank()) {
-            errorMessage = "Please paste CSV text or load sample data."
+            errorMessage = "Please choose a CSV file or paste CSV data."
             previewResult = null
+            inspection = null
             return
         }
         try {
+            val inspected = CsvImportEngine.inspectCsv(csvText)
+            inspection = inspected
+            val chosenMapping = overrideMap ?: inspected.suggestedMapping
+            activeMapping = chosenMapping
+            if (overrideMap == null) {
+                mapperExpanded = inspected.detectedFormat == CsvImportFormat.GENERIC
+            }
             val existingExtIds = existingTransactions.mapNotNull { it.externalId }.toSet()
             val catMap = categories.associateBy { it.name.lowercase() }
-            val preview = CsvImportEngine.buildPreview(csvText, existingExtIds, catMap)
+            val preview = CsvImportEngine.buildPreview(csvText, existingExtIds, catMap, chosenMapping)
             previewResult = preview
             errorMessage = null
             haptics.confirm()
@@ -86,11 +101,14 @@ fun CsvImportSheet(
                 onDismiss = onDismiss,
                 onConfirm = {
                     if (preview == null) {
-                        parseCsv()
+                        parseCsv(activeMapping)
+                    } else if (onImportPreview != null) {
+                        onImportPreview(fileName, preview, selectedAccountId, includeRules)
                     } else {
-                        val accountName = accounts.find { it.id == selectedAccountId }?.name ?: ""
+                        val fallbackId = selectedAccountId ?: 1L
+                        val accountName = accounts.find { it.id == fallbackId }?.name ?: ""
                         val assignedTxns = preview.transactions.map {
-                            it.copy(accountId = selectedAccountId, accountName = accountName)
+                            it.copy(accountId = fallbackId, accountName = it.accountName.ifBlank { accountName })
                         }
                         val generatedRules = if (includeRules) {
                             preview.rules.map { candidate ->
@@ -116,7 +134,7 @@ fun CsvImportSheet(
                         } else emptyList()
 
                         if (onImportBatch != null) {
-                            onImportBatch("import.csv", csvText, assignedTxns, generatedRules)
+                            onImportBatch(fileName, csvText, assignedTxns, generatedRules)
                         } else {
                             onImportConfirmed(assignedTxns, generatedRules)
                         }
@@ -128,6 +146,7 @@ fun CsvImportSheet(
     ) {
         OrbitSheetHeader(
             title = "Import Transactions CSV",
+            subtitle = "Rocket Money, Mint, Monarch, YNAB, or any bank CSV",
             onDismiss = onDismiss,
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
         )
@@ -149,6 +168,7 @@ fun CsvImportSheet(
                     onClick = {
                         haptics.tick()
                         fileHelper.pickAndImportFile("text/csv") { content ->
+                            fileName = "imported.csv"
                             csvText = content
                             parseCsv()
                         }
@@ -160,6 +180,7 @@ fun CsvImportSheet(
                 TextButton(
                     onClick = {
                         haptics.tick()
+                        fileName = "sample_rocket_money.csv"
                         csvText = sampleCsv
                         parseCsv()
                     },
@@ -171,10 +192,9 @@ fun CsvImportSheet(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Account Selector
-            if (accounts.isNotEmpty()) {
+            if (accounts.isNotEmpty() && (previewResult == null || previewResult?.accounts.isNullOrEmpty())) {
                 Text(
-                    text = "TARGET ACCOUNT",
+                    text = "FALLBACK ACCOUNT (WHEN CSV HAS NO ACCOUNT COLUMN)",
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
@@ -195,25 +215,46 @@ fun CsvImportSheet(
                         )
                     }
                 }
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(12.dp))
             }
 
-            // CSV Text Area
             OrbitTextField(
                 value = csvText,
                 onValueChange = {
                     csvText = it
                     if (previewResult != null) previewResult = null
+                    if (inspection != null) inspection = null
                 },
                 label = { Text("CSV Data (Header row required)") },
-                placeholder = { Text("Paste Date, Account Type, Account Name, Institution Name, Name, Amount, Description, Category...") },
+                placeholder = { Text("Paste CSV rows from Rocket Money, Mint, Monarch, YNAB, or your bank...") },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(140.dp),
+                    .height(128.dp),
                 maxLines = 8
             )
 
-            // Error Message
+            val currentInspection = inspection
+            val currentMapping = activeMapping
+            OrbitAccordionVisibility(visible = currentInspection != null && currentMapping != null) {
+                if (currentInspection != null && currentMapping != null) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        CsvColumnMapperPanel(
+                            detectedFormat = currentInspection.detectedFormat,
+                            headers = currentInspection.headers,
+                            mapping = currentMapping,
+                            sampleRows = currentInspection.sampleRows,
+                            expanded = mapperExpanded,
+                            onExpandedChange = { mapperExpanded = it },
+                            onMappingChange = { updated ->
+                                activeMapping = updated
+                                parseCsv(updated)
+                            }
+                        )
+                    }
+                }
+            }
+
             var lastError by remember { mutableStateOf<String?>(null) }
             if (errorMessage != null) lastError = errorMessage
             OrbitAccordionVisibility(visible = errorMessage != null) {
@@ -244,7 +285,6 @@ fun CsvImportSheet(
                 }
             }
 
-            // Preview Result Card
             var cachedPreview by remember { mutableStateOf<CsvImportPreview?>(null) }
             if (previewResult != null) cachedPreview = previewResult
             OrbitAccordionVisibility(visible = previewResult != null) {
@@ -264,7 +304,7 @@ fun CsvImportSheet(
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Text(
-                                    text = "IMPORT SUMMARY",
+                                    text = "IMPORT SUMMARY (${preview.detectedFormat.displayName.uppercase()})",
                                     style = MaterialTheme.typography.labelSmall,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.primary
@@ -283,11 +323,20 @@ fun CsvImportSheet(
                                 fontWeight = FontWeight.Medium,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
-                            Text(
-                                text = "• Total rows in file: ${preview.totalRowCount}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            if (preview.accounts.isNotEmpty()) {
+                                Text(
+                                    text = "• Accounts detected: ${preview.accounts.size} (${preview.accounts.joinToString { it.name }})",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            if (preview.earliestTransactionDateIso != null && preview.latestTransactionDateIso != null) {
+                                Text(
+                                    text = "• Date range: ${preview.earliestTransactionDateIso} to ${preview.latestTransactionDateIso}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                             OrbitAccordionVisibility(visible = preview.duplicateRowCount > 0) {
                                 Text(
                                     text = "• Duplicates skipped: ${preview.duplicateRowCount}",

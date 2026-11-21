@@ -1,10 +1,12 @@
 package app.overbay.orbit.data.network
 
 import app.overbay.orbit.data.model.Account
+import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.data.model.BalanceRecordSource
 import app.overbay.orbit.data.model.OrbitWorkspaceSnapshot
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.domain.BalanceHistoryEngine
+import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MoneyUtils
 import io.ktor.client.HttpClient
@@ -17,11 +19,24 @@ import io.ktor.client.request.parameter
 import io.ktor.client.request.post
 import io.ktor.client.statement.bodyAsText
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
+
+@Serializable
+data class SimpleFinOrg(
+    val name: String? = null,
+    val domain: String? = null,
+    @SerialName("sfin-url") val sfinUrl: String? = null
+)
 
 @Serializable
 data class SimpleFinAccount(
@@ -31,6 +46,7 @@ data class SimpleFinAccount(
     val balance: String = "0.00",
     @SerialName("available-balance") val availableBalance: String? = null,
     @SerialName("balance-date") val balanceDate: Long = 0L,
+    val org: SimpleFinOrg? = null,
     val transactions: List<SimpleFinTransaction> = emptyList()
 )
 
@@ -52,12 +68,14 @@ data class SimpleFinDataResponse(
 
 data class DirectSyncOutcome(
     val updatedSnapshot: OrbitWorkspaceSnapshot,
-    val newTransactionCount: Int
+    val newTransactionCount: Int,
+    val accountsCreatedCount: Int = 0,
+    val accountsSyncedCount: Int = 0
 )
 
 /**
  * Pure Kotlin multiplatform client communicating directly with the SimpleFIN Bridge protocol.
- * Enables Android and Web PWA in Single-User Local Mode to connect and sync banks without an Express backend.
+ * Enables Android in Single-User Local Mode to connect and sync banks without an Express backend.
  */
 class SimpleFinDirectClient(
     private val customClient: HttpClient? = null
@@ -70,29 +88,49 @@ class SimpleFinDirectClient(
             })
         }
         install(HttpTimeout) {
-            requestTimeoutMillis = 20000L
+            requestTimeoutMillis = 25000L
             connectTimeoutMillis = 15000L
         }
     }
 
-    /**
-     * Claims a permanent access URL from a one-shot base64 setup token.
-     */
+    fun isAccessUrl(raw: String): Boolean {
+        val trimmed = raw.trim()
+        return trimmed.startsWith("https://", ignoreCase = true) && trimmed.contains("@")
+    }
+
     @OptIn(ExperimentalEncodingApi::class)
-    suspend fun claimAccessUrl(setupToken: String): Result<String> = runCatching {
+    internal fun decodeClaimUrl(setupToken: String): String {
         val trimmed = setupToken.trim()
-        val decodedClaimUrl = Base64.decode(trimmed).decodeToString().trim()
-        require(decodedClaimUrl.startsWith("https://", ignoreCase = true)) {
+        require(trimmed.isNotEmpty()) { "Please paste your SimpleFIN setup token." }
+        val decoded = if (trimmed.startsWith("https://", ignoreCase = true)) {
+            trimmed
+        } else {
+            runCatching { Base64.decode(trimmed).decodeToString().trim() }
+                .getOrElse { throw IllegalArgumentException("That doesn't look like a valid SimpleFIN setup token.") }
+        }
+        require(decoded.startsWith("https://", ignoreCase = true)) {
             "Setup token did not decode to a valid https URL."
         }
+        return decoded
+    }
 
+    /**
+     * Claims a permanent access URL from a one-shot base64 setup token.
+     * If given an already-claimed SimpleFIN access URL (`https://user:pass@...`), returns it directly.
+     */
+    suspend fun claimAccessUrl(setupToken: String): Result<String> = runCatching {
+        val trimmed = setupToken.trim()
+        require(trimmed.isNotEmpty()) { "Please paste your SimpleFIN setup token." }
+        if (isAccessUrl(trimmed)) return@runCatching trimmed
+
+        val decodedClaimUrl = decodeClaimUrl(trimmed)
         val (cleanUrl, authHeader) = splitBasicAuth(decodedClaimUrl)
         val response = client.post(cleanUrl) {
             if (authHeader != null) header("Authorization", authHeader)
         }
         val accessUrl = response.bodyAsText().trim()
-        require(accessUrl.startsWith("https://", ignoreCase = true) && accessUrl.contains("@")) {
-            "SimpleFIN returned an invalid access URL: $accessUrl"
+        require(isAccessUrl(accessUrl)) {
+            "SimpleFIN rejected that setup token (tokens can only be claimed once)."
         }
         accessUrl
     }
@@ -100,7 +138,11 @@ class SimpleFinDirectClient(
     /**
      * Fetches accounts and posted transactions from SimpleFIN Bridge.
      */
-    suspend fun fetchBridgeData(accessUrl: String, startDateSeconds: Long? = null, endDateSeconds: Long? = null): Result<SimpleFinDataResponse> = runCatching {
+    suspend fun fetchBridgeData(
+        accessUrl: String,
+        startDateSeconds: Long? = null,
+        endDateSeconds: Long? = null
+    ): Result<SimpleFinDataResponse> = runCatching {
         val (cleanUrl, authHeader) = splitBasicAuth(accessUrl)
         val endpoint = "${cleanUrl.trimEnd('/')}/accounts"
         val response = client.get(endpoint) {
@@ -112,25 +154,70 @@ class SimpleFinDirectClient(
     }
 
     /**
-     * High-level direct sync that fetches bank data and merges new transactions into OrbitWorkspaceSnapshot.
+     * High-level direct sync that fetches bank data, auto-creates any unseen accounts,
+     * updates balance checkpoints, and merges new transactions into OrbitWorkspaceSnapshot.
      */
-    suspend fun syncWithSnapshot(accessUrl: String, snapshot: OrbitWorkspaceSnapshot): DirectSyncOutcome {
-        val bridgeData = fetchBridgeData(accessUrl).getOrThrow()
+    suspend fun syncWithSnapshot(
+        accessUrl: String,
+        snapshot: OrbitWorkspaceSnapshot,
+        cutoverDateIso: String? = null
+    ): DirectSyncOutcome {
+        val normalizedCutover = cutoverDateIso?.trim()?.takeIf { it.length == 10 }
+        val startDateSec = resolveStartDateEpochSeconds(normalizedCutover)
+        val bridgeData = fetchBridgeData(accessUrl, startDateSeconds = startDateSec).getOrThrow()
+        return mergeBridgeData(bridgeData, snapshot, normalizedCutover)
+    }
+
+    internal fun mergeBridgeData(
+        bridgeData: SimpleFinDataResponse,
+        snapshot: OrbitWorkspaceSnapshot,
+        cutoverDateIso: String? = null
+    ): DirectSyncOutcome {
+        val normalizedCutover = cutoverDateIso?.trim()?.takeIf { it.length == 10 }
         val existingTxIds = snapshot.transactions.mapNotNull { it.externalId }.toSet()
-        val accountBySimpleFinId = snapshot.accounts.associateBy { it.simplefinAccountId }
+        val accountBySimpleFinId = snapshot.accounts
+            .filter { !it.simplefinAccountId.isNullOrBlank() }
+            .associateBy { it.simplefinAccountId!! }
+            .toMutableMap()
         val todayIso = LocalDateUtils.todayIsoDate()
 
+        val createdAccounts = mutableListOf<Account>()
         val newTransactions = mutableListOf<Transaction>()
-        val updatedBalancesByAccountId = mutableMapOf<Long, Long>()
+        val updatedBalancesByAccountId = mutableMapOf<Long, Cents>()
         var updatedRecords = snapshot.balanceRecords
-        var nextId = (snapshot.transactions.maxOfOrNull { it.id } ?: 0L) + 1L
+        var nextAccountId = (snapshot.accounts.maxOfOrNull { it.id } ?: 0L) + 1L
+        var nextSortOrder = (snapshot.accounts.maxOfOrNull { it.sortOrder } ?: 0) + 10
+        var nextTxId = (snapshot.transactions.maxOfOrNull { it.id } ?: 0L) + 1L
+        var syncedCount = 0
 
         for (sfAccount in bridgeData.accounts) {
-            val localAccount = accountBySimpleFinId[sfAccount.id] ?: continue
             val parsedBalance = sfAccount.balance.toDoubleOrNull()
+            val balanceCents = parsedBalance?.let { MoneyUtils.dollarsToCents(it) } ?: 0L
+            val recordDate = if (sfAccount.balanceDate > 0L) formatEpochDate(sfAccount.balanceDate) else todayIso
+
+            val existing = accountBySimpleFinId[sfAccount.id]
+            val localAccount = if (existing != null) {
+                existing
+            } else {
+                val created = Account(
+                    id = nextAccountId++,
+                    name = sfAccount.name.ifBlank { "Linked Account" },
+                    type = inferAccountType(sfAccount.name, sfAccount.org?.name, balanceCents),
+                    institution = sfAccount.org?.name?.takeIf { it.isNotBlank() },
+                    currentBalanceCents = balanceCents,
+                    isManual = false,
+                    simplefinAccountId = sfAccount.id,
+                    sortOrder = nextSortOrder
+                )
+                nextSortOrder += 10
+                createdAccounts.add(created)
+                accountBySimpleFinId[sfAccount.id] = created
+                created
+            }
+
+            syncedCount += 1
+
             if (parsedBalance != null) {
-                val balanceCents = MoneyUtils.dollarsToCents(parsedBalance)
-                val recordDate = if (sfAccount.balanceDate > 0L) formatEpochDate(sfAccount.balanceDate) else todayIso
                 updatedBalancesByAccountId[localAccount.id] = balanceCents
                 updatedRecords = BalanceHistoryEngine.upsertAutoCheckpoint(
                     records = updatedRecords,
@@ -140,17 +227,19 @@ class SimpleFinDirectClient(
                     source = BalanceRecordSource.SIMPLEFIN
                 )
             }
+
             for (sfTx in sfAccount.transactions) {
                 if (existingTxIds.contains(sfTx.id)) continue
-
                 val dateIso = formatEpochDate(sfTx.posted)
+                if (normalizedCutover != null && dateIso < normalizedCutover) continue
+
                 val amountDouble = sfTx.amount.toDoubleOrNull() ?: 0.0
                 val amountCents = MoneyUtils.dollarsToCents(amountDouble)
                 val merchantName = sfTx.payee?.takeIf { it.isNotBlank() } ?: sfTx.description
 
                 newTransactions.add(
                     Transaction(
-                        id = nextId++,
+                        id = nextTxId++,
                         accountId = localAccount.id,
                         accountName = localAccount.name,
                         originalDate = dateIso,
@@ -164,21 +253,45 @@ class SimpleFinDirectClient(
             }
         }
 
-        val updatedAccounts = if (updatedBalancesByAccountId.isEmpty()) {
-            snapshot.accounts
-        } else {
-            snapshot.accounts.map { acct ->
-                val syncedBal = updatedBalancesByAccountId[acct.id]
-                if (syncedBal != null) acct.copy(currentBalanceCents = syncedBal) else acct
-            }
+        val updatedExistingAccounts = snapshot.accounts.map { acct ->
+            val syncedBal = updatedBalancesByAccountId[acct.id]
+            if (syncedBal != null) acct.copy(currentBalanceCents = syncedBal) else acct
         }
-
         val merged = snapshot.copy(
-            accounts = updatedAccounts,
+            accounts = updatedExistingAccounts + createdAccounts,
             balanceRecords = updatedRecords,
             transactions = snapshot.transactions + newTransactions
         )
-        return DirectSyncOutcome(merged, newTransactions.size)
+        return DirectSyncOutcome(
+            updatedSnapshot = merged,
+            newTransactionCount = newTransactions.size,
+            accountsCreatedCount = createdAccounts.size,
+            accountsSyncedCount = syncedCount
+        )
+    }
+
+    internal fun inferAccountType(name: String, orgName: String?, balanceCents: Cents): AccountType {
+        val text = "$name ${orgName.orEmpty()}".lowercase()
+        return when {
+            Regex("mortgage|home loan").containsMatchIn(text) -> AccountType.MORTGAGE
+            Regex("credit|card|sapphire|amex|visa|mastercard|discover|venture|freedom|cash back").containsMatchIn(text) -> AccountType.CREDIT
+            Regex("auto loan|student loan|loan|line of credit|heloc").containsMatchIn(text) -> AccountType.LOAN
+            Regex("401\\(?k\\)?|ira|roth|vanguard|fidelity|schwab|betterment|brokerage|hsa|403b|tsp|investment").containsMatchIn(text) -> AccountType.INVESTMENT
+            Regex("saving|money market|reserve|cd ").containsMatchIn(text) -> AccountType.SAVINGS
+            Regex("checking|debit|everyday").containsMatchIn(text) -> AccountType.CHECKING
+            balanceCents < 0L -> AccountType.CREDIT
+            else -> AccountType.CHECKING
+        }
+    }
+
+    private fun resolveStartDateEpochSeconds(cutoverDateIso: String?): Long {
+        if (!cutoverDateIso.isNullOrBlank()) {
+            val parsed = runCatching { LocalDate.parse(cutoverDateIso) }.getOrNull()
+            if (parsed != null) {
+                return parsed.atStartOfDayIn(TimeZone.UTC).epochSeconds
+            }
+        }
+        return Clock.System.now().epochSeconds - (90L * 86400L)
     }
 
     @OptIn(ExperimentalEncodingApi::class)
@@ -200,21 +313,6 @@ class SimpleFinDirectClient(
         return Pair(rawUrl, null)
     }
 
-    private fun formatEpochDate(epochSeconds: Long): String {
-        // Approximate YYYY-MM-DD from epoch days
-        val days = epochSeconds / 86400
-        var l = days + 719468
-        var n = (4 * l) / 146097
-        l -= (146097 * n + 3) / 4
-        var y = (4000 * (l + 1)) / 1461001
-        l -= (1461 * y) / 4 - 31
-        var m = (80 * l) / 2447
-        val d = l - (2447 * m) / 80
-        l = m / 11
-        m = m + 2 - 12 * l
-        y = 100 * (n - 49) + y + l
-        val mm = if (m < 10) "0$m" else "$m"
-        val dd = if (d < 10) "0$d" else "$d"
-        return "$y-$mm-$dd"
-    }
+    internal fun formatEpochDate(epochSeconds: Long): String =
+        Instant.fromEpochSeconds(epochSeconds).toLocalDateTime(TimeZone.UTC).date.toString()
 }

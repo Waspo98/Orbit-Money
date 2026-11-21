@@ -1,5 +1,6 @@
 package app.overbay.orbit.data
 
+import app.overbay.orbit.data.engine.SyncResult
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.data.model.BackupPreviewStats
@@ -324,10 +325,22 @@ suspend fun OrbitRepository.setupSimpleFinBridge(setupToken: String, cutoverDate
         _simpleFinStatus.value = refreshed
         refreshed
     } else {
-        val updatedPref = preferences.value.copy(simpleFinToken = setupToken, simpleFinCutoverDate = cutoverDate)
+        val accessUrl = simpleFinClient.claimAccessUrl(setupToken).getOrThrow()
+        val updatedPref = preferences.value.copy(
+            simpleFinToken = accessUrl,
+            simpleFinCutoverDate = cutoverDate?.takeIf { it.isNotBlank() }
+        )
         updatePreferences(updatedPref)
-        sync(force = true)
-        val info = SimpleFinStatusInfo(configured = true, connected = true, cutoverDate = cutoverDate)
+        val syncResult = sync(force = true)
+        if (syncResult is SyncResult.Error) {
+            throw IllegalStateException(syncResult.message)
+        }
+        val info = SimpleFinStatusInfo(
+            configured = true,
+            connected = true,
+            syncEnabled = true,
+            cutoverDate = updatedPref.simpleFinCutoverDate
+        )
         _simpleFinStatus.value = info
         info
     }

@@ -509,6 +509,23 @@ class TransactionsViewModel(
         }
     }
 
+    fun importCsvPreview(
+        fileName: String,
+        preview: app.overbay.orbit.domain.CsvImportPreview,
+        fallbackAccountId: Long?,
+        includeRules: Boolean = true
+    ) {
+        viewModelScope.launch(computeDispatcher) {
+            repository.importCsvPreview(
+                fileName = fileName,
+                preview = preview,
+                fallbackAccountId = fallbackAccountId,
+                includeRules = includeRules
+            )
+            closeCsvImportSheet()
+        }
+    }
+
     fun undoImportBatch(batchId: Long) {
         viewModelScope.launch(computeDispatcher) {
             repository.undoImportBatch(batchId)

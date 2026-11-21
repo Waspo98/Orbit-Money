@@ -71,9 +71,15 @@ class LocalSnapshotEngine(
         }
 
         return try {
-            val syncResult = simpleFinClient.syncWithSnapshot(token, snapshot)
+            val syncResult = simpleFinClient.syncWithSnapshot(
+                accessUrl = token,
+                snapshot = snapshot,
+                cutoverDateIso = snapshot.preferences.simpleFinCutoverDate
+            )
             saveSnapshot(syncResult.updatedSnapshot)
-            SyncResult.Success("Synced ${syncResult.newTransactionCount} transactions directly from SimpleFIN")
+            SyncResult.Success(
+                "Synced ${syncResult.accountsSyncedCount} accounts · ${syncResult.newTransactionCount} new transactions"
+            )
         } catch (e: Throwable) {
             SyncResult.Error("Direct SimpleFIN sync failed: ${e.message}", e)
         }
