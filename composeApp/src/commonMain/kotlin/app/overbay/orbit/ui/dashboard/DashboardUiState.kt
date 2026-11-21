@@ -224,11 +224,32 @@ data class UpcomingBillsState(
     val items: List<UpcomingBillItem> = emptyList()
 )
 
+enum class RecentTransactionConfirmKind {
+    DELETE,
+    RESET_EDITS,
+    MARK_RECURRING
+}
+
+data class RecentTransactionPendingConfirm(
+    val transactionId: Long,
+    val merchant: String,
+    val kind: RecentTransactionConfirmKind
+)
+
+data class RecentTransactionOverlayState(
+    val expandedTransactionId: Long? = null,
+    val categoryPickerTransactionId: Long? = null,
+    val pendingConfirm: RecentTransactionPendingConfirm? = null
+)
+
 data class DashboardRecentTransactionItem(
     val id: Long,
+    val transaction: Transaction,
+    val category: Category? = null,
     val merchant: String,
     val amountCents: Cents,
     val isExpense: Boolean,
+    val isIncome: Boolean = false,
     val formattedAmount: String,
     val dateIso: String,
     val dateDisplay: String,
@@ -246,7 +267,10 @@ data class DashboardRecentTransactionItem(
 )
 
 data class RecentTransactionsState(
-    val transactions: List<DashboardRecentTransactionItem> = emptyList()
+    val transactions: List<DashboardRecentTransactionItem> = emptyList(),
+    val expandedTransactionId: Long? = null,
+    val categoryPickerTransaction: Transaction? = null,
+    val pendingConfirm: RecentTransactionPendingConfirm? = null
 )
 
 data class AccountsOverviewState(

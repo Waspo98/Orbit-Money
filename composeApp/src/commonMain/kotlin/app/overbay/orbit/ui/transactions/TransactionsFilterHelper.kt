@@ -53,7 +53,7 @@ object TransactionsFilterHelper {
         isSearchActive = destination.openSearch,
         inspectingId = destination.transactionId,
         expandedId = destination.transactionId,
-        showEditorSheet = destination.openAddSheet
+        showEditorSheet = destination.openAddSheet || (destination.openEditor && destination.transactionId != null)
     )
 
     fun filterTransactions(

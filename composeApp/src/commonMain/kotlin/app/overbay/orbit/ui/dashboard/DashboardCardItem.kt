@@ -161,18 +161,20 @@ fun DashboardCardItem(
             modifier = modifier
         )
         DashboardCardType.RECENT_TRANSACTIONS -> RecentTransactionsCard(
-            transactions = uiState.recentTransactions.transactions,
+            state = uiState.recentTransactions,
             mhaEnabled = uiState.mhaEnabled,
-            categories = uiState.availableCategories,
-            onSelectTransaction = { onNavigate(OrbitNavKey.Transactions(transactionId = it)) },
-            onViewAll = { onNavigate(OrbitNavKey.Transactions()) },
-            onQuickCategorize = { id, catId -> onAction(DashboardAction.ApplyCategory(id, catId)) },
+            onToggleExpand = { onAction(DashboardAction.ToggleExpandRecentTransaction(it)) },
+            onOpenCategoryPicker = { onAction(DashboardAction.OpenRecentCategoryPicker(it)) },
+            onEditTransaction = { onNavigate(OrbitNavKey.Transactions(transactionId = it, openEditor = true)) },
+            onViewDetails = { onNavigate(OrbitNavKey.Transactions(transactionId = it)) },
             onToggleTransfer = { id, isTr -> onAction(DashboardAction.ToggleTransactionTransfer(id, isTr)) },
             onToggleIgnore = { id, isIgn -> onAction(DashboardAction.ToggleTransactionIgnored(id, isIgn)) },
             onToggleMha = { id, isMha -> onAction(DashboardAction.ToggleTransactionMha(id, isMha)) },
-            onMarkRecurring = { id -> onAction(DashboardAction.MarkTransactionRecurring(id)) },
-            onResetEdits = { id -> onAction(DashboardAction.ResetTransactionEdits(id)) },
-            onDelete = { id -> onAction(DashboardAction.DeleteTransaction(id)) },
+            onRequestConfirm = { id, merchant, kind ->
+                onAction(DashboardAction.RequestRecentTransactionConfirm(id, merchant, kind))
+            },
+            onReportLogoStatus = { key, status -> onAction(DashboardAction.ReportMerchantLogoStatus(key, status)) },
+            onViewAll = { onNavigate(OrbitNavKey.Transactions()) },
             modifier = modifier
         )
     }

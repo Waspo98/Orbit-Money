@@ -39,7 +39,8 @@ object DashboardDataTransform {
         focusedGoalId: Long?,
         retirementAge: Int,
         retirementPreset: String,
-        categorizeReview: CategorizeReviewState
+        categorizeReview: CategorizeReviewState,
+        recentOverlay: RecentTransactionOverlayState = RecentTransactionOverlayState()
     ): DashboardUiState {
         val today = LocalDateUtils.todayLocalDate()
         val todayIso = LocalDateUtils.formatIsoDate(today)
@@ -457,23 +458,27 @@ object DashboardDataTransform {
             items = top3Bills
         )
 
-        // 15. Recent Transactions (last 5)
+        // 15. Recent Transactions (last 10)
         val recentList = topRecent.map { txn ->
             val cat = txn.effectiveCategoryId?.let { categoryById[it] }
             val acct = accountById[txn.accountId]
             val dateDisplay = LocalDateUtils.parseIsoDate(txn.effectiveDate)?.let {
-                LocalDateUtils.formatRelativeOrDisplayDate(it)
+                LocalDateUtils.formatRecentCompactDate(it, today)
             } ?: txn.effectiveDate
 
             val hasEdits = txn.editedDate != null || txn.editedMerchant != null || txn.editedAmountCents != null ||
-                txn.editedCategoryIdSource != null || txn.editedIsTransfer != null || txn.editedIsIgnored != null ||
+                txn.editedCategoryIdSource != null || txn.editedCategoryId != null ||
+                txn.editedIsTransfer != null || txn.editedIsIgnored != null ||
                 (snapshot.preferences.mhaTrackerEnabled && txn.editedMhaEligible != null)
 
             DashboardRecentTransactionItem(
                 id = txn.id,
+                transaction = txn,
+                category = cat,
                 merchant = txn.effectiveMerchant,
                 amountCents = txn.effectiveAmountCents,
                 isExpense = txn.isExpense,
+                isIncome = txn.isIncome,
                 formattedAmount = MoneyUtils.formatCents(txn.effectiveAmountCents, signed = true),
                 dateIso = txn.effectiveDate,
                 dateDisplay = dateDisplay,
@@ -490,7 +495,18 @@ object DashboardDataTransform {
                 hasEdits = hasEdits
             )
         }
-        val recentState = RecentTransactionsState(transactions = recentList)
+        val pickerTxn = recentOverlay.categoryPickerTransactionId?.let { targetId ->
+            snapshot.transactions.find { it.id == targetId }
+        }
+        val expandedId = recentOverlay.expandedTransactionId?.takeIf { id ->
+            recentList.any { it.id == id }
+        }
+        val recentState = RecentTransactionsState(
+            transactions = recentList,
+            expandedTransactionId = expandedId,
+            categoryPickerTransaction = pickerTxn,
+            pendingConfirm = recentOverlay.pendingConfirm
+        )
 
         // 16. Cards Display & Customization
         val rawWidgets = snapshot.preferences.dashboardWidgets.ifEmpty {

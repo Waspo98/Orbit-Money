@@ -43,7 +43,7 @@ internal object DashboardTransactionAggregator {
         var priorExpense: Cents = 0L
         val categorySpendingMap = HashMap<Long, Long>()
         val topBiggestExpenses = ArrayList<Transaction>(6)
-        val topRecent = ArrayList<Transaction>(6)
+        val topRecent = ArrayList<Transaction>(11)
         var mhaSpending: Cents = 0L
         var mhaTxnCount = 0
 
@@ -103,7 +103,7 @@ internal object DashboardTransactionAggregator {
         )
     }
 
-    private fun insertTopRecent(top: ArrayList<Transaction>, candidate: Transaction, maxSize: Int = 5) {
+    private fun insertTopRecent(top: ArrayList<Transaction>, candidate: Transaction, maxSize: Int = 10) {
         val date = candidate.effectiveDate
         val id = candidate.id
         if (top.size == maxSize) {

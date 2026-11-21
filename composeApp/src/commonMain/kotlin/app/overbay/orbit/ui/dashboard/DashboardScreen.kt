@@ -37,6 +37,7 @@ import app.overbay.orbit.ui.components.CanopyIconButton
 import app.overbay.orbit.ui.components.CanopySettingsButton
 import app.overbay.orbit.ui.components.HeroScrollState
 import app.overbay.orbit.ui.components.MorphingPageHero
+import app.overbay.orbit.ui.components.OrbitConfirmationDialog
 import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.orbitFadeContentTransform
 import app.overbay.orbit.ui.components.rememberHeroScrollState
@@ -46,6 +47,7 @@ import app.overbay.orbit.ui.dashboard.dialogs.DashboardCustomizeSheet
 import app.overbay.orbit.ui.dashboard.dialogs.TransactionReviewSheet
 import app.overbay.orbit.ui.settings.SettingsSection
 import app.overbay.orbit.ui.transactions.components.TransactionsSearchBar
+import app.overbay.orbit.ui.transactions.sheets.CategoryPickerSheet
 import app.overbay.orbit.util.LocalDevicePosture
 
 /**
@@ -309,5 +311,54 @@ fun DashboardScreen(
         if (uiState.isReviewModalOpen) {
             TransactionReviewSheet(state = uiState.categorizeReview, onAction = onAction)
         }
+
+        uiState.recentTransactions.categoryPickerTransaction?.let { pickerTxn ->
+            CategoryPickerSheet(
+                transaction = pickerTxn,
+                categories = uiState.availableCategories,
+                onSaveCategory = { categoryId ->
+                    onAction(DashboardAction.SetRecentTransactionCategory(pickerTxn.id, categoryId))
+                },
+                onDismiss = { onAction(DashboardAction.CloseRecentCategoryPicker) }
+            )
+        }
+
+        uiState.recentTransactions.pendingConfirm?.let { pending ->
+            val (title, message, confirmText, isDestructive) = when (pending.kind) {
+                RecentTransactionConfirmKind.DELETE -> ConfirmCopy(
+                    title = "Delete Transaction?",
+                    message = "Permanently delete \"${pending.merchant}\"? This cannot be undone.",
+                    confirmText = "Delete",
+                    isDestructive = true
+                )
+                RecentTransactionConfirmKind.RESET_EDITS -> ConfirmCopy(
+                    title = "Reset Edits?",
+                    message = "Restore \"${pending.merchant}\" to its original bank statement values?",
+                    confirmText = "Reset",
+                    isDestructive = false
+                )
+                RecentTransactionConfirmKind.MARK_RECURRING -> ConfirmCopy(
+                    title = "Mark as Recurring?",
+                    message = "Create a recurring upcoming item from \"${pending.merchant}\"?",
+                    confirmText = "Add to Upcoming",
+                    isDestructive = false
+                )
+            }
+            OrbitConfirmationDialog(
+                title = title,
+                message = message,
+                confirmText = confirmText,
+                isDestructive = isDestructive,
+                onConfirm = { onAction(DashboardAction.ConfirmRecentTransactionAction) },
+                onDismiss = { onAction(DashboardAction.DismissRecentTransactionConfirm) }
+            )
+        }
     }
 }
+
+private data class ConfirmCopy(
+    val title: String,
+    val message: String,
+    val confirmText: String,
+    val isDestructive: Boolean
+)

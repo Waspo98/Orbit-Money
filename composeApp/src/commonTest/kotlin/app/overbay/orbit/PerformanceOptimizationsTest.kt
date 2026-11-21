@@ -100,11 +100,11 @@ class PerformanceOptimizationsTest {
         )
         assertEquals(3_200L + 8_900L + 1_500L, scanUnified.categorySpendingMap[0L])
         assertNull(scanUnified.categorySpendingMap[99L])
-        // Recent top-5 sorts by effectiveDate DESC then id DESC (includes transfers, excludes ignored)
+        // Recent top-10 sorts by effectiveDate DESC then id DESC (includes transfers, excludes ignored)
         val expectedRecentIds = transactions
             .filter { !it.effectiveIsIgnored }
             .sortedWith(compareByDescending<Transaction> { it.effectiveDate }.thenByDescending { it.id })
-            .take(5)
+            .take(10)
             .map { it.id }
         assertEquals(expectedRecentIds, scan.topRecent.map { it.id })
         // Biggest expenses excludes hiddenIds (15L) and transfers (16L)

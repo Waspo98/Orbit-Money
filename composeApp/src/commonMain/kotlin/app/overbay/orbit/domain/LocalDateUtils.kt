@@ -183,6 +183,15 @@ object LocalDateUtils {
         }
     }
 
+    fun formatRecentCompactDate(date: LocalDate, today: LocalDate = todayLocalDate()): String {
+        return when {
+            date == today -> "Today"
+            date == addDays(today, -1) -> "Yesterday"
+            date.year == today.year -> formatShortDate(date)
+            else -> formatDisplayDate(date)
+        }
+    }
+
     fun ageFromBirthDate(birthDate: LocalDate, asOf: LocalDate = todayLocalDate()): Int {
         var age = asOf.year - birthDate.year
         if (asOf.monthNumber < birthDate.monthNumber ||

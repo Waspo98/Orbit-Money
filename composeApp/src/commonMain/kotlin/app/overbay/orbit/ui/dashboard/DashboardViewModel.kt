@@ -47,6 +47,7 @@ class DashboardViewModel(
     private val _retirementAge = MutableStateFlow(repository.preferences.value.dashboardRetirementAge)
     private val _retirementPreset = MutableStateFlow(repository.preferences.value.dashboardRetirementPreset.ifBlank { "balanced" })
     private val _reviewState = MutableStateFlow(CategorizeReviewState())
+    private val _recentTxnOverlay = MutableStateFlow(RecentTransactionOverlayState())
     private val reviewPrefsMutex = Mutex()
 
     init {
@@ -78,8 +79,9 @@ class DashboardViewModel(
             _reviewState
         ) { hiddenBiggestIds, focusedGoalId, retirementAge, retirementPreset, reviewState ->
             TransformInput2(hiddenBiggestIds, focusedGoalId, retirementAge, retirementPreset, reviewState)
-        }
-    ) { input1, input2 ->
+        },
+        _recentTxnOverlay
+    ) { input1, input2, recentOverlay ->
         DashboardDataTransform.buildDashboardUiState(
             snapshot = input1.snapshot,
             selectedMonth = input1.selectedMonth,
@@ -91,7 +93,8 @@ class DashboardViewModel(
             focusedGoalId = input2.focusedGoalId,
             retirementAge = input2.retirementAge,
             retirementPreset = input2.retirementPreset,
-            categorizeReview = input2.reviewState
+            categorizeReview = input2.reviewState,
+            recentOverlay = recentOverlay
         )
     }.flowOn(computeDispatcher).stateIn(
         scope = viewModelScope,
@@ -509,12 +512,62 @@ class DashboardViewModel(
             DashboardAction.OpenReviewRuleCreator -> openReviewRuleCreator()
             DashboardAction.CloseReviewRuleCreator -> closeReviewRuleCreator()
             is DashboardAction.SaveReviewRule -> saveReviewRule(action.rule)
-            is DashboardAction.ToggleTransactionTransfer -> viewModelScope.launch { repository.batchMarkTransfer(setOf(action.transactionId), action.isTransfer) }
-            is DashboardAction.ToggleTransactionIgnored -> viewModelScope.launch { repository.setTransactionIgnored(action.transactionId, action.isIgnored) }
-            is DashboardAction.ToggleTransactionMha -> viewModelScope.launch { repository.batchSetMhaEligible(setOf(action.transactionId), action.isEligible) }
-            is DashboardAction.MarkTransactionRecurring -> viewModelScope.launch { repository.createUpcomingFromTransaction(action.transactionId) }
-            is DashboardAction.ResetTransactionEdits -> viewModelScope.launch { repository.resetTransaction(action.transactionId) }
-            is DashboardAction.DeleteTransaction -> viewModelScope.launch { repository.deleteTransaction(action.transactionId) }
+            is DashboardAction.ToggleExpandRecentTransaction -> _recentTxnOverlay.value = _recentTxnOverlay.value.copy(
+                expandedTransactionId = if (_recentTxnOverlay.value.expandedTransactionId == action.transactionId) null else action.transactionId
+            )
+            is DashboardAction.OpenRecentCategoryPicker -> _recentTxnOverlay.value = _recentTxnOverlay.value.copy(categoryPickerTransactionId = action.transactionId)
+            DashboardAction.CloseRecentCategoryPicker -> _recentTxnOverlay.value = _recentTxnOverlay.value.copy(categoryPickerTransactionId = null)
+            is DashboardAction.SetRecentTransactionCategory -> setRecentTransactionCategory(action.transactionId, action.categoryId)
+            is DashboardAction.ToggleTransactionTransfer -> viewModelScope.launch(computeDispatcher) { repository.batchMarkTransfer(setOf(action.transactionId), action.isTransfer) }
+            is DashboardAction.ToggleTransactionIgnored -> {
+                if (action.isIgnored && _recentTxnOverlay.value.expandedTransactionId == action.transactionId) {
+                    _recentTxnOverlay.value = _recentTxnOverlay.value.copy(expandedTransactionId = null)
+                }
+                viewModelScope.launch(computeDispatcher) { repository.setTransactionIgnored(action.transactionId, action.isIgnored) }
+            }
+            is DashboardAction.ToggleTransactionMha -> viewModelScope.launch(computeDispatcher) { repository.batchSetMhaEligible(setOf(action.transactionId), action.isEligible) }
+            is DashboardAction.RequestRecentTransactionConfirm -> _recentTxnOverlay.value = _recentTxnOverlay.value.copy(
+                pendingConfirm = RecentTransactionPendingConfirm(action.transactionId, action.merchant, action.kind)
+            )
+            DashboardAction.DismissRecentTransactionConfirm -> _recentTxnOverlay.value = _recentTxnOverlay.value.copy(pendingConfirm = null)
+            DashboardAction.ConfirmRecentTransactionAction -> confirmRecentTransactionAction()
+            is DashboardAction.ReportMerchantLogoStatus -> viewModelScope.launch(computeDispatcher) {
+                repository.reportMerchantLogoStatus(action.merchantKey, action.status)
+            }
+        }
+    }
+
+    private fun setRecentTransactionCategory(transactionId: Long, categoryId: Long?) {
+        _recentTxnOverlay.value = _recentTxnOverlay.value.copy(categoryPickerTransactionId = null)
+        viewModelScope.launch(computeDispatcher) {
+            val txn = repository.transactions.value.find { it.id == transactionId } ?: return@launch
+            if (categoryId == txn.effectiveCategoryId &&
+                (txn.editedCategoryIdSource == null || txn.editedCategoryIdSource == "user")
+            ) return@launch
+            repository.saveTransaction(
+                txn.copy(
+                    editedCategoryId = categoryId,
+                    editedCategoryIdSource = "user",
+                    editSource = EditSource.USER
+                )
+            )
+        }
+    }
+
+    private fun confirmRecentTransactionAction() {
+        val pending = _recentTxnOverlay.value.pendingConfirm ?: return
+        _recentTxnOverlay.value = _recentTxnOverlay.value.copy(
+            pendingConfirm = null,
+            expandedTransactionId = if (pending.kind == RecentTransactionConfirmKind.DELETE &&
+                _recentTxnOverlay.value.expandedTransactionId == pending.transactionId
+            ) null else _recentTxnOverlay.value.expandedTransactionId
+        )
+        viewModelScope.launch(computeDispatcher) {
+            when (pending.kind) {
+                RecentTransactionConfirmKind.DELETE -> repository.deleteTransaction(pending.transactionId)
+                RecentTransactionConfirmKind.RESET_EDITS -> repository.resetTransaction(pending.transactionId)
+                RecentTransactionConfirmKind.MARK_RECURRING -> repository.createUpcomingFromTransaction(pending.transactionId)
+            }
         }
     }
 

@@ -1,73 +1,73 @@
 package app.overbay.orbit.ui.dashboard.cards
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.IconButton
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.CategoryEmojiMapper
+import app.overbay.orbit.data.model.displayEmoji
 import app.overbay.orbit.data.model.isUncategorizedCategoryName
+import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.theme.toComposeColor
 import app.overbay.orbit.ui.components.OrbitAccordionVisibility
-import app.overbay.orbit.ui.components.OrbitBadge
-import app.overbay.orbit.ui.components.OrbitCompactListRow
-import app.overbay.orbit.ui.components.OrbitExpandableChevron
 import app.overbay.orbit.ui.components.OrbitSectionCard
+import app.overbay.orbit.ui.components.orbitTactilePress
 import app.overbay.orbit.ui.dashboard.DashboardRecentTransactionItem
+import app.overbay.orbit.ui.dashboard.RecentTransactionConfirmKind
+import app.overbay.orbit.ui.dashboard.RecentTransactionsState
+import app.overbay.orbit.ui.transactions.components.TransactionMerchantMark
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 /**
- * Editorial Recent Transactions card showing up to 5 latest transactions
- * with tinted category emoji avatars, pending pills, and inline expandable quick actions.
+ * Dashboard Recent Transactions card showing up to 10 latest transactions with 3-line ledger rows,
+ * shared display-only merchant logos, and an inline lean quick-action drawer.
  */
 @Composable
 fun RecentTransactionsCard(
-    transactions: List<DashboardRecentTransactionItem>,
+    state: RecentTransactionsState,
     mhaEnabled: Boolean = false,
-    categories: List<Category> = emptyList(),
-    onSelectTransaction: (Long) -> Unit,
+    onToggleExpand: (Long) -> Unit,
+    onOpenCategoryPicker: (Long) -> Unit,
+    onEditTransaction: (Long) -> Unit,
+    onViewDetails: (Long) -> Unit,
+    onToggleTransfer: (Long, Boolean) -> Unit,
+    onToggleIgnore: (Long, Boolean) -> Unit,
+    onToggleMha: (Long, Boolean) -> Unit,
+    onRequestConfirm: (Long, String, RecentTransactionConfirmKind) -> Unit,
+    onReportLogoStatus: (String, String) -> Unit,
     onViewAll: () -> Unit,
-    onQuickCategorize: (Long, Long) -> Unit = { _, _ -> },
-    onToggleTransfer: (Long, Boolean) -> Unit = { _, _ -> },
-    onToggleIgnore: (Long, Boolean) -> Unit = { _, _ -> },
-    onToggleMha: (Long, Boolean) -> Unit = { _, _ -> },
-    onMarkRecurring: (Long) -> Unit = {},
-    onResetEdits: (Long) -> Unit = {},
-    onDelete: (Long) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val haptics = LocalOrbitHaptics.current
-    val colors = OrbitTheme.colors
-    var expandedTransactionId by remember { mutableStateOf<Long?>(null) }
-
     OrbitSectionCard(
         title = "Recent Transactions",
         actionText = "See All",
         onActionClick = onViewAll,
-        onCardClick = onViewAll,
+        onCardClick = null,
         modifier = modifier
     ) {
-        if (transactions.isEmpty()) {
+        if (state.transactions.isEmpty()) {
             Text(
                 text = "No recent transactions recorded yet.",
                 style = MaterialTheme.typography.bodyMedium,
@@ -75,95 +75,185 @@ fun RecentTransactionsCard(
             )
         } else {
             Column(modifier = Modifier.fillMaxWidth()) {
-                transactions.take(10).forEachIndexed { index, txn ->
-                    val isExpanded = expandedTransactionId == txn.id
-                    val catColor = txn.categoryColor.toComposeColor(MaterialTheme.colorScheme.primary)
-                    val emoji = CategoryEmojiMapper.resolveEmoji(txn.categoryIcon)
-                        ?: if (txn.categoryName.isNullOrBlank() || isUncategorizedCategoryName(txn.categoryName)) "❓" else "💳"
-                    val catLabel = txn.categoryName ?: "Uncategorized"
-                    val subtitleText = buildString {
-                        append(txn.dateDisplay)
-                        append(" · ")
-                        append(catLabel)
-                        if (txn.isPending) append(" · Pending")
-                    }
+                state.transactions.forEachIndexed { index, item ->
+                    val isExpanded = state.expandedTransactionId == item.id
+                    val catColor = (item.category?.color ?: item.categoryColor)
+                        .toComposeColor(MaterialTheme.colorScheme.primary)
+                    val categoryLabel = resolveCategoryLabel(item)
 
-                    OrbitCompactListRow(
-                        title = txn.merchant,
-                        subtitle = subtitleText,
-                        amount = txn.formattedAmount,
-                        amountDetail = txn.accountName,
-                        amountColor = if (txn.isExpense) colors.expense else colors.income,
+                    RecentTransactionRow(
+                        item = item,
+                        categoryLabel = categoryLabel,
+                        categoryColor = catColor,
                         showTopDivider = index > 0,
-                        leadingContent = {
-                            Box(
-                                modifier = Modifier
-                                    .size(34.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(catColor.copy(alpha = 0.14f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(text = emoji, fontSize = 15.sp)
-                            }
-                        },
-                        trailingAction = {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                if (txn.isPending) {
-                                    OrbitBadge(
-                                        text = "Pending",
-                                        containerColor = colors.warning.copy(alpha = 0.14f),
-                                        contentColor = colors.warning
-                                    )
-                                }
-                                IconButton(
-                                    onClick = {
-                                        haptics.tick()
-                                        expandedTransactionId = if (isExpanded) null else txn.id
-                                    },
-                                    modifier = Modifier.size(30.dp)
-                                ) {
-                                    OrbitExpandableChevron(
-                                        expanded = isExpanded,
-                                        contentDescription = "Quick actions"
-                                    )
-                                }
-                            }
-                        },
-                        onClick = {
-                            haptics.tick()
-                            onSelectTransaction(txn.id)
-                        }
+                        onReportLogoStatus = onReportLogoStatus,
+                        onClick = { onToggleExpand(item.id) }
                     )
 
                     OrbitAccordionVisibility(visible = isExpanded) {
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.surfaceContainerLow,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 8.dp)
-                        ) {
-                            RecentTransactionQuickActionsRow(
-                                transaction = txn,
-                                mhaEnabled = mhaEnabled,
-                                categories = categories,
-                                onQuickCategorize = { catId -> onQuickCategorize(txn.id, catId) },
-                                onToggleTransfer = { isTr -> onToggleTransfer(txn.id, isTr) },
-                                onToggleIgnore = { isIgn -> onToggleIgnore(txn.id, isIgn) },
-                                onToggleMha = { isMha -> onToggleMha(txn.id, isMha) },
-                                onMarkRecurring = { onMarkRecurring(txn.id) },
-                                onResetEdits = { onResetEdits(txn.id) },
-                                onInspectDetails = { onSelectTransaction(txn.id) },
-                                onDelete = { onDelete(txn.id) },
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                            )
-                        }
+                        RecentTransactionLeanDrawer(
+                            item = item,
+                            categoryLabel = categoryLabel,
+                            categoryColor = catColor,
+                            mhaEnabled = mhaEnabled,
+                            onOpenCategoryPicker = { onOpenCategoryPicker(item.id) },
+                            onEdit = { onEditTransaction(item.id) },
+                            onRequestMarkRecurring = {
+                                onRequestConfirm(item.id, item.merchant, RecentTransactionConfirmKind.MARK_RECURRING)
+                            },
+                            onViewDetails = { onViewDetails(item.id) },
+                            onToggleTransfer = { onToggleTransfer(item.id, !item.isTransfer) },
+                            onToggleIgnore = { onToggleIgnore(item.id, !item.isIgnored) },
+                            onToggleMha = { onToggleMha(item.id, !item.isMhaEligible) },
+                            onRequestResetEdits = {
+                                onRequestConfirm(item.id, item.merchant, RecentTransactionConfirmKind.RESET_EDITS)
+                            },
+                            onRequestDelete = {
+                                onRequestConfirm(item.id, item.merchant, RecentTransactionConfirmKind.DELETE)
+                            }
+                        )
                     }
                 }
             }
+        }
+    }
+}
+
+private fun resolveCategoryLabel(item: DashboardRecentTransactionItem): String {
+    item.category?.let { return it.labelWithEmoji }
+    if (item.isTransfer) return "🔄 Transfer"
+    val rawName = item.categoryName
+    if (!rawName.isNullOrBlank() && !isUncategorizedCategoryName(rawName)) {
+        val emoji = CategoryEmojiMapper.resolveEmoji(item.categoryIcon)
+        return if (!emoji.isNullOrBlank()) "$emoji $rawName" else rawName
+    }
+    return "❓ Uncategorized"
+}
+
+@Composable
+private fun RecentTransactionRow(
+    item: DashboardRecentTransactionItem,
+    categoryLabel: String,
+    categoryColor: Color,
+    showTopDivider: Boolean,
+    onReportLogoStatus: (String, String) -> Unit,
+    onClick: () -> Unit
+) {
+    val haptics = LocalOrbitHaptics.current
+    val colors = OrbitTheme.colors
+    val rowInteractionSource = remember { MutableInteractionSource() }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        if (showTopDivider) {
+            HorizontalDivider(thickness = 1.dp, color = colors.cardBorder)
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .orbitTactilePress(interactionSource = rowInteractionSource)
+                .clickable(
+                    interactionSource = rowInteractionSource,
+                    indication = LocalIndication.current
+                ) {
+                    haptics.tick()
+                    onClick()
+                }
+                .padding(vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TransactionMerchantMark(
+                transaction = item.transaction,
+                categoryIcon = item.category?.displayEmoji ?: item.categoryIcon,
+                categoryColor = categoryColor,
+                size = 40.dp,
+                cornerRadius = 10.dp,
+                onFindLogo = null,
+                onUseCategoryIcon = null,
+                onReportLogoStatus = onReportLogoStatus
+            )
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.Center
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = item.merchant,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontSize = 14.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (item.isIgnored) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface,
+                        textDecoration = if (item.isIgnored) TextDecoration.LineThrough else null,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    if (item.isPending) {
+                        Text(
+                            text = "Pending",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontSize = 10.5.sp,
+                            color = colors.warning,
+                            modifier = Modifier.padding(start = 6.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(2.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = item.dateDisplay,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1
+                    )
+                    Text(
+                        text = " • ",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outlineVariant
+                    )
+                    Text(
+                        text = categoryLabel,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = categoryColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(2.dp))
+
+                Text(
+                    text = item.accountName.ifBlank { "Account" },
+                    style = MaterialTheme.typography.bodySmall,
+                    fontSize = 11.5.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            val amountColor = when {
+                item.isTransfer -> MaterialTheme.colorScheme.secondary
+                item.isIncome -> colors.income
+                else -> MaterialTheme.colorScheme.onSurface
+            }
+            Text(
+                text = item.formattedAmount,
+                style = TabularNumStyle.copy(fontSize = 15.sp, fontWeight = FontWeight.Bold),
+                color = amountColor,
+                maxLines = 1
+            )
         }
     }
 }

@@ -29,6 +29,7 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -503,7 +504,7 @@ class DashboardViewModelTest {
     fun testRecentTransactions_sortingAndExclusions() = runTest(testDispatcher) {
         repository.saveAccount(Account(id = 1L, name = "Checking", type = AccountType.CHECKING))
 
-        for (i in 1..8) {
+        for (i in 1..12) {
             repository.saveTransaction(
                 Transaction(
                     id = i.toLong(),
@@ -516,7 +517,7 @@ class DashboardViewModelTest {
         }
         repository.saveTransaction(
             Transaction(
-                id = 9L,
+                id = 13L,
                 accountId = 1L,
                 originalDate = "2026-04-20",
                 originalMerchant = "Store Ignored",
@@ -531,15 +532,130 @@ class DashboardViewModelTest {
         testScheduler.advanceUntilIdle()
 
         val recents = viewModel.uiState.value.recentTransactions.transactions
-        assertEquals(5, recents.size)
-        assertFalse(recents.any { it.id == 9L })
-        assertEquals("Store 8", recents[0].merchant)
-        assertEquals("Store 7", recents[1].merchant)
-        assertEquals("Store 6", recents[2].merchant)
-        assertEquals("Store 5", recents[3].merchant)
-        assertEquals("Store 4", recents[4].merchant)
+        assertEquals(10, recents.size)
+        assertFalse(recents.any { it.id == 13L })
+        assertEquals("Store 12", recents[0].merchant)
+        assertEquals("Store 3", recents[9].merchant)
 
         collectJob.cancel()
+    }
+
+    @Test
+    fun testRecentTransactions_expandCategoryAndConfirmGuards() = runTest(testDispatcher) {
+        repository.saveAccount(Account(id = 1L, name = "Chase Freedom (4083)", type = AccountType.CREDIT))
+        repository.saveCategory(Category(id = 1L, name = "Dining", isIncome = false, isTransfer = false))
+        repository.saveCategory(Category(id = 2L, name = "Groceries", isIncome = false, isTransfer = false))
+        repository.saveTransaction(
+            Transaction(
+                id = 101L,
+                accountId = 1L,
+                originalDate = "2026-11-18",
+                originalMerchant = "Domino's",
+                originalAmountCents = -3805L,
+                originalCategoryId = 1L
+            )
+        )
+
+        val collectJob = launch(testDispatcher) {
+            viewModel.uiState.collect {}
+        }
+        testScheduler.advanceUntilIdle()
+
+        // Toggle expand open and closed
+        viewModel.onAction(DashboardAction.ToggleExpandRecentTransaction(101L))
+        testScheduler.advanceUntilIdle()
+        assertEquals(101L, viewModel.uiState.value.recentTransactions.expandedTransactionId)
+
+        viewModel.onAction(DashboardAction.ToggleExpandRecentTransaction(101L))
+        testScheduler.advanceUntilIdle()
+        assertNull(viewModel.uiState.value.recentTransactions.expandedTransactionId)
+
+        viewModel.onAction(DashboardAction.ToggleExpandRecentTransaction(101L))
+        viewModel.onAction(DashboardAction.OpenRecentCategoryPicker(101L))
+        testScheduler.advanceUntilIdle()
+        assertEquals(101L, viewModel.uiState.value.recentTransactions.categoryPickerTransaction?.id)
+
+        // Assigning category preserves originalCategoryId
+        viewModel.onAction(DashboardAction.SetRecentTransactionCategory(101L, 2L))
+        testScheduler.advanceUntilIdle()
+        assertNull(viewModel.uiState.value.recentTransactions.categoryPickerTransaction)
+        val afterCatEdit = viewModel.uiState.value.recentTransactions.transactions.single()
+        assertEquals(2L, afterCatEdit.categoryId)
+        assertTrue(afterCatEdit.hasEdits)
+        assertEquals(1L, afterCatEdit.transaction.originalCategoryId)
+
+        // Clearing to Uncategorized (null) writes editedCategoryId = null without losing originalCategoryId
+        viewModel.onAction(DashboardAction.SetRecentTransactionCategory(101L, null))
+        testScheduler.advanceUntilIdle()
+        val afterClear = viewModel.uiState.value.recentTransactions.transactions.single()
+        assertNull(afterClear.categoryId)
+        assertEquals(1L, afterClear.transaction.originalCategoryId)
+
+        // Reset edits requires confirmation; dismiss makes no changes, confirm restores original category
+        viewModel.onAction(
+            DashboardAction.RequestRecentTransactionConfirm(
+                101L,
+                "Domino's",
+                RecentTransactionConfirmKind.RESET_EDITS
+            )
+        )
+        testScheduler.advanceUntilIdle()
+        assertEquals(RecentTransactionConfirmKind.RESET_EDITS, viewModel.uiState.value.recentTransactions.pendingConfirm?.kind)
+
+        viewModel.onAction(DashboardAction.DismissRecentTransactionConfirm)
+        testScheduler.advanceUntilIdle()
+        assertNull(viewModel.uiState.value.recentTransactions.pendingConfirm)
+        assertNull(viewModel.uiState.value.recentTransactions.transactions.single().categoryId)
+
+        viewModel.onAction(
+            DashboardAction.RequestRecentTransactionConfirm(
+                101L,
+                "Domino's",
+                RecentTransactionConfirmKind.RESET_EDITS
+            )
+        )
+        viewModel.onAction(DashboardAction.ConfirmRecentTransactionAction)
+        testScheduler.advanceUntilIdle()
+        assertEquals(1L, viewModel.uiState.value.recentTransactions.transactions.single().categoryId)
+
+        // Delete requires confirmation; dismiss keeps transaction, confirm deletes & collapses
+        viewModel.onAction(
+            DashboardAction.RequestRecentTransactionConfirm(
+                101L,
+                "Domino's",
+                RecentTransactionConfirmKind.DELETE
+            )
+        )
+        viewModel.onAction(DashboardAction.DismissRecentTransactionConfirm)
+        testScheduler.advanceUntilIdle()
+        assertEquals(1, viewModel.uiState.value.recentTransactions.transactions.size)
+
+        viewModel.onAction(
+            DashboardAction.RequestRecentTransactionConfirm(
+                101L,
+                "Domino's",
+                RecentTransactionConfirmKind.DELETE
+            )
+        )
+        viewModel.onAction(DashboardAction.ConfirmRecentTransactionAction)
+        testScheduler.advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.recentTransactions.transactions.isEmpty())
+        assertNull(viewModel.uiState.value.recentTransactions.expandedTransactionId)
+
+        collectJob.cancel()
+    }
+
+    @Test
+    fun testLocalDateUtils_formatRecentCompactDate() {
+        val today = LocalDateUtils.parseIsoDate("2026-11-21")!!
+        val yesterday = LocalDateUtils.parseIsoDate("2026-11-20")!!
+        val sameYear = LocalDateUtils.parseIsoDate("2026-11-18")!!
+        val priorYear = LocalDateUtils.parseIsoDate("2025-12-31")!!
+
+        assertEquals("Today", LocalDateUtils.formatRecentCompactDate(today, today))
+        assertEquals("Yesterday", LocalDateUtils.formatRecentCompactDate(yesterday, today))
+        assertEquals("Nov 18", LocalDateUtils.formatRecentCompactDate(sameYear, today))
+        assertEquals("Dec 31, 2025", LocalDateUtils.formatRecentCompactDate(priorYear, today))
     }
 
     @Test

@@ -121,6 +121,7 @@ sealed interface OrbitNavKey {
         val endDate: String? = null,
         val sortOption: String? = null,
         val openAddSheet: Boolean = false,
+        val openEditor: Boolean = false,
         val openSearch: Boolean = false,
         val includeTransfers: Boolean = true,
         val includeIgnored: Boolean = true
@@ -134,6 +135,7 @@ sealed interface OrbitNavKey {
                 endDate != null ||
                 sortOption != null ||
                 openAddSheet ||
+                openEditor ||
                 openSearch ||
                 !includeTransfers ||
                 !includeIgnored

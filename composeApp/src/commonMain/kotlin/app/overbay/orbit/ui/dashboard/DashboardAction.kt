@@ -35,11 +35,20 @@ sealed interface DashboardAction {
     data object CloseReviewRuleCreator : DashboardAction
     data class SaveReviewRule(val rule: TransactionRule) : DashboardAction
 
-    // Recent Transaction Quick Actions
+    // Recent Transaction Quick Actions & Overlays
+    data class ToggleExpandRecentTransaction(val transactionId: Long) : DashboardAction
+    data class OpenRecentCategoryPicker(val transactionId: Long) : DashboardAction
+    data object CloseRecentCategoryPicker : DashboardAction
+    data class SetRecentTransactionCategory(val transactionId: Long, val categoryId: Long?) : DashboardAction
     data class ToggleTransactionTransfer(val transactionId: Long, val isTransfer: Boolean) : DashboardAction
     data class ToggleTransactionIgnored(val transactionId: Long, val isIgnored: Boolean) : DashboardAction
     data class ToggleTransactionMha(val transactionId: Long, val isEligible: Boolean) : DashboardAction
-    data class MarkTransactionRecurring(val transactionId: Long) : DashboardAction
-    data class ResetTransactionEdits(val transactionId: Long) : DashboardAction
-    data class DeleteTransaction(val transactionId: Long) : DashboardAction
+    data class RequestRecentTransactionConfirm(
+        val transactionId: Long,
+        val merchant: String,
+        val kind: RecentTransactionConfirmKind
+    ) : DashboardAction
+    data object DismissRecentTransactionConfirm : DashboardAction
+    data object ConfirmRecentTransactionAction : DashboardAction
+    data class ReportMerchantLogoStatus(val merchantKey: String, val status: String) : DashboardAction
 }
