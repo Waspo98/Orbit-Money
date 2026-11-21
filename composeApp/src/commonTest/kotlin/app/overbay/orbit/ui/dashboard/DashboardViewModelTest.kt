@@ -646,6 +646,60 @@ class DashboardViewModelTest {
     }
 
     @Test
+    fun testRecentTransactions_markRecurringCreatesUpcomingAndSurfacesErrors() = runTest(testDispatcher) {
+        repository.saveAccount(Account(id = 1L, name = "Checking", type = AccountType.CHECKING))
+        repository.saveCategory(Category(id = 1L, name = "Subscriptions", isIncome = false, isTransfer = false))
+        repository.saveTransaction(
+            Transaction(
+                id = 201L,
+                accountId = 1L,
+                originalDate = "2026-11-18",
+                originalMerchant = "Spotify",
+                originalAmountCents = -1199L,
+                originalCategoryId = 1L
+            )
+        )
+
+        val collectJob = launch(testDispatcher) {
+            viewModel.uiState.collect {}
+        }
+        testScheduler.advanceUntilIdle()
+
+        viewModel.onAction(
+            DashboardAction.RequestRecentTransactionConfirm(
+                201L,
+                "Spotify",
+                RecentTransactionConfirmKind.MARK_RECURRING
+            )
+        )
+        viewModel.onAction(DashboardAction.ConfirmRecentTransactionAction)
+        testScheduler.advanceUntilIdle()
+
+        assertNull(viewModel.uiState.value.recentTransactions.actionErrorMessage)
+        assertEquals(1, repository.upcomingItems.value.size)
+        assertEquals("Spotify", repository.upcomingItems.value.single().merchant)
+
+        // Confirming MARK_RECURRING for a missing transaction surfaces actionErrorMessage and dismiss clears it
+        viewModel.onAction(
+            DashboardAction.RequestRecentTransactionConfirm(
+                999L,
+                "Ghost",
+                RecentTransactionConfirmKind.MARK_RECURRING
+            )
+        )
+        viewModel.onAction(DashboardAction.ConfirmRecentTransactionAction)
+        testScheduler.advanceUntilIdle()
+
+        assertTrue(!viewModel.uiState.value.recentTransactions.actionErrorMessage.isNullOrBlank())
+
+        viewModel.onAction(DashboardAction.DismissRecentTransactionError)
+        testScheduler.advanceUntilIdle()
+        assertNull(viewModel.uiState.value.recentTransactions.actionErrorMessage)
+
+        collectJob.cancel()
+    }
+
+    @Test
     fun testLocalDateUtils_formatRecentCompactDate() {
         val today = LocalDateUtils.parseIsoDate("2026-11-21")!!
         val yesterday = LocalDateUtils.parseIsoDate("2026-11-20")!!

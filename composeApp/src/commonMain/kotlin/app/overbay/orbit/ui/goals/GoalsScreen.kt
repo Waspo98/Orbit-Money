@@ -88,7 +88,7 @@ fun GoalsScreen(
                     val masterList: @Composable () -> Unit = {
                         GoalsMasterList(
                             state = state,
-                            contentPadding = PaddingValues(start = startPad, end = endPad, top = 16.dp, bottom = 16.dp),
+                            contentPadding = PaddingValues(start = startPad, end = endPad, top = 16.dp, bottom = 88.dp),
                             calculateMonthlyNeeded = viewModel::calculateMonthlyRequiredCents,
                             onSelectTab = { tab ->
                                 haptics.tick()

@@ -1,8 +1,6 @@
 package app.overbay.orbit.ui.dashboard.cards
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.LocalIndication
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,7 +33,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -103,20 +100,17 @@ internal fun RecentTransactionLeanDrawer(
             Box {
                 val moreInteraction = remember { MutableInteractionSource() }
                 Surface(
+                    onClick = {
+                        haptics.tick()
+                        menuExpanded = true
+                    },
                     shape = RoundedCornerShape(12.dp),
                     color = MaterialTheme.colorScheme.surfaceContainerHigh,
                     border = BorderStroke(1.dp, colors.cardBorder),
+                    interactionSource = moreInteraction,
                     modifier = Modifier
                         .size(48.dp)
                         .orbitTactilePress(interactionSource = moreInteraction)
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable(
-                            interactionSource = moreInteraction,
-                            indication = LocalIndication.current
-                        ) {
-                            haptics.tick()
-                            menuExpanded = true
-                        }
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
@@ -213,20 +207,17 @@ private fun DrawerCategorySelector(
     val interactionSource = remember { MutableInteractionSource() }
 
     Surface(
+        onClick = {
+            haptics.tick()
+            onClick()
+        },
         shape = RoundedCornerShape(12.dp),
         color = categoryColor.copy(alpha = 0.14f),
         border = BorderStroke(1.dp, categoryColor.copy(alpha = 0.45f)),
+        interactionSource = interactionSource,
         modifier = modifier
             .height(48.dp)
             .orbitTactilePress(interactionSource = interactionSource)
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(
-                interactionSource = interactionSource,
-                indication = LocalIndication.current
-            ) {
-                haptics.tick()
-                onClick()
-            }
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp),
@@ -264,20 +255,17 @@ private fun DrawerActionButton(
     val interactionSource = remember { MutableInteractionSource() }
 
     Surface(
+        onClick = {
+            haptics.tick()
+            onClick()
+        },
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
+        interactionSource = interactionSource,
         modifier = modifier
             .height(48.dp)
             .orbitTactilePress(interactionSource = interactionSource)
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(
-                interactionSource = interactionSource,
-                indication = LocalIndication.current
-            ) {
-                haptics.tick()
-                onClick()
-            }
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 14.dp),

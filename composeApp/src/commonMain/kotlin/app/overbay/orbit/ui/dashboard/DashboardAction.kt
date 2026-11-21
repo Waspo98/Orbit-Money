@@ -20,7 +20,6 @@ sealed interface DashboardAction {
     data class SetRetirementPreset(val presetKey: String) : DashboardAction
     data object OpenCategorizeReview : DashboardAction
     data object CloseCategorizeReview : DashboardAction
-    data class ApplyCategory(val transactionId: Long, val categoryId: Long) : DashboardAction
     data object ApproveReviewTransaction : DashboardAction
     data object RejectReviewTransaction : DashboardAction
     data object CloseReviewCategoryPicker : DashboardAction
@@ -50,5 +49,6 @@ sealed interface DashboardAction {
     ) : DashboardAction
     data object DismissRecentTransactionConfirm : DashboardAction
     data object ConfirmRecentTransactionAction : DashboardAction
+    data object DismissRecentTransactionError : DashboardAction
     data class ReportMerchantLogoStatus(val merchantKey: String, val status: String) : DashboardAction
 }

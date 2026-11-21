@@ -34,6 +34,7 @@ import app.overbay.orbit.ui.components.CanopyIconButton
 import app.overbay.orbit.ui.components.CanopySettingsButton
 import app.overbay.orbit.ui.components.HeroScrollState
 import app.overbay.orbit.ui.components.MorphingPageHero
+import app.overbay.orbit.ui.components.OrbitAlertDialog
 import app.overbay.orbit.ui.components.OrbitConfirmationDialog
 import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.orbitFadeContentTransform
@@ -345,6 +346,14 @@ fun DashboardScreen(
                 isDestructive = isDestructive,
                 onConfirm = { onAction(DashboardAction.ConfirmRecentTransactionAction) },
                 onDismiss = { onAction(DashboardAction.DismissRecentTransactionConfirm) }
+            )
+        }
+
+        uiState.recentTransactions.actionErrorMessage?.let { errorMsg ->
+            OrbitAlertDialog(
+                title = "Action Failed",
+                message = errorMsg,
+                onDismiss = { onAction(DashboardAction.DismissRecentTransactionError) }
             )
         }
     }

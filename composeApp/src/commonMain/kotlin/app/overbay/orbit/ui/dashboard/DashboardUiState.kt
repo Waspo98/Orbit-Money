@@ -239,7 +239,8 @@ data class RecentTransactionPendingConfirm(
 data class RecentTransactionOverlayState(
     val expandedTransactionId: Long? = null,
     val categoryPickerTransactionId: Long? = null,
-    val pendingConfirm: RecentTransactionPendingConfirm? = null
+    val pendingConfirm: RecentTransactionPendingConfirm? = null,
+    val actionErrorMessage: String? = null
 )
 
 data class DashboardRecentTransactionItem(
@@ -247,11 +248,8 @@ data class DashboardRecentTransactionItem(
     val transaction: Transaction,
     val category: Category? = null,
     val merchant: String,
-    val amountCents: Cents,
-    val isExpense: Boolean,
     val isIncome: Boolean = false,
     val formattedAmount: String,
-    val dateIso: String,
     val dateDisplay: String,
     val categoryId: Long? = null,
     val categoryName: String? = null,
@@ -259,7 +257,6 @@ data class DashboardRecentTransactionItem(
     val categoryIcon: String? = null,
     val accountName: String = "",
     val isPending: Boolean = false,
-    val merchantLogoUrl: String? = null,
     val isTransfer: Boolean = false,
     val isIgnored: Boolean = false,
     val isMhaEligible: Boolean = false,
@@ -270,7 +267,8 @@ data class RecentTransactionsState(
     val transactions: List<DashboardRecentTransactionItem> = emptyList(),
     val expandedTransactionId: Long? = null,
     val categoryPickerTransaction: Transaction? = null,
-    val pendingConfirm: RecentTransactionPendingConfirm? = null
+    val pendingConfirm: RecentTransactionPendingConfirm? = null,
+    val actionErrorMessage: String? = null
 )
 
 data class AccountsOverviewState(

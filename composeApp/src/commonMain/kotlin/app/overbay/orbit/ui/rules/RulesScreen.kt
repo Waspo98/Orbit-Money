@@ -219,7 +219,7 @@ fun RulesScreen(
                                     LazyColumn(
                                         state = listState,
                                         modifier = Modifier.fillMaxSize(),
-                                        contentPadding = PaddingValues(start = startPad, end = endPad, top = 8.dp, bottom = 16.dp),
+                                        contentPadding = PaddingValues(start = startPad, end = endPad, top = 8.dp, bottom = 88.dp),
                                         verticalArrangement = Arrangement.spacedBy(10.dp)
                                     ) {
                                         items(

@@ -294,7 +294,7 @@ private fun TransactionsGroupedLazyList(
     LazyColumn(
         state = listState,
         modifier = modifier,
-        contentPadding = PaddingValues(start = startPadding, end = endPadding, top = 0.dp, bottom = 16.dp),
+        contentPadding = PaddingValues(start = startPadding, end = endPadding, top = 0.dp, bottom = 88.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         state.groupedTransactions.forEach { group ->

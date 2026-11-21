@@ -183,98 +183,98 @@ private fun RecentTransactionRow(
                     ),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-            TransactionMerchantMark(
-                transaction = item.transaction,
-                categoryIcon = item.category?.displayEmoji ?: item.categoryIcon,
-                categoryColor = categoryColor,
-                size = 40.dp,
-                cornerRadius = 10.dp,
-                onFindLogo = null,
-                onUseCategoryIcon = null,
-                onReportLogoStatus = onReportLogoStatus
-            )
+                TransactionMerchantMark(
+                    transaction = item.transaction,
+                    categoryIcon = item.category?.displayEmoji ?: item.categoryIcon,
+                    categoryColor = categoryColor,
+                    size = 40.dp,
+                    cornerRadius = 10.dp,
+                    onFindLogo = null,
+                    onUseCategoryIcon = null,
+                    onReportLogoStatus = onReportLogoStatus
+                )
 
-            Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(12.dp))
 
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.Center
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = item.merchant,
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontSize = 14.5.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (item.isIgnored) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface,
-                        textDecoration = if (item.isIgnored) TextDecoration.LineThrough else null,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false)
-                    )
-                    if (item.isPending) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = "Pending",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontSize = 10.5.sp,
-                            color = colors.warning,
-                            modifier = Modifier.padding(start = 6.dp)
+                            text = item.merchant,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontSize = 14.5.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (item.isIgnored) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface,
+                            textDecoration = if (item.isIgnored) TextDecoration.LineThrough else null,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        if (item.isPending) {
+                            Text(
+                                text = "Pending",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontSize = 10.5.sp,
+                                color = colors.warning,
+                                modifier = Modifier.padding(start = 6.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(2.dp))
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = item.dateDisplay,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1
+                        )
+                        Text(
+                            text = " • ",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.outlineVariant
+                        )
+                        Text(
+                            text = categoryLabel,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = categoryColor,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
                         )
                     }
-                }
 
-                Spacer(modifier = Modifier.height(2.dp))
+                    Spacer(modifier = Modifier.height(2.dp))
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = item.dateDisplay,
+                        text = item.accountName.ifBlank { "Account" },
                         style = MaterialTheme.typography.bodySmall,
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1
-                    )
-                    Text(
-                        text = " • ",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outlineVariant
-                    )
-                    Text(
-                        text = categoryLabel,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = categoryColor,
+                        fontSize = 11.5.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false)
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
 
-                Spacer(modifier = Modifier.height(2.dp))
+                Spacer(modifier = Modifier.width(10.dp))
 
+                val amountColor = when {
+                    item.isTransfer -> MaterialTheme.colorScheme.secondary
+                    item.isIncome -> colors.income
+                    else -> MaterialTheme.colorScheme.onSurface
+                }
                 Text(
-                    text = item.accountName.ifBlank { "Account" },
-                    style = MaterialTheme.typography.bodySmall,
-                    fontSize = 11.5.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    text = item.formattedAmount,
+                    style = TabularNumStyle.copy(fontSize = 15.sp, fontWeight = FontWeight.Bold),
+                    color = amountColor,
+                    maxLines = 1
                 )
-            }
-
-            Spacer(modifier = Modifier.width(10.dp))
-
-            val amountColor = when {
-                item.isTransfer -> MaterialTheme.colorScheme.secondary
-                item.isIncome -> colors.income
-                else -> MaterialTheme.colorScheme.onSurface
-            }
-            Text(
-                text = item.formattedAmount,
-                style = TabularNumStyle.copy(fontSize = 15.sp, fontWeight = FontWeight.Bold),
-                color = amountColor,
-                maxLines = 1
-            )
             }
         }
     }

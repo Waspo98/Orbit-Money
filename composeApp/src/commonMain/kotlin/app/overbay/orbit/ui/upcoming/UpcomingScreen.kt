@@ -202,7 +202,7 @@ fun UpcomingScreen(
                         LazyColumn(
                             state = listState,
                             modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(start = startPad, end = endPad, top = 12.dp, bottom = 16.dp),
+                            contentPadding = PaddingValues(start = startPad, end = endPad, top = 12.dp, bottom = 88.dp),
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             // 4-Stat Summary Hero Row/Grid (Income, Giving, Bills, Subscriptions)

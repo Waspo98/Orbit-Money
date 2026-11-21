@@ -476,11 +476,8 @@ object DashboardDataTransform {
                 transaction = txn,
                 category = cat,
                 merchant = txn.effectiveMerchant,
-                amountCents = txn.effectiveAmountCents,
-                isExpense = txn.isExpense,
                 isIncome = txn.isIncome,
                 formattedAmount = MoneyUtils.formatCents(txn.effectiveAmountCents, signed = true),
-                dateIso = txn.effectiveDate,
                 dateDisplay = dateDisplay,
                 categoryId = txn.effectiveCategoryId,
                 categoryName = cat?.name ?: txn.categoryName ?: "Uncategorized",
@@ -488,7 +485,6 @@ object DashboardDataTransform {
                 categoryIcon = cat?.displayEmoji ?: CategoryEmojiMapper.resolveEmoji(txn.categoryIcon),
                 accountName = acct?.name ?: txn.accountName,
                 isPending = txn.isPending,
-                merchantLogoUrl = txn.merchantLogo?.url?.takeIf { it.isNotBlank() && txn.merchantLogo.status != "hidden" && txn.merchantLogo.status != "failed" },
                 isTransfer = txn.effectiveIsTransfer,
                 isIgnored = txn.effectiveIsIgnored,
                 isMhaEligible = txn.effectiveMhaEligible ?: false,
@@ -505,7 +501,8 @@ object DashboardDataTransform {
             transactions = recentList,
             expandedTransactionId = expandedId,
             categoryPickerTransaction = pickerTxn,
-            pendingConfirm = recentOverlay.pendingConfirm
+            pendingConfirm = recentOverlay.pendingConfirm,
+            actionErrorMessage = recentOverlay.actionErrorMessage
         )
 
         // 16. Cards Display & Customization

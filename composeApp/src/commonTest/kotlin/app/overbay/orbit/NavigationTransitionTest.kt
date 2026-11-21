@@ -11,9 +11,12 @@ import app.overbay.orbit.ui.components.CanopyTransitionCoordinator
 import app.overbay.orbit.ui.components.TransactionFilterDraft
 import app.overbay.orbit.ui.components.canopyBackdropFillSize
 import app.overbay.orbit.ui.components.canopyBackdropFillTopLeft
+import app.overbay.orbit.ui.transactions.TransactionsFilterHelper
+import app.overbay.orbit.ui.transactions.TransactionsViewModel
 import app.overbay.orbit.util.PlatformStorage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -454,6 +457,52 @@ class NavigationTransitionTest {
             // One more pop returns directly to Dashboard
             assertTrue(coordinator.popBack())
             assertEquals(OrbitNavKey.Dashboard, controller.currentKey)
+        } finally {
+            Dispatchers.resetMain()
+            storage.clear()
+        }
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `transactions openEditor deep link opens transaction editor only when transactionId is present`() = runTest {
+        val openWithId = OrbitNavKey.Transactions(transactionId = 42L, openEditor = true)
+        assertTrue(openWithId.hasDeepLinkParams)
+        val snapWithId = TransactionsFilterHelper.buildDeepLinkNavSnapshot(openWithId, isCompactView = false)
+        assertEquals(42L, snapWithId.inspectingId)
+        assertEquals(42L, snapWithId.expandedId)
+        assertTrue(snapWithId.showEditorSheet)
+
+        val openWithoutId = OrbitNavKey.Transactions(openEditor = true)
+        assertTrue(openWithoutId.hasDeepLinkParams)
+        val snapWithoutId = TransactionsFilterHelper.buildDeepLinkNavSnapshot(openWithoutId, isCompactView = false)
+        assertNull(snapWithoutId.inspectingId)
+        assertFalse(snapWithoutId.showEditorSheet)
+
+        val testDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(testDispatcher)
+        val storage = PlatformStorage()
+        storage.clear()
+        try {
+            val repo = OrbitRepository(storage)
+            repo.initialize()
+            val controller = OrbitBackStackController(OrbitNavKey.Dashboard)
+            val viewModels = OrbitViewModelHolder(repo)
+            val coordinator = OrbitNavigationCoordinator(controller, viewModels)
+
+            coordinator.navigate(openWithId, fromTab = false)
+            val navSnap = viewModels.transactionsViewModel.captureNavSnapshot()
+            assertEquals(42L, navSnap.inspectingId)
+            assertEquals(42L, navSnap.expandedId)
+
+            val txVm = TransactionsViewModel(repo, testDispatcher)
+            val collectJob = launch(testDispatcher) { txVm.uiState.collect {} }
+            txVm.applyDeepLink(openWithId)
+            testScheduler.advanceUntilIdle()
+
+            assertTrue(txVm.uiState.value.showEditorSheet)
+            assertEquals(42L, txVm.uiState.value.inspectingTransactionId)
+            collectJob.cancel()
         } finally {
             Dispatchers.resetMain()
             storage.clear()

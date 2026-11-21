@@ -390,10 +390,6 @@ class DashboardViewModel(
         applyCategoryAndAdvance(current.id, categoryId)
     }
 
-    fun applyCategory(transactionId: Long, categoryId: Long) {
-        applyCategoryAndAdvance(transactionId, categoryId)
-    }
-
     private fun applyCategoryAndAdvance(transactionId: Long, categoryId: Long) {
         val state = _reviewState.value
         val category = repository.categories.value.find { it.id == categoryId }
@@ -498,7 +494,6 @@ class DashboardViewModel(
             is DashboardAction.SetRetirementPreset -> setRetirementPreset(action.presetKey)
             DashboardAction.OpenCategorizeReview -> openCategorizeReview()
             DashboardAction.CloseCategorizeReview -> closeCategorizeReview()
-            is DashboardAction.ApplyCategory -> applyCategory(action.transactionId, action.categoryId)
             DashboardAction.ApproveReviewTransaction -> approveReviewTransaction()
             DashboardAction.RejectReviewTransaction -> rejectReviewTransaction()
             DashboardAction.CloseReviewCategoryPicker -> closeReviewCategoryPicker()
@@ -531,6 +526,7 @@ class DashboardViewModel(
             )
             DashboardAction.DismissRecentTransactionConfirm -> _recentTxnOverlay.value = _recentTxnOverlay.value.copy(pendingConfirm = null)
             DashboardAction.ConfirmRecentTransactionAction -> confirmRecentTransactionAction()
+            DashboardAction.DismissRecentTransactionError -> _recentTxnOverlay.value = _recentTxnOverlay.value.copy(actionErrorMessage = null)
             is DashboardAction.ReportMerchantLogoStatus -> viewModelScope.launch(computeDispatcher) {
                 repository.reportMerchantLogoStatus(action.merchantKey, action.status)
             }
@@ -558,6 +554,7 @@ class DashboardViewModel(
         val pending = _recentTxnOverlay.value.pendingConfirm ?: return
         _recentTxnOverlay.value = _recentTxnOverlay.value.copy(
             pendingConfirm = null,
+            actionErrorMessage = null,
             expandedTransactionId = if (pending.kind == RecentTransactionConfirmKind.DELETE &&
                 _recentTxnOverlay.value.expandedTransactionId == pending.transactionId
             ) null else _recentTxnOverlay.value.expandedTransactionId
@@ -566,7 +563,13 @@ class DashboardViewModel(
             when (pending.kind) {
                 RecentTransactionConfirmKind.DELETE -> repository.deleteTransaction(pending.transactionId)
                 RecentTransactionConfirmKind.RESET_EDITS -> repository.resetTransaction(pending.transactionId)
-                RecentTransactionConfirmKind.MARK_RECURRING -> repository.createUpcomingFromTransaction(pending.transactionId)
+                RecentTransactionConfirmKind.MARK_RECURRING -> {
+                    repository.createUpcomingFromTransaction(pending.transactionId).onFailure { err ->
+                        _recentTxnOverlay.value = _recentTxnOverlay.value.copy(
+                            actionErrorMessage = err.message ?: "Failed to create recurring item."
+                        )
+                    }
+                }
             }
         }
     }
