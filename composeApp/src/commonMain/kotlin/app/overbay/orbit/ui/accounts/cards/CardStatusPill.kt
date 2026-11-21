@@ -31,9 +31,9 @@ fun CardStatusPill(
     modifier: Modifier = Modifier
 ) {
     val (containerColor, contentColor, icon) = when (tone) {
-        CardStatusTone.POSITIVE -> Triple(OrbitTheme.colors.incomeContainer, OrbitTheme.colors.income, Icons.Filled.CheckCircle)
-        CardStatusTone.WARNING -> Triple(OrbitTheme.colors.warningContainer, OrbitTheme.colors.warning, Icons.Filled.Warning)
-        CardStatusTone.CRITICAL -> Triple(OrbitTheme.colors.expenseContainer, OrbitTheme.colors.expense, Icons.Filled.Warning)
+        CardStatusTone.POSITIVE -> Triple(OrbitTheme.colors.incomeContainer, OrbitTheme.colors.onIncomeContainer, Icons.Filled.CheckCircle)
+        CardStatusTone.WARNING -> Triple(OrbitTheme.colors.warningContainer, OrbitTheme.colors.onWarningContainer, Icons.Filled.Warning)
+        CardStatusTone.CRITICAL -> Triple(OrbitTheme.colors.expenseContainer, OrbitTheme.colors.onExpenseContainer, Icons.Filled.Warning)
         CardStatusTone.NEUTRAL -> Triple(MaterialTheme.colorScheme.surfaceContainerHigh, MaterialTheme.colorScheme.onSurfaceVariant, Icons.Filled.Info)
     }
 

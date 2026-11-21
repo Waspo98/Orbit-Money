@@ -247,6 +247,8 @@ fun spaceshipRedCustomColors(isDark: Boolean): CustomThemeColors {
             expense = SpaceshipRedLightOnSurface,
             onExpense = Color.White,
             danger = Color(0xFFD42F3F),
+            warning = Color(0xFF8A5000),
+            onWarning = Color.White,
             warningContainer = Color(0xFFFED48C),
             onWarningContainer = Color(0xFF3B2300),
             transfer = SpaceshipRedLightOnSurfaceVariant,

@@ -8,7 +8,7 @@ import androidx.activity.ComponentActivity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalConfiguration
@@ -18,7 +18,10 @@ import androidx.core.util.Consumer
 
 private tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
-    is ContextWrapper -> baseContext.findActivity()
+    is ContextWrapper -> {
+        val next = baseContext
+        if (next == null || next === this) null else next.findActivity()
+    }
     else -> null
 }
 
@@ -31,13 +34,16 @@ actual fun rememberDevicePosture(): DevicePosture {
     val widthDp = configuration.screenWidthDp
     val heightDp = configuration.screenHeightDp
 
-    var multiWindowChangeCount by remember(activity) { mutableIntStateOf(0) }
+    var listenerMultiWindowMode by remember(activity) {
+        mutableStateOf(activity?.isInMultiWindowMode == true)
+    }
 
     DisposableEffect(activity) {
         val componentActivity = activity as? ComponentActivity
         if (componentActivity != null) {
-            val listener = Consumer<MultiWindowModeChangedInfo> {
-                multiWindowChangeCount += 1
+            listenerMultiWindowMode = componentActivity.isInMultiWindowMode
+            val listener = Consumer<MultiWindowModeChangedInfo> { info ->
+                listenerMultiWindowMode = info.isInMultiWindowMode
             }
             componentActivity.addOnMultiWindowModeChangedListener(listener)
             onDispose {
@@ -48,8 +54,10 @@ actual fun rememberDevicePosture(): DevicePosture {
         }
     }
 
-    val isInMultiWindowMode = remember(activity, configuration, multiWindowChangeCount) {
-        activity?.isInMultiWindowMode == true
+    val isInMultiWindowMode = if (activity is ComponentActivity) {
+        listenerMultiWindowMode
+    } else {
+        remember(activity, configuration) { activity?.isInMultiWindowMode == true }
     }
 
     val isFoldableHardware = remember(context) { FoldableDetector.isFoldableDevice(context) }
