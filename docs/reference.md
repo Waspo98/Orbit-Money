@@ -1,660 +1,319 @@
-# Orbit Money — Technical Reference
+# Orbit Money Technical Reference
 
-> This document covers implementation details needed when modifying or debugging the app.
+This document covers architecture, database migrations, engine rules, API routes, and implementation notes for modifying or debugging Orbit Money.
 
 ## Stack
-- **Frontend:** React 18 (Vite build, client-side routing via React Router v6)
-- **Backend:** Node.js 20.19+ + Express
-- **Auth:** Local session login, OIDC login, or both; `API_KEY` header for programmatic access
-- **Data:** SQLite (better-sqlite3) + Docker named volume
-- **Key dependencies:** `express`, `express-session`, `better-sqlite3`, `multer` 2.x (CSV upload), `papaparse` (CSV parsing), `@dnd-kit/core` + `@dnd-kit/sortable` (dashboard, account, navigation, and settings reorder UI)
-- **Session storage:** local `better-sqlite3` session store in `backend/src/services/sessionStore.js`
 
-## Dockerfile
-Multi-stage build:
-- **Stage 1 (build):** `node:20-slim` — not Alpine, because Rollup/musl hangs on Docker Desktop + WSL2
-- **Stage 2 (prod):** `node:20-alpine` — requires `python3 make g++` for better-sqlite3 native compilation (removed after install)
-- Uses `--no-audit --no-fund` flags to prevent npm hangs
+- **Shared app (`:composeApp`):** Kotlin Multiplatform (Kotlin 2.1.20) + Compose Multiplatform (1.7.3) + Material 3, compiling to Android (`androidTarget`, JVM 17) and WebAssembly (`wasmJs`, bundled as `orbitApp.js`).
+- **Android wrapper (`:androidApp`):** `compileSdk 35`, `minSdk 24`, `targetSdk 35`. Handles splash screen, edge-to-edge display, adaptive 120Hz refresh rate, biometric app lock, foldable posture detection, Storage Access Framework (SAF) file import/export, Custom Tabs OIDC login, and launcher shortcuts.
+- **Client libraries:** `kotlinx-coroutines`, `kotlinx-serialization-json`, `kotlinx-datetime`, `okio`, `ktor` 3.1.1 (`ktor-client-okhttp` on Android, `ktor-client-js` on Web), and `androidx.lifecycle` ViewModel Compose.
+- **Backend (`backend/`):** Node.js 20.19+ + Express 4.21 + SQLite (`better-sqlite3`), `express-session` backed by `BetterSqliteSessionStore`, `multer` 2.x (CSV/backup uploads), `papaparse` (CSV parsing), and `web-push`.
+- **Auth:** Local username/password login, OIDC login, or both; optional `X-API-Key` header for programmatic access.
 
-## Docker Images
-- Public installs use `ghcr.io/waspo98/orbit-money:latest` from `docker-compose.yml`.
-- Maintainer beta uses `ghcr.io/waspo98/orbit-money:beta` from `deploy/beta/docker-compose.yml`.
-- The `main` and `Beta` GitHub Actions workflows run the self-hosted deploy scripts; those scripts build and publish the branch image tags, build the matching Docker Compose service locally, restart the container, and verify the running container version.
-- Manual maintainer deploys use the same build/push/local-build/restart path and do not pull GHCR images.
-- The maintainer Windows host keeps the self-hosted GitHub Actions runner online through the automatic service `actions.runner.Waspo98-Orbit-Money.orbit-money-server`. If deploy jobs are queued but not running, verify `Get-Service "actions.runner.*"` and repair with `scripts\install-actions-runner-service.ps1` from an Administrator PowerShell session.
-- Release tags like `v0.62.0` publish matching version image tags through `publish-release-image.yml`.
-- The Compose files keep `build` definitions so maintainer deploys can always restart from the checked-out source instead of trusting a registry pull.
-- Public self-host installs can still use `docker compose pull` against `ghcr.io/waspo98/orbit-money:latest`; maintainer deploy scripts intentionally avoid pull-based updates.
+## Dockerfile and Container Images
 
-## Data Storage
-All data lives in Docker named volume `orbit-money-data` mounted at `/app/data`:
+`Dockerfile` uses a two-stage build:
+
+- **Stage 1 (`eclipse-temurin:21-jdk` as `build-wasm`):** Reuses a pre-built host bundle at `composeApp/build/dist/wasmJs/productionExecutable/index.html` when present. Otherwise downloads Android command-line tools (`platforms;android-35`, `build-tools;35.0.0`) inside the build container and runs `./gradlew :composeApp:wasmJsBrowserDistribution -x compileProductionExecutableKotlinWasmJsOptimize --no-daemon`.
+- **Stage 2 (`node:20-alpine` as `prod`):** Installs `sqlite` and `wget`, installs temporary build dependencies (`python3 make g++`) to compile `better-sqlite3`, runs `npm install --omit=dev --no-audit --no-fund`, removes build dependencies, copies `backend/src` to `/app/src` and the built `wasmJs` PWA bundle to `/app/public`, creates `/app/data`, and starts `node src/server.js` on port `5008`.
+
+Container image targets and workflows:
+
+- Public self-host installs pull `ghcr.io/waspo98/orbit-money:latest` via `docker-compose.yml` (host port `5008`, volume `orbit-money-data`).
+- Maintainer beta uses `ghcr.io/waspo98/orbit-money:beta` via `deploy/beta/docker-compose.yml` (host port `5019`, volume `orbitmoney-beta_orbit-money-beta-data`).
+- `.github/workflows/deploy-live.yml` and `.github/workflows/deploy-beta.yml` trigger only on manual `workflow_dispatch` (never automatically on push). Both build and publish branch image tags, rebuild/recreate the local container, and verify the running `backend/package.json` version.
+- Pushing a `v*` Git tag triggers `.github/workflows/publish-release-image.yml` to publish matching version tags (`vX.Y.Z`, `X.Y.Z`, `X.Y`).
+
+## Data Storage and Sync Modes
+
+### Server Storage
+
+All server state lives in Docker named volume `orbit-money-data` mounted at `/app/data`:
 
 | File | Purpose |
 |---|---|
-| `budget.db` | SQLite database — accounts, transactions, categories, rules, budgets, sync config, sync log |
-| `sessions.db` | Session store (separate `better-sqlite3` connection) |
+| `budget.db` | SQLite database (accounts, transactions, categories, rules, budgets, goals, household, credit cards, sync config, logs) |
+| `sessions.db` | Express session store (separate `better-sqlite3` WAL connection via `backend/src/services/sessionStore.js`) |
 
-## Offline PWA Cache
+### Client Storage Modes
 
-Offline mode is intentionally read-only. The service worker caches the app shell
-and static assets, while `frontend/src/api.js` keeps successful authenticated
-GET responses in IndexedDB through `frontend/src/offlineCache.js`. Non-GET API
-calls are blocked while offline with the read-only message shown in the app
-banner.
+`OrbitRepository` switches between two `OrbitStorageEngine` implementations:
 
-Cached API responses are keyed by signed-in user identity, household id, and
-request path. A successful `/api/auth/me` response is the access validation
-source. Owner households can use cached data offline without a time limit;
-shared/member households must have validated access within the last 7 days.
-Logout clears the IndexedDB financial response cache.
+- **Local mode (`StorageMode.LOCAL` / `LocalSnapshotEngine`):** Stores the full `OrbitWorkspaceSnapshot` JSON via `PlatformStorage` (atomic Okio file writes in Android internal `filesDir`, or `localStorage` with an in-memory fallback on Web). Supports direct SimpleFIN Bridge sync (`SimpleFinDirectClient`), client-side Rocket Money CSV import (`CsvImportEngine`), JSON export/restore, and optional Google Drive `appDataFolder` backups (`CloudSyncManager`).
+- **Self-Hosted mode (`StorageMode.SELF_HOSTED` / `SelfHostedApiEngine`):** Communicates with the Express backend via `OrbitApiClient` and caches `OrbitWorkspaceSnapshot` locally in `PlatformStorage`. Cold starts load immediately from cache and fall back to read-only offline viewing when the server is unreachable. Owner households can read cached data offline indefinitely; shared/member households require an online validation within the last 7 days. Signing out clears cached household data.
 
-Route components are lazy-loaded, so `App.jsx` warms those route chunks after a
-successful online app load. Keep that preloading behavior when adding new
-offline-readable pages, otherwise a never-visited page can fail to import while
-offline.
+### Web PWA Service Worker and Caching
 
-The backend serves the SPA shell with `Cache-Control: no-cache`, serves `sw.js`
-with no-store CDN/browser headers, and returns 404s for missing static asset URLs
-instead of falling through to `index.html`. This keeps stale hashed route chunks
-from producing confusing module-load failures after a Docker rebuild or deploy.
+`composeApp/src/wasmJsMain/resources/sw.js` (`CACHE_NAME = 'orbit-money-kmp-v2'`):
 
-`frontend/src/offlineWarmup.js` also warms core read-only API paths shortly
-after login, including the default Transactions and Budgets requests. Keep those
-paths mechanically aligned with each page's initial `api.get(...)` call; the
-offline cache keys by exact request path.
+- Pre-caches `/`, `/index.html`, `/manifest.webmanifest`, `/orbitApp.js`, and app icons on install.
+- Uses network-first for page navigations and cache-first for static assets, including Webpack's content-hashed `.wasm` chunks.
+- Never intercepts `/api/*` or cross-origin requests.
+- Handles `push` and `notificationclick` events for Web Push notifications (with `/notification-badge-96.png` badge icon).
 
-PWA asset cache strings are intentionally repeated in `frontend/index.html`,
-`frontend/public/manifest.webmanifest`, `frontend/public/sw.js`, and
-`frontend/src/brandAssets.js`. Keep those suffixes aligned when refreshing the
-app-shell cache; this is not an app version bump.
+`backend/src/server.js` sets `Cache-Control: no-store` (plus CDN/Cloudflare no-store headers) on `sw.js`, `Cache-Control: no-cache` on `index.html` and `manifest.webmanifest`, `public, max-age=31536000, immutable` on `/assets/*`, returns `404` for missing static asset URLs instead of falling back to `index.html`, and serves `index.html` for client-side routes.
 
-### Database Schema (37 migrations)
+## Database Schema (38 Migrations)
+
+Versioned migrations in `backend/src/db/migrations/` run automatically on server startup. Never edit an applied migration; add a new numbered file for schema changes.
 
 | Migration | Purpose |
 |---|---|
-| `001_initial_schema.sql` | Core tables: accounts, transactions, categories, rules, simplefin_config, budgets, goals. 32 seeded Rocket Money categories. |
+| `001_initial_schema.sql` | Core tables (`accounts`, `transactions`, `categories`, `rules`, `simplefin_config`, `budgets`, `goals`) and 32 seeded Rocket Money categories |
 | `002_seed_categories.sql` | Additional category seeds |
-| `003_account_uniqueness.sql` | Composite unique index on (institution, account_number_last4) |
-| `004_simplefin_sync_support.sql` | `sync_log` table, `cutover_date` on `simplefin_config` |
-| `005_add_mortgage_type.sql` | Adds `mortgage` to accounts.type CHECK constraint (full table rebuild) |
-| `006_account_sort_order.sql` | Adds `sort_order` column to accounts for drag-and-drop reorder |
-| `007_transactions_updated_at.sql` | Adds `updated_at` column to transactions (constant default + backfill from `imported_at`) |
-| `008_original_edited_split.sql` | Renames `transactions.merchant` → `original_merchant`, adds `edited_merchant`, `edited_category_id`, `edited_is_transfer`, `edited_is_ignored` and matching `_source` columns |
-| `009_budget_monthly.sql` | Per-month budgets: rebuilds `budgets` with composite unique `(category_id, month)` |
-| `010_budget_global_amount.sql` | Reverted to global per-category budgets: rebuilds `budgets` back to `category_id UNIQUE`, collapses any multi-month rows to the most recent via `ROW_NUMBER() OVER (PARTITION BY category_id ORDER BY month DESC)` |
-| `011_account_estimated_value.sql` | Adds `estimated_value` to accounts for mortgage/home-equity net-worth calculations |
-| `012_mha_tracker.sql` | Adds MHA app setting, default account eligibility, and transaction-level MHA overrides |
+| `003_account_uniqueness.sql` | Composite unique index on `(institution, account_number_last4)` |
+| `004_simplefin_sync_support.sql` | `sync_log` table and `cutover_date` on `simplefin_config` |
+| `005_add_mortgage_type.sql` | Adds `mortgage` to `accounts.type` CHECK constraint (full table rebuild) |
+| `006_account_sort_order.sql` | Adds `sort_order` to `accounts` |
+| `007_transactions_updated_at.sql` | Adds `updated_at` to `transactions` (constant default + backfill from `imported_at`) |
+| `008_original_edited_split.sql` | Renames `transactions.merchant` to `original_merchant`, adds `edited_*` and `edited_*_source` provenance columns |
+| `009_budget_monthly.sql` | Per-month budgets `(category_id, month)` |
+| `010_budget_global_amount.sql` | Reverts `budgets` to one global cap per `category_id`, keeping each category's most recent row |
+| `011_account_estimated_value.sql` | Adds `estimated_value` to `accounts` for home-equity calculations |
+| `012_mha_tracker.sql` | Adds MHA setting, account defaults, and transaction-level MHA overrides |
 | `013_mha_category_defaults.sql` | Adds category-level MHA default eligibility |
 | `014_mha_category_ignore_defaults.sql` | Adds category-level MHA default ignore behavior |
-| `015_goal_allocations.sql` | Extends goals metadata and adds multi-account goal allocations |
-| `016_merchant_logo_cache.sql` | Adds cached merchant logo metadata for transaction display |
+| `015_goal_allocations.sql` | Extends goals metadata and adds `goal_account_allocations` |
+| `016_merchant_logo_cache.sql` | Adds cached merchant logo metadata |
 | `017_goal_sort_order.sql` | Adds custom goal ordering |
-| `018_account_balance_records.sql` | Adds dated account balance snapshots for manual/disconnected account history |
-| `019_household_income.sql` | Adds household member profiles and dated income/benefit history snapshots |
-| `020_household_retirement_accounts.sql` | Links household members to existing retirement/HSA accounts for projections |
-| `021_integer_cents.sql` | Converts money storage to integer cents and splits goal allocation percent vs fixed-amount storage |
-| `022_upcoming_items.sql` | Adds saved Upcoming bills, subscriptions, income items, and dismissed recurring-suggestion keys |
-| `023_multi_user_households.sql` | Adds users, households, memberships, OIDC-ready ownership, household-scoped defaults, and migrates existing data to household `1` |
-| `024_household_sharing.sql` | Adds pending household shares by email for partner access |
-| `025_rename_authentik_sub_to_oidc_sub.sql` | Renames the stored OIDC subject column from Authentik-specific naming to `oidc_sub` |
-| `026_neutral_default_household_name.sql` | Renames the old default household label to `My Household` when it has not been customized |
+| `018_account_balance_records.sql` | Adds dated account balance snapshots (`account_balance_records`) |
+| `019_household_income.sql` | Adds `household_members` and dated `household_income_records` snapshots |
+| `020_household_retirement_accounts.sql` | Links household members to existing retirement/HSA accounts |
+| `021_integer_cents.sql` | Converts SQLite money columns to integer cents and separates percent vs fixed goal allocations |
+| `022_upcoming_items.sql` | Adds `upcoming_items` and dismissed recurring suggestion keys |
+| `023_multi_user_households.sql` | Adds users, households, memberships, OIDC ownership, household-scoped defaults, and migrates existing data to household `1` |
+| `024_household_sharing.sql` | Adds pending email-based household shares |
+| `025_rename_authentik_sub_to_oidc_sub.sql` | Renames OIDC subject column to `oidc_sub` |
+| `026_neutral_default_household_name.sql` | Sets uncustomized default household name to `My Household` |
 | `027_upcoming_recurrence_projection.sql` | Adds Upcoming recurrence-rule metadata and history-average amount projection settings |
-| `028_upcoming_occurrence_reconciliation.sql` | Adds persisted Upcoming occurrence tracking for matched and missed projected transactions |
+| `028_upcoming_occurrence_reconciliation.sql` | Adds persisted Upcoming occurrence matching and missed-occurrence tracking |
 | `029_permissions_import_batches.sql` | Adds household read/write permissions plus import preview and undo batch tracking |
-| `030_user_preferences.sql` | Adds account-scoped UI preferences so customization follows the user across browsers |
-| `031_push_notifications.sql` | Adds browser push subscriptions and per-user delivery history for deduped notifications |
-| `032_account_balance_record_source.sql` | Adds source metadata to account balance snapshots and keeps balance record uniqueness household-scoped |
-| `033_credit_card_profiles.sql` | Adds local credit card profile metadata for tracked credit accounts |
-| `034_clean_credit_card_profiles.sql` | Removes external catalog-specific card columns and keeps the user-entered card name as local data |
-| `035_credit_card_strategy.sql` | Adds statement closing day, payment due day, and strategy_json to credit_card_profiles |
-| `036_credit_card_billing.sql` | Adds standard APR (apr_bps), promotional APR (promo_apr_bps), and promotional APR expiration date (promo_end_date) to credit_card_profiles |
-| `037_credit_card_catalog.sql` | Adds household-scoped and shared credit card template catalog metadata (`credit_card_catalog`, elevated SUB offer fields) |
+| `030_user_preferences.sql` | Adds user-scoped UI preferences synced across devices |
+| `031_push_notifications.sql` | Adds `push_subscriptions` and `notification_delivery_log` |
+| `032_account_balance_record_source.sql` | Adds source metadata to balance records with household-scoped uniqueness |
+| `033_credit_card_profiles.sql` | Adds `credit_card_profiles` for tracked credit cards |
+| `034_clean_credit_card_profiles.sql` | Removes external catalog-specific card columns, keeping local card metadata |
+| `035_credit_card_strategy.sql` | Adds `statement_closing_day`, `payment_due_day`, and `strategy_json` |
+| `036_credit_card_billing.sql` | Adds `apr_bps`, `promo_apr_bps`, and `promo_end_date` |
+| `037_credit_card_catalog.sql` | Adds household-scoped and shared credit card template catalog (`credit_card_catalog`) |
+| `038_real_estate_and_sync_closure.sql` | Adds standalone properties (`is_property`, `property_name`), linked property loans (`linked_property_account_id`), and SimpleFIN missing/closed account tracking (`simplefin_last_seen_at`, `simplefin_missing_since`, `closure_prompt_dismissed_at`) |
 
-### Key Data Model Notes
+## Key Data Model Rules
 
-**Sign convention:** expenses are negative, income is positive (flipped from Rocket Money's positive-expense format during CSV import).
+- **Sign convention:** Expenses are negative and income is positive (flipped from Rocket Money's positive-expense format on CSV import).
+- **Money units:** SQLite and all Kotlin domain models/engines store currency as integer cents (`Long` / `typealias Cents = Long`). Express API request and response payloads convert at the route boundary via `backend/src/lib/money.js`. Percent fields remain decimal percent values; credit card APRs are stored in integer basis points (`0..10000`, where `2499` = `24.99%`).
+- **Route boundary conventions:** Express handlers parse and validate parameters through `backend/src/lib/routeParams.js` and `backend/src/lib/localDate.js`, returning standardized envelopes via `backend/src/lib/http.js`.
+- **Transaction provenance (migration 008):** Imported fields live in `original_*` columns and are never mutated by edits or rules. User and rule changes write to `edited_*` columns with `edited_*_source` (`'user'`, `'rule:{id}'`, `'system:*'`, or `NULL`). Display values resolve via `COALESCE(edited_X, original_X)`. User edits are sticky and are never overwritten by rules.
+- **Multi-user households and sharing:** Tenant rows carry `household_id`. Owners invite partners by email; first OIDC login claims the pending invite, creates the `household_memberships` row, and retires the invite. Subsequent read/write access changes happen on `household_memberships`.
+- **Backup restore:** Owner-only in Self-Hosted mode. Replaces the active household's data, remaps all foreign keys across accounts, categories, rules, transactions, goals, household members, upcoming items, import batches, and preferences, and keeps the current user as owner. SimpleFIN credentials are excluded and must be reconnected after restore.
+- **Rules:** Conditions (`merchant`, `original_description`, `amount`, `account_id`, `category_id`) evaluate exclusively against original imported values so match counts stay stable and rules do not chain on prior renames. Actions (`rename`, `categorize`, `mark_transfer`, `mark_ignored`) apply in `priority DESC, id ASC` order; the first rule claiming a field wins.
+- **Account types and real estate:** Account types are `checking`, `savings`, `credit`, `investment`, `loan`, `mortgage`, `cash`, and `other`. Migration 038 adds standalone property accounts (`is_property = 1`) and allows mortgages/loans to link to a property via `linked_property_account_id`. Net worth includes home equity (estimated value minus linked mortgage debt).
+- **SimpleFIN closed-account detection:** When a previously synced unarchived SimpleFIN account disappears from a clean sync payload, `markMissingSimpleFinAccounts` stamps `simplefin_missing_since`. Users resolve the prompt via `POST /api/accounts/:id/resolve-closure` with `paid_off_keep_property`, `refinanced_keep_property`, `sold_property`, `sold_or_closed`, or `dismiss`.
+- **Account balance records:** `account_balance_records` upserts by `(account_id, record_date)` and updates `accounts.current_balance` when the new record is the latest snapshot. Net worth history uses the latest snapshot on or before each month before falling back to transaction deltas.
 
-**Money representation:** SQLite stores money fields as integer cents. API responses and request bodies still use dollar values for the frontend. Convert at route/service boundaries with `backend/src/lib/money.js`; do not store floating-point dollars in SQLite. Percent fields remain percent values, and goal allocations store percent allocations in `allocation_percent` while fixed-dollar allocations use integer cents in `allocation_amount`.
-
-**Route template:** Express handlers should validate and normalize route inputs at the boundary, use `backend/src/lib/routeParams.js` for common id/boolean/bounded-integer parsing, use `backend/src/lib/localDate.js` for strict date/month validation, and send responses through `backend/src/lib/http.js` helpers (`sendOk`, `sendBadRequest`, `sendNotFound`, `sendServerError`, etc.) so API success and error shapes stay mechanical.
-
-**Transaction sources:** `csv_import`, `simplefin`, `manual` — tracked in `source` column, deduplicated via `external_id`.
-
-**Original / edited provenance (migration 008):** Rules and manual edits never mutate the raw imported values. Each editable field has an `original_*` column (populated at import, never touched afterward) and a nullable `edited_*` column with an `edited_*_source` tag (`'user'`, `'rule:{id}'`, `'system:*'`, or NULL). Display values are computed as `COALESCE(edited_X, original_X)` at the API layer so the UI sees one logical merchant/category/flag regardless of how it got there. User edits are sticky — rules never override `source='user'`. System edits are reserved for app-owned derivations like transfer matching and are preserved during rule reapply.
-
-**Multi-user ownership:** Tenant-owned data carries `household_id`. Existing single-user data is assigned to household `1` during migration. Fresh installs end with the neutral default name `My Household`; existing installs are only renamed if the household still has the old default label. Uniqueness that used to be global, such as category name, SimpleFIN account id, transaction external id, and app settings, is now scoped by household. New OIDC users get a household seeded from `app_default_settings` and `app_default_categories`.
-
-**Partner sharing:** Owners create pending email invites. OIDC login claims only unaccepted pending invites, creates the household membership once, and retires the invite; future access changes happen only on `household_memberships`.
-
-**Backup restore:** Orbit backup restore is owner-only. It replaces the active household's data, clears existing pending shares/memberships and SimpleFIN sync history for that household, then restores matching memberships from the backup while keeping the current user as owner. Restores allocate fresh row ids in the target household and remap dependent references across accounts, categories, rules, transactions, goals, income members, upcoming items, import batch history, and user preferences. SimpleFIN connection information is intentionally excluded and must be reconnected after restore.
-
-**Auth modes:** `AUTH_PROVIDER=local` shows only the username/password form. `AUTH_PROVIDER=oidc` shows only the OIDC button. `AUTH_PROVIDER=both` shows both options. `OIDC_LOGIN_LABEL` controls the OIDC button text and defaults to `Log in with OIDC`. `ENABLE_SAMPLE_DATA=1` exposes the sample-data login flow; it is disabled by default for normal installs.
-
-**Public-safe env defaults:** `API_KEY` is optional and should remain blank unless programmatic access is intentionally enabled. `SIMPLEFIN_ENCRYPTION_KEY` may remain blank until the user connects SimpleFIN. Startup rejects known placeholder values for required secrets so copied example files do not become predictable public deployments.
-
-**Rules:** JSON-serialized `conditions` (array of `{field, operator, value}`) and `actions` (array of `{type, value}`). Condition fields: `merchant`, `original_description`, `amount`, `account_id`, `category_id`. All condition evaluation runs against originals only, making match counts stable. Merchant text conditions check both `original_merchant` and `original_description` so SimpleFIN payee cleanup does not break rules when the raw description still contains the fuller merchant name. Action types: `rename`, `categorize`, `mark_transfer`, `mark_ignored`. First rule (priority DESC, id ASC) to claim a given field wins; lower-priority rules skip it.
-
-**Account types:** `checking`, `savings`, `credit`, `investment`, `loan`, `mortgage`, `cash`, `other`.
-
-**Account balance records:** `account_balance_records` stores dated balance snapshots for accounts that need manual history outside SimpleFIN. Adding a record upserts by `(account_id, record_date)` and updates `accounts.current_balance` when that record is the newest snapshot for the account. Net Worth history uses the latest snapshot on or before each month when one exists, then falls back to transaction-derived balances. Push snapshot reminders can target selected accounts and deep-link to `/accounts?action=add-snapshot&accountId=...`.
-
-**Credit card profiles:** `credit_card_profiles` stores optional one-to-one profile details for accounts with `type = 'credit'`.
-- **Financial Units:** Money fields (`annual_fee`, `credit_limit`, benefit amounts, SUB targets and values) are stored as integer cents (`typealias Cents = Long`) in SQLite and domain models, and converted to decimal dollars in API JSON payloads.
-- **Basis Points (BPS):** Standard interest rate (`apr_bps`) and promotional interest rate (`promo_apr_bps`) are stored as non-negative integer basis points where 1 BPS = 0.01% (e.g., 24.99% is stored as `2499`, 0% promo is `0`). Valid range is `0` to `10000` (0.00% to 100.00%). Promotional expiration is stored as strict ISO date string `promo_end_date` (`YYYY-MM-DD`).
-- **Billing Cycle Days:** `statement_closing_day` and `payment_due_day` are stored as integers clamped to `1..31`. If a month has fewer days than the specified cycle day, calculation engines clamp to the month's last valid day.
-- **Benefits v2 Schema (`benefits_json`):** JSON array of up to 24 card benefit objects. Each benefit has a deterministic string `id` (`b_<alphanumeric>` or `legacy-<idx>-<hash>`), display `title` (max 120 chars), optional `description` (max 300 chars), `category` tag, `period_value` (integer cents in storage, decimal dollars in API), `cadence` (`monthly`, `quarterly`, `semi_annual`, `annual`, `every_4_years`), `anchor` (`calendar` vs `cardmember_year`), and a structured `usage` ledger array of `{ period_key, amount, used_on }` objects capped at 120 historical entries.
-- **Strategy & Lifecycle Schema (`strategy_json`):** JSON object tracking household player assignments and rewards strategy:
-  - `cardholder_member_id`: foreign key referencing `household_members.id` (primary cardholder).
-  - `authorized_user_member_ids`: array of up to 12 `household_members.id` references representing authorized users on the account.
-  - `cardholder`: free-text label used when the account is not linked to a household member profile.
-  - `opened_date` & `closed_date`: ISO `YYYY-MM-DD` lifecycle dates.
-  - `is_business_card`: boolean flag. Business cards do not count toward personal 5/24 limits unless overridden.
-  - `counts_toward_524_override`: nullable boolean allowing explicit manual override of 5/24 inclusion.
-  - `product_changed_from`: text tracking original product for upgraded/downgraded cards.
-  - Welcome bonus (SUB) tracker fields: `sub_reward_text`, `sub_estimated_value` (cents), `sub_target_spend` (cents), `sub_deadline_date` (ISO date), `sub_manual_spend_offset` (cents), `sub_completed` (boolean), `sub_received_date` (ISO date), and `sub_cooldown_months` (0..1200, with 999 representing lifetime).
-
-**Overlap strategy (SimpleFIN + Rocket Money):** cutover date approach — RM owns transactions before cutover, SimpleFIN owns after. Pre-cutover RM transactions are deleted during sync if SimpleFIN provides the same period.
-
-**Budgets:** One row per spending `category_id` (globally applied). Transfer and income categories are excluded from budget rows and per-category spending lists; income is summarized separately in the monthly Income / Expenses / Net stat row. The `budgets` table retains the `rollover` column from migration 001 for future Phase 2 work but it's not consumed by the current UI.
-
-**Spending Trends:** Read-only historical reporting uses the same non-ignored, non-transfer transaction pool as Budgets. Income/expense flow is summarized by month, and category history is limited to spending categories plus true uncategorized expense rows.
-
-**Goals:** Goal progress is computed from `goal_account_allocations` and active asset account balances. Allocations can be fixed dollar amounts or percentages of the account balance; fixed allocations are stored as integer cents and percentage allocations remain percent values. The old `goals.current_amount` column is retained for compatibility, but the Goals API derives live progress at read time.
-
-**Household:** `household_members` stores the current profile, income, retirement, and benefit assumptions for each person. `household_income_records` stores dated snapshots so future projections can use compensation history without mutating old records. `household_retirement_accounts` links existing account rows to household members so retirement projections can compound present balances without moving or duplicating account data.
-
-## Features
-
-### Core Transactions
-- Rocket Money CSV import: auto-creates accounts, sign-flips amounts, and generates rename rules from Custom Name columns. Existing account matching only reuses an account when both institution and last4 are present; missing identifiers create a fresh account to avoid merging unrelated cash/manual accounts.
-- SimpleFIN bank sync with AES-256-GCM encrypted access URL storage
-- Tap-to-expand transaction cards — grid-template-rows animated expand/contract (220ms), auto-scroll-into-view on expand (accounts for bottom tabs height)
-- Inline edit modal: merchant, category, notes (date/amount read-only — bank ground truth)
-- Transaction deletion and transfer/ignored toggles
-- "Mark as recurring" is available from the transaction row menu and expanded transaction card; it opens the recurring-item editor seeded from that transaction before saving to Upcoming.
-- Edit provenance UI: "edited manually" / "applied by rule" badges, per-field "reset to original" buttons, inline display of the original value alongside the edited one
-
-### Search, Filter, and Sort
-Transactions page toolbar has a debounced search input + filter sheet + sort dropdown. URL query params are the source of truth — back-button and link-sharing work. Active filters render as dismissible pills below the toolbar. Supported filters:
-
-- **q** — free-text search across display merchant, original merchant, original description, and notes
-- **accounts** — multi-select account IDs
-- **categories** — multi-select category IDs (supports `uncategorized` literal for NULL matches)
-- **date_from** / **date_to** — YYYY-MM-DD inclusive, with chip presets (This month, Last month, Last 30 / 90, YTD, All time)
-- **amount_min** / **amount_max** — absolute-value match so `50` catches both ±$50
-- **type** — all / income / expense / transfer
-- **include_ignored** — default true; can hide
-- **exclude_credit_card_payments** — `1` hides credit-card-payment style rows for dashboard/report views
-- **has_edits** — any / yes / no
-- **sort** — `date_desc | date_asc | amount_desc | amount_asc | abs_amount_desc | abs_amount_asc | merchant_asc`
-
-All comparisons use COALESCE(edited, original) so filtering matches what's on screen.
-
-### Rules Management
-- Full CRUD: create, read, update, delete individual rules
-- Bulk wipe with typed "DELETE" confirmation
-- Condition builder: field + operator + value rows, AND'd together
-- Action builder: rename, categorize, mark transfer, mark ignored
-- Live preview: debounced (400ms) match count against existing transactions before saving
-- Enable/disable toggle per rule with optimistic UI
-- Match count displayed per rule in the list view — stable because counting is condition-only (no actions involved)
-- "Create rule from transaction" flow: pre-fills condition with `merchant contains [original merchant]`, action with `rename to [current merchant]`, and carries the source transaction into the editor so added/changed conditions default to that transaction's merchant, raw description, amount, account, or category. Synchronous reapply on save so the Transactions page reflects the change immediately on silent refresh
-- Rule deletion reverts every edit whose `source = 'rule:{id}'`, then re-runs remaining rules to re-populate any fields they should claim
-- Auto-apply: creating, updating, or toggling a rule triggers a synchronous reapply — by the time the response returns, all transactions reflect settled state
-
-### SimpleFIN Sync
-- Setup via base64 token exchange (SimpleFIN Bridge API)
-- Access URL encrypted at rest (AES-256-GCM, key from `.env`)
-- Auto-match accounts by (institution, last4)
-- Transfer auto-matcher: pairs opposite-sign same-day transactions in displayed transfer-flagged categories. It respects edited category/ignored state and marks transfer status as a resettable `system:transfer_matcher` edit rather than mutating originals.
-- Scheduler: daily at 6 AM (configurable) + manual "Sync Now"
-- Sync log with status tracking (success / error / partial)
-- Partial sync detection: if SimpleFIN reports account connection issues, status shows as yellow "Partial sync" rather than red "Error"
-- Node `fetch` rejects inline URL credentials — implementation strips them and sends as Basic Auth header
-
-- Transactions with missing/zero SimpleFIN `posted` timestamps are skipped instead of being stored as `1970-01-01`; if a later sync returns a valid date for a previously affected transaction ID, the sync repairs that row's raw date/details.
-
-### MHA Tracker
-- Eligible transaction totals exclude transactions whose displayed state is ignored or transfer. Eligibility can still come from account defaults, category defaults, or transaction overrides, but ignored/transfer rows are filtered out before summary totals and savings are computed.
-- MHA savings use a per-household tax profile stored in `app_settings` under `mha_tax_profile`. Simple mode uses only the manual federal and state percentages entered by the user.
-- Household estimate mode uses the bundled current-year federal brackets and standard deductions, subtracts household pre-tax paycheck contributions, and supports standard vs itemized deductions.
-- State auto-estimates intentionally cover no-tax and single-rate ordinary income states only. Graduated-rate states do not auto-estimate state savings yet.
-- Bundled tax data exposes source, reviewed, and review-after metadata so the UI can show freshness and stale-data warnings instead of silently using old tables.
-
-### Accounts
-- Full CRUD + merge + archive/unarchive. Account merge preserves dependent account data before deleting the source: transactions, balance snapshots, goal links/allocations, household retirement links, upcoming items, credit card profiles, estimated value, and SimpleFIN id when the target has room for it.
-- **Reorder mode:** dedicated toggle that replaces normal grouped account cards with drag handles; account rows can be reordered within their account-type group, and group headers can be dragged to reorder whole groups. In-mode there are no competing tap targets, activation distance is 0 (any movement), and tapping "Done" exits. Outside reorder mode, no `@dnd-kit` listeners are mounted at all — eliminating the press-and-hold activation problems that dogged earlier versions.
-- Sort order persisted to `sort_order` column
-- "See transactions" button filters the Transactions page via `?accounts=X` query param
-- Three-dot dropdown menu per account (Add Record, Edit, Merge, Archive, Delete)
-- Add Record modal stores a dated account total snapshot with an app-dialog confirmation that summarizes the percentage change from the previous balance.
-- Edit modal: name, type, institution, plus estimated value for mortgage accounts. Balance and last-4 are intentionally not editable in the UI.
-- Credit card account rows open the unified Card Editor on tap/click (or via the "Edit Card Details & Perks" action menu). The editor binds directly to a configuration-proof `CardEditorDraft` in the ViewModel, preserving unsaved changes across screen rotation and device folding. Card visual styles use physical wallet-matched gradient presets (`CardArtPalette`) rather than fragile image scraping or external URLs.
-
-### Credit Card Tracking & Rewards Strategy
-
-Orbit provides an integrated, local-first credit card management and rewards strategy suite designed for multi-player households, travel rewards enthusiasts, and disciplined budgeters.
-
-#### 1. Billing & Cycle Engine (`CreditCardCycleEngine`)
-- **Clamped Date Math:** Statement close and due days (`1..31`) are dynamically clamped to each month's actual length via `LocalDateUtils.daysInMonth(year, month)`.
-- **Statement Close Date Derivation:**
-  - `lastClose(closingDay, today)`: Returns the closing date in the current month if on or before `today`; otherwise rolls back to the prior month (handling January to December year boundaries).
-  - `nextClose(closingDay, today)`: Returns the next closing date strictly after `today`, rolling forward into the subsequent month/year when this month's close date has elapsed.
-- **Payment Due Date Derivation:**
-  - `dueDateAfter(close, dueDay)`: Finds the first valid `dueDay` strictly after `close`. If `dueDay > close.dayOfMonth`, it falls in the same month; otherwise it rolls into the subsequent month (accounting for standard 21–25 day grace periods).
-  - When closing day is unconfigured, the due date is derived from the next upcoming occurrence of `dueDay`.
-- **Rolling Annual Fee Dates:**
-  - `nextAnnualFeeDate(postIso, today)`: Advances the card's original fee posting anniversary by whole years until it falls on or after `today`. Leap-day anniversaries (February 29) automatically clamp to February 28 during non-leap years.
-- **Statement Balance Estimation:**
-  - Orbit represents debt liabilities as negative current balances (`currentBalanceCents <= 0`).
-  - Transactions use negative cents for charges/expenses and positive cents for payments/refunds.
-  - The engine derives the balance at the last statement close by subtracting charges incurred after the close date:
-    $$\text{balanceAtClose} = \text{currentBalance} - \sum_{\text{date} > \text{lastClose}} \text{effectiveAmountCents}$$
-    $$\text{estimatedStatementBalance} = \max(0, -\text{balanceAtClose})$$
-  - If the card has a credit balance (`currentBalance > 0`) or closing day is unconfigured, estimated statement balance evaluates to `null`.
-- **Credit Utilization:**
-  - Portfolio utilization is calculated across all active, non-closed credit cards:
-    $$\text{utilizationBps} = \frac{\text{totalOwedCents} \times 10000}{\text{totalLimitCents}}$$
-  - Individual and portfolio utilization values are displayed with M3E color thresholds (green < 10%, amber 10–30%, red > 30%).
-- **Upcoming Payments Due:**
-  - Integrated into the Upcoming screen via `CardPaymentsDueCard`.
-  - Scans active credit cards with a derived `dueDate` within the next 35 days (`daysUntilDue in 0..35`).
-  - Displays due date, countdown pill, card title, cardholder label, estimated statement balance (or owed-now amount), and deep-links to transaction history or card settings.
-
-#### 2. Benefits v2 Model & Value Ledger (`CreditCardBenefitEngine`)
-- **Deterministic Benefit IDs:** Benefits carry immutable string identifiers (`b_<uuid>` or legacy upgrade slugs), ensuring usage records remain reliably linked across card template reapplications and title edits.
-- **Reset Cadences & Period Keys:**
-  - `MONTHLY`: Resets on the 1st of every month (`YYYY-MM`, e.g., `2026-11`).
-  - `QUARTERLY`: Resets on calendar quarter boundaries (`YYYY-Q1` through `YYYY-Q4`).
-  - `SEMI_ANNUAL`: Resets every six months (`YYYY-H1` for Jan–Jun, `YYYY-H2` for Jul–Dec).
-  - `ANNUAL` (Calendar): Resets on January 1 (`YYYY`, e.g., `2026`).
-  - `ANNUAL` (Cardmember Year): Resets on the card opening anniversary (`CM-YYYY-MM-DD`, where the date suffix is the window start date derived via `cardmemberYear(openedDate, today)`).
-  - `EVERY_4_YEARS`: 48-month window used for TSA PreCheck / Global Entry credits (`YYYY` representing the active 4-year block start).
-- **Value Ledger Calculation:**
-  - `CreditCardBenefitEngine.ledger(profile, today)` evaluates the card's active 12-month accounting window (cardmember year if `openedDate` is present; calendar year otherwise).
-  - **Captured Credits:** Sums usage amounts from `usage` entries whose period start falls within the active window.
-  - **Available Potential Credits:** Annualized sum of all configured card benefits:
-    $$\text{annualizedValue} = \text{periodValue} \times \frac{12}{\text{cadenceMonths}}$$
-  - **Fee After Credits (Net Effective Annual Fee):**
-    $$\text{feeAfterCredits} = \text{annualFee} - \text{creditsCaptured}$$
-    (A negative value indicates credits captured exceed the annual fee, yielding net positive financial return).
-- **Atomic Usage Mutation & Ledger History:**
-  - `PUT /api/accounts/:id/credit-card-profile/benefits/:benefitId/usage` updates benefit usage with optimistic rollback on the client.
-  - Usage histories are capped at 120 entries (`slice(-120)`) in SQLite to guarantee predictable document size in `benefits_json`.
-- **Card Template Merge Semantics:**
-  - Applying a template merges new catalog benefits and reward categories into the profile while preserving existing user usage history, manual custom benefits, and custom category rates. Templates are stamped with an `asOf` date (`2026-11`).
-
-#### 3. Household 5/24 & Strategy Tracking (`CreditCardStrategyEngine`)
-- **Chase 5/24 Rule:** Evaluates personal credit cards opened across any issuer within the sliding 24-month window (`today - 24 months`).
-- **Household Player Partitioning:**
-  - Card profiles map to household members via `cardholder_member_id` (`m:<id>`), falling back to string `cardholder` or `~unassigned`.
-  - The portfolio summary partitions 5/24 calculations by individual person (`Chase524PersonSummary`) and supports a global household filter (`ALL_PLAYERS`).
-- **Slot Drop-Off Calculation:**
-  - Each qualifying card occupies a 5/24 slot with drop-off date `openedDate + 24 months`.
-  - Slots are sorted chronologically by opening date.
-  - `nextSlotFreeDate`: The earliest drop-off date among active slots.
-  - `under524DropDate`: When at 5/5 or higher, the drop-off date of the $(N - 4)$-th card that will return the cardholder to 4/24.
-- **Authorized User Handling:**
-  - Cards where a player is listed in `authorized_user_member_ids` appear in that player's 5/24 list flagged with `isAuthorizedUser = true`.
-  - Because automated underwriting systems count authorized user cards until manual reconsideration, Orbit counts them toward the slot total while rendering a distinct AU visual badge.
-- **Missing Opened Date Safeguard:**
-  - If a card has `countsToward524 == true` but no `openedDate` is recorded, the engine cannot place it in the 24-month window.
-  - Rather than omitting the card or guessing, `missingOpenDateCount` is incremented and an attention banner is displayed in the UI prompting the user to supply the opening date.
-- **Business Cards & Manual Overrides:**
-  - Cards marked `isBusinessCard = true` are excluded from 5/24 by default (reflecting that small business cards from Chase, Amex, and Citi do not report to personal credit bureaus).
-  - Users can explicitly toggle `countsToward524Override` (`true` or `false`) to handle exceptions (such as Capital One business cards that report to personal bureaus).
-- **Account Deletion Warning:**
-  - Attempting to delete a credit card account opened within the last 24 months triggers a confirmation warning informing the user that deletion will remove the card from household 5/24 tracking.
-- **Welcome Bonus (SUB) Tracker:**
-  - Hardened spend calculation using `CardTransactionClassifier.bonusSpendDeltaCents(txn)`: strictly isolates true purchases, excluding balance transfers, payments, refunds, annual fees, interest charges, and cash advances.
-  - Supports manual spend offset (`subManualSpendOffsetCents`) to account for transactions that occurred prior to bank account linking.
-  - Status progression: `ON_TRACK`, `AT_RISK` (spend velocity behind pace or < 14 days remaining with < 85% spend met), `SPEND_MET`, `RECEIVED`, and `EXPIRED`.
-  - Conservative eligibility checks support once-per-lifetime rules (`subCooldownMonths >= 999`) and standard 24/48-month cooldowns with a 3-month anchor fallback when bonus receipt date is omitted.
-
-#### 4. UI Architecture & Responsive Layout Containment
-- **Unified Draft State in ViewModel:**
-  - Card editor state lives in `AccountsViewModel.cardEditor.draftState: StateFlow<CardEditorDraft?>`.
-  - Holds all editing properties (identity, billing days, APRs, dates, benefits, categories, welcome bonus mode, and discard confirmation state).
-  - Survives Android activity recreation, screen rotation, and foldable display unfolding without state loss.
-- **CardEditorController:**
-  - Encapsulates draft mutations: `startDraft`, `applyTemplate`, `skipTemplate`, `upsertBenefit`, `removeBenefit`, `undoRemoveBenefit`, `upsertReward`, `removeReward`, `setWelcomeBonusMode`, and atomic `save`.
-  - Validation engine provides synchronous per-field error mapping (`draft.errors`) for immediate input feedback.
-- **Hybrid Card Artwork & Preset Gradients (`CardArtPalette`):**
-  - Card thumbnails resolve curated issuer card art via `CreditCardTemplates.resolveArtworkUrl` and `MerchantLogoImageCache` when `artworkUrl` is configured on a template or profile, falling back seamlessly to physical wallet-inspired gradient presets:
-    - `preset://sapphire-blue` (Chase Sapphire deep navy/cobalt)
-    - `preset://amex-gold` (American Express warm gold/brass)
-    - `preset://venture-silver` (Capital One slate / brushed titanium)
-    - `preset://apple-card` (Apple Card frosted pearl / light titanium)
-    - `preset://discover-plum` (Discover plum / royal purple)
-  - Rendered via `CardArtworkThumbnail` and selected via gradient/artwork controls in the card editor.
-  - **Design System Carve-Out:** Card artwork composables are explicitly granted an architectural exception to the semantic color token rule to ensure instant physical wallet brand recognition.
-- **Dual Two-Pane / Sheet Rendering:**
-  - The single composable `CardEditorSheetContent` powers both form presentations:
-    - **Compact / Mobile (< 640dp):** Hosted in `CardEditorModalSheet` (wrapping `OrbitModalSheet`).
-    - **Expanded / Tablet / Desktop (≥ 640dp):** Rendered inline inside the right-hand inspector pane (`AccountDetailInspectorPane`) under submode `AccountInspectorSubMode.PERKS`.
-  - Built with a single root `LazyColumn` containing `item {}` sections, preventing nested scroll conflicts and fixed viewport height clamping.
-
-### Budgets
-- **Monthly caps, global per category.** One amount per category that applies to every month. Editing `Groceries` updates the cap for every past and future month.
-- **Month navigation** via `‹ / ›` arrows plus the shared `AppSelect` pill. The select menu is portaled and page-centered on mobile so month jumps use the same dropdown primitive as the rest of the app.
-- **Snapshot card:** total monthly expenses, percentage of budgeted amount, remaining/over, unbudgeted spending, cash flow, and spend pace. The headline and progress math intentionally include unbudgeted expenses.
-- **Spending mix:** expandable category-share rows with transaction previews. Rows use the shared `ExpandingSection` animation; the optional collapse chevron primitive is deliberately hidden on this page.
-- **Tracking sections:** notable budget activity, unbudgeted spending quick-add CTAs, and budgeted categories with inactive categories collapsed at the bottom of the card. True uncategorized/null-category spending appears in the unbudgeted breakdown and links to `categories=uncategorized`, but it cannot be quick-added as a budget until it has a real category.
-- **Category sort preference:** the Budgeted Categories sort menu persists through the existing `budgetedSort` user preference key.
-- Progress bars transition green → yellow (≥85%) → red (>100%)
-- Endpoints: GET `/api/budgets?month=YYYY-MM`, GET `/api/budgets/months`, PUT `/api/budgets` (upsert), DELETE `/api/budgets/:id`
-
-### Spending Trends
-- Standalone More-menu page at `/spending-trends` focused on historical change over time.
-- **Income Vs Expenses:** 3, 6, or 12 month bar chart built from non-ignored, non-transfer transactions.
-- **Category History:** category picker, month-by-month spending bars, budget reference line when a category has a monthly cap, and quick stats for average, median, highest month, over-budget count, and transaction count. Tapping a month with transactions confirms, then opens Transactions filtered to that category and month.
-- **Top categories list:** compact category buttons sorted by total spend in the selected range so budget-setting research stays one tap away.
-- Endpoint: GET `/api/spending-trends?months=3|6|12`
-
-### Goals
-- Create and edit saving targets from the More menu with a three-step wizard: purpose, accounts, allocation
-- Supported goal kinds: college, car, home, emergency, travel, custom
-- Allocations can connect multiple active asset accounts to a goal: checking, savings, cash, investment, or other
-- Each account allocation can apply either a percent of the account balance or a fixed dollar amount
-- Wizard shows each account's existing goal allocations and can steal allocation from other goals when explicitly enabled
-- Goal charts derive monthly history from existing transaction deltas and current account balances; ETA uses recent monthly progress
-- Account allocation meters are split into consistent per-goal color chunks so the same goal is visually traceable across accounts.
-- "Imagine" slider projects a hypothetical ETA with extra monthly savings
-- Endpoints: GET `/api/goals?months=`, POST `/api/goals`, PUT `/api/goals/:id`, DELETE `/api/goals/:id`
-
-### Retirement Calculator
-- Standalone More-menu page at `/retirement-calculator`.
-- Uses Household retirement inputs and linked retirement/HSA accounts as the automatic current-balance, income, age, and contribution source.
-- Compares Conservative, Balanced, and Aggressive market scenarios in today's dollars on one chart with touch scrubbing and a dynamic projection ceiling.
-- Defaults retirement spending to 80% of current gross household income, shows 55% and 80% guideposts, and supports manual spending and savings inputs.
-- Includes a retirement runway drawdown with spending and final-age controls, final-age balance, breakeven/static-savings pace, and projected depletion age when savings reach zero.
-- Expandable Current Retirement Stats cards show linked-account mix, YTD growth, and member-level contribution detail.
-- Non-HSA Savings checks separate HSA assets from non-HSA retirement balances before age 65.
-
-### Household
-- Create and edit household members from the More menu after Net Worth
-- Tracks age source date, employment status, employer/title, gross income, pay cadence, annualized net pay, retirement account type, employee contribution, employer match assumptions, and benefit values
-- Links active investment accounts to household members as 401(k), 403(b), Roth IRA, HSA, pension, or other retirement assets so current balances feed the retirement calculator
-- Paycheck deduction fields are entered per paycheck in the UI and annualized from the selected pay frequency for projection math
-- Saving a profile writes a dated income snapshot for future historical income reporting
-- Summary cards show annualized take-home pay, gross income, employer retirement match, benefits value, and earners
-- Endpoints: GET `/api/household`, POST `/api/household/members`, PUT `/api/household/members/:id`, POST `/api/household/members/:id/income-records`, DELETE `/api/household/members/:id`
-
-### Upcoming
-- Standalone More-menu page at `/upcoming` for saved bills, subscriptions, and income.
-- Supports manual entries with type, amount, amount mode, next date, category, account, notes, and frequency: weekly, biweekly, twice monthly, monthly, bimonthly, yearly, or custom every X days/weeks/months.
-- Month-based schedules can use exact month days or weekday patterns such as first and third Friday.
-- Amount mode can stay fixed or estimate from matching transaction history over a selectable lookback window.
-- `/api/upcoming` expands saved items into projected occurrences for the rest of the current month and the next 62 days, then returns rest-of-month cash-flow totals.
-- The backend also stores hidden occurrence reconciliation rows. A scheduler and SimpleFIN sync pass generate expected occurrences, match them to synced transactions, and mark unmatched occurrences missed after a 4-day grace window.
-- Transaction rows can seed a recurring item with "Mark as recurring"; the shared editor opens before anything is created.
-- Suggestions are generated from recent transaction history, emphasizing income and Bills & Utilities style categories before other merchants. Suggestions can be reviewed in the recurring editor, accepted as a bill, subscription, or income, or dismissed.
-- Dashboard Subscriptions and Upcoming cards read from `/api/upcoming` rather than frontend-only transaction heuristics.
-- Monthly summary values normalize different frequencies to monthly equivalents.
-- Endpoints: GET `/api/upcoming`, POST `/api/upcoming`, PUT `/api/upcoming/:id`, DELETE `/api/upcoming/:id`, POST `/api/upcoming/from-transaction`, POST `/api/upcoming/suggestions/accept`, POST `/api/upcoming/suggestions/dismiss`
+## Features and Engines
 
 ### Dashboard
-Customizable multi-card overview page at `/dashboard`. Stacked on narrow phones, 2-column grid on foldable/tablet widths (>=640px), with each card able to span one or two wide-screen columns. The `Customize Dashboard` button opens one modal list where every dashboard card has a visibility toggle, drag handle, and icon-based wide-screen width control. Layout, dashboard-only hidden biggest transactions, goal focus, retirement snapshot preferences, and review state persist through `/api/preferences` so they follow the signed-in account across browsers.
 
-- **Accounts card:** net worth (active balances plus mortgage estimated-value equity), breakdown by group (Cash = checking+savings+cash, Investments, Credit cards, Loans, Real Estate, Other). Rows with zero balance are hidden.
-- **This month card:** Day X of Y + compact Income / Expenses / Net trio
-- **Budget pulse card:** overall progress bar + daily spend pace + up to 5 "attention" categories (over-budget first, then 85%+), or a success message when all are on track
-- **Top spending card:** up to 7 categories with horizontal bars scaled to the biggest spender; bars use each category's color
-- **Biggest Monthly Transactions card:** top 5 current-month expenses, excluding income, ignored rows, transfers, and credit-card-payment style rows. `Hide From Dashboard` is dashboard-only and does not set the transaction ignored flag used by budgets/reports.
-- **Subscriptions / Recurring and Upcoming cards:** read saved bills, subscriptions, and income from `/api/upcoming`. The Upcoming page owns manual entries and accepted suggestions.
-- **Categorize Recent Transactions card:** opens a swipe-style review modal that asks whether each category is correct, batches reviews in groups of 10, and lets the user change the category, create a rule, or skip the transaction. Candidates come from recent uncategorized transactions, noisy imported merchant text, and category pattern changes. Reviewed/skipped card IDs are stored as account preferences; category changes still use the normal transaction edit API.
-- **Uncategorized, Month vs Last Month, Goals Progress, Goal Focus, Retirement Snapshot, MHA Tracker Summary, Mortgage Snapshot:** reuse existing route data from Transactions, Budgets, Goals, Household, MHA, and Accounts.
-- **Recent activity card:** last 10 transactions with the shared `TransactionRow` actions
-- Shimmer skeleton loading per card
-- Empty state routes new users to Settings, where Rocket Money import and SimpleFIN setup live
+Customizable card grid (`DashboardScreen`, 15 default widgets persisted via preferences): Accounts, Budget Pulse, Top Spending, This Month, Biggest Monthly Transactions (with dashboard-only hide that does not set transaction `is_ignored`), Subscriptions / Recurring, Categorize Recent Transactions (swipe-style review queue unifying uncategorized items, noisy merchant text, and category changes), Month vs Last Month, Goals Progress, Goal Focus, Retirement Snapshot, MHA Tracker Summary, Upcoming: Bills and Income, Mortgage Snapshot, and Recent Transactions.
 
-### Responsive Layout
-- **Phone (< 640px):** Single column, bottom tabs
-- **Tablet/Foldable (640–1079px):** Centered content with foldable-aware 2-column card grids on Dashboard, Budgets, Accounts, Category Manager, Goals, Net Worth, Household, and MHA Tracker where the page content benefits from it; bottom tabs remain active
-- **Desktop (≥ 1080px):** Left sidebar (260px) + content area, bottom tabs hidden
+### Transactions and Rules
 
-### Navigation
-- **Bottom tabs (5):** Dashboard, Transactions, Budgets, Accounts, More. These four primary routes are locked to their original positions.
-- **Desktop sidebar:** Lists every visible page directly. Primary routes remain first, and More-menu pages follow the user-controlled More order. Bottom tabs are hidden on desktop.
-- **More tab:** Opens bottom sheet (mobile) with cards for Rules, Category Manager, Savings Goals, Upcoming, Retirement Calculator, Housing Calculator, Net Worth, Household, MHA Tracker when enabled, and Settings. Settings can hide optional frontend sections from navigation and reorder More-menu cards through account preferences; locked pages stay visible.
-- **Removed hamburger menu:** do not reintroduce a separate hamburger drawer; use Bottom Tabs, Desktop Sidebar, and More Sheet.
-- **Settings page:** Collapsible/reorderable cards for Appearance, Notifications, Turn App Features On/Off, SimpleFIN, Rules maintenance, Import/Export, Backup/Restore, Account, and Orbit Money build details. The Notifications card owns device push enablement, privacy, default timing, weekly snapshots, income alerts, sync issues, and account snapshot reminders. The Data Management section includes a Reapply Rules action that reruns every enabled rule against every transaction while preserving manual edits. The feature toggle card owns frontend-only navigation visibility, More-card order, and the existing MHA visibility control.
-- **React Router v6:** Client-side routing with browser back/forward support. Page modules are lazy-loaded through `React.lazy`/`Suspense` so the authenticated app shell stays small. All routes are served via the Express catch-all for deep-link support.
+- Rocket Money CSV import (with preview, commit, and batch undo on the backend, plus direct local import in Local mode) auto-creates accounts when `(institution, last4)` does not match an existing account, flips signs, and generates rename rules from Custom Name columns.
+- Full search, multi-account/multi-category filtering (including `uncategorized`), date presets, absolute-amount range, type filters, ignored/transfer filters, and sort options.
+- Inline editing for merchant, category, notes, transfer, and ignored flags, transaction splitting, per-field reset to original, and "Mark as recurring" / "Create rule from transaction" shortcuts.
+- Customizable transaction quick actions configured in Settings.
+- Creating, editing, toggling, or deleting rules synchronously reapplies enabled rules while preserving manual user edits.
 
-### UI Details
-- `AnimatedModal` component: render-prop pattern (`{({ close }) => ...}`), 180ms slide/zoom animations via `.closing` CSS classes. Saved closes animate; canceled closes should feel immediate unless a specific flow says otherwise.
-- `PageHero` component and `useMorphingPageHero(initialHeight)` hook own the morphing sticky hero measurement logic. Reuse `PageHero` for page headers; pass `chrome` and `toolbar` slots when a page needs custom header controls.
-- `AppDialog.jsx` exposes `useAppDialog()` for modal alert/confirmation flows. Prefer it over native `alert()` / `confirm()` so mobile UX and destructive-action styling stay consistent.
-- `DashboardCard.jsx` is the shared card primitive for dashboard-style panels outside the Dashboard page too. Prefer its `className`, `headerClassName`, `bodyClassName`, `header`, and `action` slots instead of duplicating `.dashboard-card` markup.
-- `SettingsCard.jsx` is the shared settings-section primitive. Keep new settings pages mechanically similar by using it instead of local settings card copies.
-- `FinancialForm.jsx` provides `FinancialFormGrid` and `FinancialField` for money/date/settings forms that use the existing `.goal-form-grid` and `.field` treatment.
-- `DateInput.jsx` wraps native date inputs and only displays strict `YYYY-MM-DD` values accepted by `frontend/src/lib/localDate.js`.
-- `charts/ChartFrame.jsx` owns the accessible SVG chart shell; chart implementations should provide geometry and marks, not repeat `viewBox`/`role`/`aria-label` boilerplate.
-- `AppSelect.jsx` is the shared custom select primitive. Pass an `options` array (`{ value, label }`) and do not nest native `<option>` children; use `menuPlacement="page-center"` for compact month/year picker pills.
-- `ExpandingSection.jsx` owns expand/collapse animation. Pair it with `CollapseIndicator` only when the local pattern wants a visible affordance; `CollapseIndicator` supports `visible={false}` so pages can keep shared structure without showing a chevron.
-- `frontend/src/navigation.js` owns route metadata. `BottomTabs.jsx`, `DesktopSidebar.jsx`, `MoreSheet.jsx`, `App.jsx`, and route visibility should read from it so labels, icons, route rendering, and feature gating stay aligned.
-- `SelectableListItem.jsx` is the shared two-line selectable card/row primitive. Use it for lists where one item is selected, such as goal/category pickers; selected rows use the shared green active treatment.
-- `CurrencyInput.jsx` is the shared primitive for editable dollar amounts. Use it for money text fields so values format with `$` and comma grouping while typing; pair saved values with `parseCurrencyInput`.
-- `SearchField.jsx` is the shared rounded search primitive for page toolbars and collapsed page-hero search slots.
-- `PercentInput.jsx` is the shared editable percent primitive; pair ad hoc percent formatting with `formatPercentInput` from `frontend/src/lib/formatters.js`.
-- Overlay behavior: modals, app dialogs, sheets, and full-screen popovers blur the app backdrop and lock body scroll. `DropdownMenu` stays anchored to its trigger, does not blur the page, and does not lock scroll.
-- Three-way theme toggle (☀️ / 💻 / 🌙): localStorage persistence with pre-paint script in `index.html` to avoid flash
-- Night Style (`Soft Dark` / `AMOLED Black`) also persists in `localStorage`; the selected night style applies to explicit Night mode and to System mode when the device prefers dark.
-- 40+ CSS custom properties for light/dark themes, emerald-600/500 accent
-- Inter Tight (Google Fonts) for body/UI text and bundled DM Sans for titles/brand headings
-- Bottom tabs: 80px height (Material Design baseline), 5 columns
-- Dismissable sync-error banner keyed by error message text in localStorage
-- Mobile zoom suppression: `text-size-adjust: 100%` on `html` + 16px minimum font-size on editable form controls ≤767px (prevents both Android Chrome text boosting and iOS Safari focus zoom)
+### SimpleFIN Sync
 
-### PWA
-- `manifest.webmanifest` with PNG icons (regular + maskable)
-- Service worker (`sw.js`): caches the app shell and static assets for read-only offline launch; API reads are cached in IndexedDB by `frontend/src/api.js` and `frontend/src/offlineCache.js`; push events display notifications with a dedicated Android-friendly badge icon, and notification clicks focus/open the target app route
-- Installable on Android Chrome, desktop Chrome/Edge
-- `theme-color` meta tags for light and dark schemes
+- Exchanges a one-shot base64 setup token for an access URL. Server mode stores the URL encrypted with AES-256-GCM using `SIMPLEFIN_ENCRYPTION_KEY`; Local mode syncs directly via `SimpleFinDirectClient`.
+- Cutover-date overlap handling lets Rocket Money own pre-cutover history and SimpleFIN own post-cutover transactions.
+- Transfer auto-matcher pairs opposite-sign same-day transactions in transfer categories using resettable `system:transfer_matcher` edits.
+- Daily scheduler (default 6:00 AM) plus manual Sync Now, sync log tracking (`success`, `partial`, `error`), and missing/zero posted-date guards.
+
+### Budgets and Spending Trends
+
+- **Budgets (`BudgetsScreen`):** Global monthly cap per spending category (transfer and income categories excluded), month navigation, total spent / pace / remaining hero, interactive Spending Mix donut with **Categories** and **Merchants** modes, budgeted/unbudgeted ("Everything Else") rows, and persisted sort order (`budgetSortOption`).
+- **Spending Trends (`SpendingTrendsScreen`):** 3-, 6-, or 12-month Income vs Expenses bar chart, per-category monthly history with budget reference line and summary stats (average, median, high month, over-budget count), and drill-down into filtered Transactions.
+
+### Credit Card Tracker and Rewards Strategy
+
+Powered by `CreditCardCycleEngine`, `CreditCardBenefitEngine`, `CreditCardStrategyEngine`, and `CardTransactionClassifier`:
+
+- **Billing and cycle math (`CreditCardCycleEngine`):** Clamps `statement_closing_day` and `payment_due_day` (`1..31`) to month length via `LocalDateUtils.daysInMonth`. Derives `lastClose`, `nextClose`, `dueDateAfter`, rolling annual fee anniversaries (`nextAnnualFeeDate`, clamping Feb 29 to Feb 28 in non-leap years), utilization in basis points (green <10%, amber 10-30%, red >30%), upcoming payments due within 35 days, and estimated statement balance:
+  $$\text{balanceAtClose} = \text{currentBalance} - \sum_{\text{date} > \text{lastClose}} \text{effectiveAmountCents}$$
+  $$\text{estimatedStatementBalance} = \max(0, -\text{balanceAtClose})$$
+- **Benefits v2 and value ledger (`CreditCardBenefitEngine`):** Up to 24 benefits per card with immutable IDs (`b_<id>`), cadences (`monthly`, `quarterly`, `semi_annual`, `annual` calendar or cardmember year, `every_4_years`), and usage histories capped at 120 entries. Calculates captured credits, annualized potential value, and effective annual fee (`annualFee - creditsCaptured`). Applying a card template merges new benefits and reward categories while keeping existing usage logs and custom entries.
+- **Household 5/24 and welcome bonuses (`CreditCardStrategyEngine`):** Partitions personal cards opened in the last 24 months by household player (`cardholder_member_id`, fallback label, or unassigned), flags authorized user cards (`authorized_user_member_ids`) with an AU badge, excludes business cards by default unless overridden (`counts_toward_524_override`), surfaces missing-open-date warnings, and computes `nextSlotFreeDate` and `under524DropDate`. Welcome bonus tracking uses `CardTransactionClassifier.bonusSpendDeltaCents` to exclude payments, refunds, balance transfers, fees, interest, and cash advances, supports manual prior-spend offsets, and tracks `ON_TRACK`, `AT_RISK`, `SPEND_MET`, `RECEIVED`, and `EXPIRED` states.
+- **Card editor and wallet art:** Configuration-proof `CardEditorDraft` in `AccountsViewModel` renders in a modal sheet on compact screens and inline in `AccountDetailInspectorPane` on wide screens. `CardArtworkThumbnail` resolves configured issuer card artwork URLs when present and falls back to `CardArtPalette` gradient presets (`sapphire-blue`, `amex-gold`, `venture-silver`, `apple-card`, `discover-plum`).
+
+### Goals and Upcoming
+
+- **Goals (`GoalsScreen`):** Two-tab layout (**Goals** and **Funding**). Links multiple active asset accounts (`checking`, `savings`, `cash`, `investment`, `other`) by percent or fixed dollar amount, supports stealing allocation from other goals when confirmed, derives historical progress charts with touch scrubbing, and provides an "Imagine" extra-monthly-savings ETA slider.
+- **Upcoming (`UpcomingScreen`):** Tracks manual and accepted recurring bills, subscriptions, and income across weekly, biweekly, twice-monthly, monthly (day-of-month or nth-weekday), bimonthly, yearly, and custom cadences, with fixed or history-averaged amounts. Projects occurrences over the current month and next 62 days, reconciles synced transactions (marking unmatched items missed after 4 days), and surfaces recurring suggestions from transaction history.
+
+### Household, Calculators, and MHA Tracker
+
+- **Household (`HouseholdScreen`):** Stores member profiles, employment, gross/net pay, pay cadence, retirement contributions, employer match, benefits, linked retirement/HSA accounts, and dated income history snapshots.
+- **Retirement Calculator (`RetirementCalculatorScreen`):** Three-tab workspace (**What-If**, **Runway**, **Accounts**) fed by Household profiles and user-selected linked accounts (`retirementIncludedAccountIds`). Compares Conservative, Balanced, and Aggressive scenarios in today's dollars with touch scrubbing, models retirement spending drawdown and depletion age, and separates HSA vs non-HSA bridge assets before age 65.
+- **Housing Calculator (`HousingCalculatorScreen`):** Models monthly mortgage payment breakdowns and home-selling net proceeds.
+- **MHA Tracker (`MhaTrackerScreen`):** Optional ministerial housing allowance tracker (**Tracker** and **Defaults** tabs) enforcing the IRS 3-limit exclusion test (actual eligible expenses, church designation cap, fair market rental value). Filters out ignored and transfer rows, supports per-year tax rate storage, Simple manual percentage mode, and Household estimate mode using bundled 2026 federal tax tables (`taxData2026.js` / `MhaTaxEngine.kt`) plus no-tax and single-rate state auto-estimates with freshness metadata.
+
+### Layout, Navigation, Themes, and Android Integrations
+
+- **Postures (`DevicePosture`):** `COMPACT_PHONE` (<600dp), `UNFOLDED_FOLDABLE` (>=600dp or unfolded hinge), `TABLET_DESKTOP` (>=1100dp or >=840dp landscape). Wide postures enable two-pane master-detail inspectors across Accounts, Budgets, Goals, Credit Card Tracker, and Settings.
+- **Navigation (`AdaptiveNavigationShell` / `OrbitNavKey`):** 4 locked primary bottom tabs (Dashboard, Transactions, Budgets, Accounts) plus a More sheet on phones, foldables, and tablets; desktop web browsers (>=1200dp) render a persistent left sidebar. Horizontal slide transitions move between primary tabs; vertical push/pop transitions move to and from More destinations.
+- **Settings (`SettingsScreen`):** Split-pane master-detail layout with live keyword search across 7 sections grouped into Personalize (**Look and Feel**, **Notifications**, **Turn On/Off App Features**), Connections & Data (**Storage, Sync & Sharing**, **SimpleFIN Sync**, **Backups & Maintenance**), and App (**About Orbit Money**).
+- **Themes:** 5 presets (`Orbit Emerald`, `Ocean Slate`, `Warm Terracotta`, `Royal Indigo`, `Monochrome Ink`), System/Light/Dark modes, optional AMOLED true-black dark mode, Android Material You dynamic color support, and haptic feedback toggle.
+- **Android specifics:** Standalone beta package identity (`app.overbay.orbit.beta`, app title `Orbit Beta`, scheme `orbitmoneybeta://`, gold-ring beta icon) installs side-by-side with production (`app.overbay.orbit`, scheme `orbitmoney://`). Includes `BiometricPrompt` app lock, launcher shortcuts (`Add Transaction`, `Budgets`, `Accounts`), SAF file import/export, Custom Tabs OIDC exchange (`POST /api/auth/oidc/native-exchange`), and adaptive 120Hz display refresh rate.
 
 ### Push Notifications
-- Requires `WEB_PUSH_PUBLIC_KEY`, `WEB_PUSH_PRIVATE_KEY`, and `WEB_PUSH_SUBJECT` VAPID environment variables.
-- Subscriptions are stored per household/user/device in `push_subscriptions`; sent-notification dedupe is stored in `notification_delivery_log`.
-- Notification preferences persist under the `notificationPreferences` user preference key and default to privacy-first copy with dollar amounts hidden.
-- Supported categories: weekly snapshot, income arrivals, SimpleFIN sync issues, and selected-account manual snapshot reminders.
-- Backend delivery is scheduler-driven: scheduled checks honor the configured time, while SimpleFIN sync issues and after-sync income alerts can fire immediately after sync.
+
+Requires `WEB_PUSH_PUBLIC_KEY`, `WEB_PUSH_PRIVATE_KEY`, and `WEB_PUSH_SUBJECT`. Subscriptions live in `push_subscriptions` and delivery deduplication lives in `notification_delivery_log`. Defaults to privacy-first text without dollar amounts. Supports weekly snapshots, paycheck/income alerts, SimpleFIN sync warnings, and selected-account manual balance snapshot reminders.
 
 ## API Endpoints
 
-### Auth
+All `/api/*` endpoints except `/api/auth/*` and `/api/health` require authentication (`requireAuth`). Non-GET requests on data routes also enforce household write permission (`requireWriteForUnsafeMethods`).
+
+### Auth and Health
+
 | Method | Path | Description |
 |---|---|---|
-| GET | `/api/auth/config` | Active auth provider, enabled login methods, OIDC login URL/button label, and sample-data availability |
+| GET | `/api/health` | Health check (`status`, version) |
+| GET | `/api/auth/config` | Active auth provider, OIDC button label/URL, sample-data flag |
 | POST | `/api/auth/login` | Local session login |
-| POST | `/api/auth/sample` | Create/login to a temporary sample household when `ENABLE_SAMPLE_DATA=1` |
-| GET | `/api/auth/oidc/login` | Start OIDC login |
-| GET | `/api/auth/oidc/callback` | OIDC callback |
-| POST | `/api/auth/logout` | Session logout |
-| GET | `/api/auth/me` | Check auth status |
+| POST | `/api/auth/sample` | Create and sign into a temporary sample household (`ENABLE_SAMPLE_DATA=1`) |
+| GET | `/api/auth/oidc/login` | Start OIDC login flow |
+| GET | `/api/auth/oidc/callback` | OIDC redirect callback |
+| POST | `/api/auth/oidc/native-exchange` | Exchange a one-time native Android OIDC code for a session |
+| POST | `/api/auth/logout` | End session |
+| GET | `/api/auth/me` | Current authenticated user, household, and permissions |
 
-Sample households are seeded with two adult household members, MHA enabled, a household-mode MHA tax profile, MHA-eligible housing categories, and a rolling 12 complete months of demo transactions ending with the last completed month at first login.
+### Preferences and Notifications
 
-### Notifications
 | Method | Path | Description |
 |---|---|---|
-| GET | `/api/notifications/config` | Web Push runtime config, VAPID public key when configured, and current device subscription count |
-| POST | `/api/notifications/subscriptions` | Save or refresh a browser push subscription for the signed-in user |
-| POST | `/api/notifications/test` | Send a test notification to the current user's active subscriptions |
+| GET | `/api/preferences` | Fetch account-scoped UI preferences |
+| PUT | `/api/preferences` | Bulk-update preferences |
+| PUT | `/api/preferences/:key` | Update a single preference key |
+| GET | `/api/notifications/config` | Web Push config, VAPID public key, and subscription count |
+| POST | `/api/notifications/subscriptions` | Register or refresh a browser push subscription |
+| POST | `/api/notifications/test` | Send a test push notification to the user's active devices |
 
-### Transactions
+### Transactions and Import
+
 | Method | Path | Description |
 |---|---|---|
-| GET | `/api/transactions?...` | Paginated list with full filter/search/sort. Returns display values (COALESCE'd) + originals + edit metadata + `has_edits` flag, plus `grandTotal` for "X of Y shown" UI and `monthlyTotal` for the current-month transaction count |
+| GET | `/api/transactions` | Paginated filtered/sorted list with display values, originals, and provenance |
+| GET | `/api/transactions/review-queue` | Candidate transactions for the Dashboard review flow |
+| POST | `/api/transactions` | Create a manual transaction |
 | GET | `/api/transactions/:id` | Single transaction detail |
-| PATCH | `/api/transactions/:id` | Partial update (merchant, category_id, notes, is_transfer, is_ignored). Writes to `edited_*` with source='user'. Setting a value equal to the original clears the edit and re-runs rules for that one row. |
-| POST | `/api/transactions/:id/reset` | Body `{ fields: [...] }`. Clears edits on listed fields and reapplies rules |
-| DELETE | `/api/transactions/:id` | Hard delete |
+| PATCH | `/api/transactions/:id` | Partial edit writing to `edited_*` with `source = 'user'` |
+| POST | `/api/transactions/:id/reset` | Clear edits on specified fields and reapply rules |
+| DELETE | `/api/transactions/:id` | Delete transaction |
+| POST | `/api/import/rocket-money` | Upload and import Rocket Money CSV |
+| POST | `/api/import/rocket-money/preview` | Preview CSV import before committing |
+| POST | `/api/import/rocket-money/:id/commit` | Commit a previewed import batch |
+| POST | `/api/import/batches/:id/undo` | Undo an import batch |
 
-### Accounts
+### Accounts, Balance Records, and Credit Cards
+
 | Method | Path | Description |
 |---|---|---|
-| GET | `/api/accounts?includeArchived=` | List, ordered by sort_order |
-| PUT | `/api/accounts/:id` | Update (name, type, institution, balance, estimated_value) |
-| PUT | `/api/accounts/:id/credit-card-profile` | Upsert credit card profile (account name, institution, card name, issuer, network, gradient preset key, annual fee & post date, credit limit, statement closing day, payment due day, standard APR BPS, promo APR BPS, promo end date, authorized users, reward categories, benefits v2, strategy JSON, notes). Validates BPS (0..10000) and cycle days (1..31). |
-| PUT | `/api/accounts/:id/credit-card-profile/benefits/:benefitId/usage` | Upsert or clear benefit usage for a period key (`{ period_key, amount, used_on? }`) in an atomic transaction. Enforces 120-item ledger cap. |
-| DELETE | `/api/accounts/:id/credit-card-profile` | Delete credit card profile metadata while keeping the underlying credit account row intact. |
-| POST | `/api/accounts/:id/archive` | Archive |
-| POST | `/api/accounts/:id/unarchive` | Unarchive |
-| POST | `/api/accounts/:id/records` | Add or update a dated manual balance snapshot |
-| POST | `/api/accounts/:id/merge` | Merge into target account |
-| DELETE | `/api/accounts/:id` | Delete (only if 0 transactions) |
-| POST | `/api/accounts/reorder` | Save drag-and-drop order |
+| GET | `/api/accounts?includeArchived=` | List accounts ordered by `sort_order` |
+| POST | `/api/accounts` | Create an account or standalone property |
+| POST | `/api/accounts/reorder` | Persist account sort order |
+| GET | `/api/accounts/records` | List balance records across accounts |
+| PUT | `/api/accounts/:id` | Update account metadata, estimated value, or linked property |
+| POST | `/api/accounts/:id/archive` | Archive account |
+| POST | `/api/accounts/:id/unarchive` | Unarchive account |
+| GET | `/api/accounts/:id/records` | List dated balance snapshots for one account |
+| POST | `/api/accounts/:id/records` | Upsert a dated balance snapshot |
+| DELETE | `/api/accounts/:id/records/:recordId` | Delete a balance snapshot |
+| POST | `/api/accounts/:id/resolve-closure` | Resolve a missing SimpleFIN account (`paid_off_keep_property`, `refinanced_keep_property`, `sold_property`, `sold_or_closed`, `dismiss`) |
+| POST | `/api/accounts/:id/merge` | Merge source account and all dependent records into target account |
+| DELETE | `/api/accounts/:id` | Delete account (requires 0 transactions) |
+| PUT | `/api/accounts/:id/credit-card-profile` | Upsert credit card profile, billing days, APR BPS, benefits v2, and strategy JSON |
+| PUT | `/api/accounts/:id/credit-card-profile/benefits/:benefitId/usage` | Upsert or clear benefit usage for a period key (120-entry cap) |
+| DELETE | `/api/accounts/:id/credit-card-profile` | Delete credit card profile metadata while keeping the account |
+| GET | `/api/card-catalog` | List credit card templates |
+| GET | `/api/card-catalog/:id/artwork` | Fetch card template artwork |
+| POST | `/api/card-catalog/sync` | Sync credit card catalog templates |
 
-### Rules
+### Categories, Rules, Budgets, Trends, and Net Worth
+
 | Method | Path | Description |
 |---|---|---|
-| GET | `/api/rules?withCounts=1` | List all rules, optionally with match counts (condition-only counting) |
-| POST | `/api/rules` | Create rule. Synchronous full reapply before response returns. |
-| PUT | `/api/rules/:id` | Update rule. Synchronous full reapply. |
-| PATCH | `/api/rules/:id/enabled` | Toggle enabled. Synchronous full reapply. |
-| DELETE | `/api/rules/:id` | Delete single rule. Synchronously clears all `edited_*` with `source = 'rule:{id}'`, then reapplies remaining rules. |
-| DELETE | `/api/rules/all` | Wipe all rules. Clears all `rule:*` sourced edits. |
+| GET / POST / PUT / DELETE | `/api/categories`, `/api/categories/:id` | CRUD for household categories |
+| GET / POST / PUT / DELETE | `/api/rules`, `/api/rules/:id` | CRUD for rules (synchronous reapply on write) |
+| GET | `/api/rules/:id/match-count` | Condition-only match count for one rule |
 | POST | `/api/rules/preview` | Preview match count for unsaved conditions |
-| POST | `/api/rules/reapply-all` | Manual full reapply |
-| GET | `/api/rules/:id/match-count` | Match count for one rule |
+| PATCH | `/api/rules/:id/enabled` | Toggle enabled state and reapply |
+| POST | `/api/rules/reapply-all` | Reapply all enabled rules across transactions |
+| DELETE | `/api/rules/all` | Delete all rules and revert `rule:*` edits |
+| GET | `/api/budgets?month=YYYY-MM` | Monthly budgeted/unbudgeted/inactive breakdown and totals |
+| GET | `/api/budgets/months` | Months with transaction activity |
+| PUT / DELETE | `/api/budgets`, `/api/budgets/:id` | Upsert or delete global monthly category cap |
+| GET | `/api/spending-trends?months=3\|6\|12` | Monthly cash flow and per-category history |
+| GET | `/api/net-worth?months=` | Current net worth, monthly history, and breakdown (up to 240 months or `all`) |
 
-### Categories
-| Method | Path | Description |
-|---|---|---|
-| GET | `/api/categories` | List all categories for the household |
-| POST | `/api/categories` | Create a category |
-| PUT | `/api/categories/:id` | Update a category |
-| DELETE | `/api/categories/:id` | Delete a category when it is safe to remove |
-
-### Budgets
-| Method | Path | Description |
-|---|---|---|
-| GET | `/api/budgets?month=YYYY-MM` | Monthly overview: `budgeted` / `unbudgeted` / `inactive` arrays + summary with `total_budgeted`, `total_spent_in_budgets`, `total_spent_unbudgeted`, `total_spent`, `total_income`, `total_expenses`, `total_net`. Month defaults to current month. Null-category expense rows are returned as an unbudgeted `Uncategorized` item and summary money is summed in integer cents before serialization. |
-| GET | `/api/budgets/months` | Distinct months with transaction activity (for month picker) |
-| PUT | `/api/budgets` | Upsert `{ category_id, amount, rollover? }` — global per-category |
-| DELETE | `/api/budgets/:id` | Delete budget |
-
-### Spending Trends
-| Method | Path | Description |
-|---|---|---|
-| GET | `/api/spending-trends?months=3\|6\|12` | Read-only history range with continuous month keys, monthly income/expense/net flow, per-category spending history, budget reference amounts, and summary averages. |
-
-### Net Worth
-| Method | Path | Description |
-|---|---|---|
-| GET | `/api/net-worth?months=` | Current summary, monthly history, and account breakdown. `months` accepts numeric ranges up to 240 or `all`. Mortgage accounts contribute estimated value minus debt balance. |
-
-### Goals
-| Method | Path | Description |
-|---|---|---|
-| GET | `/api/goals?months=` | Goals, account allocation availability, history, progress, and ETA projections. |
-| POST | `/api/goals` | Create a goal with `{ name, target_amount, target_date?, kind?, allocations, stealFromOthers? }`. |
-| PUT | `/api/goals/reorder` | Persist custom goal order |
-| PUT | `/api/goals/:id` | Replace goal metadata and allocations. Can rebalance other goals when stealing is enabled. |
-| DELETE | `/api/goals/:id` | Delete a goal and its allocation rows. |
-
-### Upcoming
-| Method | Path | Description |
-|---|---|---|
-| GET | `/api/upcoming` | Active saved items, projected occurrences, rest-of-month cash flow, recurring suggestions, and monthly-equivalent summary totals |
-| POST | `/api/upcoming` | Create a manual item |
-| PUT | `/api/upcoming/:id` | Replace an upcoming item |
-| DELETE | `/api/upcoming/:id` | Delete an upcoming item |
-| POST | `/api/upcoming/from-transaction` | Legacy endpoint that creates a monthly recurring item from `{ transaction_id }`; current UI uses the shared editor before POST `/api/upcoming` |
-| POST | `/api/upcoming/suggestions/accept` | Accept a suggestion and create an item |
-| POST | `/api/upcoming/suggestions/dismiss` | Dismiss a suggestion key |
-
-### Household
-| Method | Path | Description |
-|---|---|---|
-| GET | `/api/household` | Household summary, member profiles, linked retirement accounts, and recent income history snapshots. |
-| GET | `/api/household/retirement-history?months=` | Monthly balance history and YTD account growth for household-linked retirement accounts. |
-| POST | `/api/household/members` | Create a household member, save linked retirement accounts, and write the first dated income snapshot. |
-| PUT | `/api/household/members/:id` | Update a household member, replace linked retirement accounts, and upsert a dated income snapshot. |
-| POST | `/api/household/members/:id/income-records` | Upsert a manual income/benefit snapshot for a member. |
-| DELETE | `/api/household/members/:id` | Delete a member and their income history. |
-
-### Household Sharing
-Partner sharing is owner-managed. Pending invites are one-time OIDC login claims:
-when the invited user signs in, the app creates the membership and retires the
-pending share. After that, `household_memberships` is the source of truth for
-role and read/write access.
+### Goals, Upcoming, Household, MHA, Logos, SimpleFIN, and Backups
 
 | Method | Path | Description |
 |---|---|---|
-| GET | `/api/household-sharing` | Current household users and pending shares |
-| POST | `/api/household-sharing/shares` | Owner-only: invite or update a pending household share by email |
-| PATCH | `/api/household-sharing/shares/:id/access` | Owner-only: change a pending share's read/write access |
-| PATCH | `/api/household-sharing/users/:id/access` | Owner-only: change a non-owner member's read/write access |
-| DELETE | `/api/household-sharing/shares/:id` | Owner-only: revoke a pending share |
-| DELETE | `/api/household-sharing/users/:id` | Owner-only: remove a household user |
-
-### Merchant Logos
-| Method | Path | Description |
-|---|---|---|
-| POST | `/api/merchant-logos/report` | Record whether a merchant logo loaded or failed |
-| POST | `/api/merchant-logos/ensure` | Ensure a transaction has a cache row for manual override |
-| POST | `/api/merchant-logos/search` | Search Logo.dev brand candidates when a secret key is configured |
-| POST | `/api/merchant-logos/override` | Save a manual logo URL or category-icon override |
-
-### SimpleFIN
-| Method | Path | Description |
-|---|---|---|
-| GET | `/api/simplefin/status` | Connection status, last sync info |
-| POST | `/api/simplefin/setup` | Connect with setup token + cutover date |
-| POST | `/api/simplefin/sync` | Manual sync now |
-| POST | `/api/simplefin/disconnect` | Disconnect (keeps data) |
-| GET | `/api/simplefin/sync-log?limit=` | Recent sync history |
-
-### Import
-| Method | Path | Description |
-|---|---|---|
-| POST | `/api/import/rocket-money` | CSV upload (multipart/form-data). Inserts raw `original_merchant`, reapplies rules post-insert so Rocket Money Custom Names land as rule-owned `edited_merchant` values. |
-
-### Health
-| Method | Path | Description |
-|---|---|---|
-| GET | `/api/health` | Health check |
+| GET / POST / PUT / DELETE | `/api/goals`, `/api/goals/:id`, `/api/goals/reorder` | Savings goals, multi-account allocations, progress history, and reorder |
+| GET / POST / PUT / DELETE | `/api/upcoming`, `/api/upcoming/:id` | Recurring bills, subscriptions, income, and 62-day projections |
+| POST | `/api/upcoming/estimate` | Estimate recurring amount from transaction history |
+| POST | `/api/upcoming/from-transaction` | Create a recurring item from a transaction |
+| POST | `/api/upcoming/suggestions/accept`, `/dismiss` | Accept or dismiss detected recurring suggestions |
+| GET / POST / PUT / DELETE | `/api/household`, `/api/household/members`, `/api/household/members/:id` | Household summary, member profiles, and linked retirement accounts |
+| GET | `/api/household/retirement-history?months=` | Monthly balance history and YTD growth for retirement accounts |
+| POST | `/api/household/members/:id/income-records` | Upsert a dated income/benefit snapshot |
+| GET / POST / PATCH / DELETE | `/api/household-sharing`, `/shares`, `/users` | Owner-managed partner invites and read/write permissions |
+| GET / PUT | `/api/mha`, `/api/mha/settings`, `/api/mha/tax-profile` | MHA summary, settings, and tax profile |
+| PUT | `/api/mha/accounts/:id/default`, `/categories/:id/default`, `/categories/:id/ignore-default` | MHA default eligibility and ignore rules |
+| POST | `/api/merchant-logos/report`, `/ensure`, `/search`, `/override` | Merchant logo load tracking, Logo.dev brand search, and manual overrides |
+| GET / POST | `/api/simplefin/status`, `/setup`, `/sync`, `/disconnect`, `/sync-log` | SimpleFIN connection, manual sync, and sync history |
+| GET | `/api/data/budgeting-export` | Export budgeting data |
+| GET | `/api/data/orbit-backup` | Download full household JSON backup |
+| POST | `/api/data/orbit-restore/preview`, `/api/data/orbit-restore` | Owner-only JSON backup preview and restore |
 
 ## File Inventory
 
-### Backend (`backend/src/`)
-- `server.js`, `config.js`, `auth.js`, `crypto.js`, `scheduler.js`
-- `db/index.js`, `db/migrations.js`
-- `lib/`: http, localDate, money, routeParams, upcomingProjection, upcomingSchedule
-- `db/migrations/001` through `037`
-- `routes/`: accounts, auth, budgets, categories, goals, health, household, householdSharing, import, merchantLogos, mha, netWorth, rules, simplefin, spendingTrends, transactions, upcoming
-- `services/`: budgetOverview, csvImport, demoSeed, householdDefaults, merchantLogos, mhaSummary, mhaTaxEstimate, oidc, ruleMatcher, sampleHouseholds, sessionStore, simplefinClient, simplefinSync, spendingTrends, taxData2026, transferMatcher, upcomingReconciliation
-- `test/`: Node built-in test runner coverage for backend helpers and calculation services
+### Shared App (`composeApp/src/`)
 
-### Frontend (`frontend/`)
-- `index.html` (PWA manifest link, pre-paint theme script, SW registration)
-- `public/`: manifest.webmanifest, PNG/SVG icons, splash wordmarks, sw.js
-- `src/main.jsx`, `src/App.jsx`, `src/Login.jsx`, `src/api.js`, `src/index.css`
-- `src/hooks/useTheme.js`
-- `src/components/`: AnimatedModal, AppDialog, AppIcon, AppRangeSlider, AppSelect, BottomTabs, BrandLogo, CollapseIndicator, CurrencyInput, DateInput, DesktopSidebar, DropdownMenu, FilterSheet, FinancialForm, InlinePopover, MoreDotsIcon, MoreSheet, PageHero, PercentInput, ReorderListItem, SearchField, SelectableListItem, SettingsCard, SyncErrorBanner, chart primitives, dashboard primitives, rule editor primitives, transaction row primitives
-- `src/pages/`: Accounts, Budgets, Categories, Dashboard, Goals, Household, HousingCalculator, MhaTracker, NetWorth, RetirementCalculator, Rules, Settings, SpendingTrends, Transactions, Upcoming
+- `commonMain/kotlin/app/overbay/orbit/`: `App.kt`, `Navigation.kt`, `NavigationBackStack.kt`, `NavigationKeys.kt`, `NavigationStateCoordinator.kt`
+- `data/`: `OrbitRepository*.kt`, `SnapshotFlushCoordinator.kt`, `engine/` (`LocalSnapshotEngine`, `SelfHostedApiEngine`, `OrbitStorageEngine`), `model/`, `network/` (`OrbitApi*Client`, `SimpleFinDirectClient`), `sync/` (`CloudSyncManager`, `RemoteDriveClient`)
+- `domain/`: `AccountClosureDetector`, `BalanceHistoryEngine`, `BudgetEngine`, `CardTransactionClassifier`, `CreditCardBenefitEngine`, `CreditCardCatalog*`, `CreditCardCycleEngine`, `CreditCardStrategyEngine`, `CreditCardTemplates`, `CsvImportEngine`, `DemoSeedGenerator`, `GoalAllocationEngine`, `HousingCalculatorEngine`, `LocalDateUtils`, `MhaTaxEngine`, `MoneyUtils`, `NetWorthEngine`, `RealEstatePropertyEngine`, `RetirementCalculatorEngine`, `ReviewQueueEngine`, `RuleMatcherEngine`, `SimpleFinWarningParser`, `SpendingTrendsEngine`, `TransferMatcherEngine`, `UpcomingEngine`, `UpcomingScheduleHelper`
+- `theme/`: `CardArtPalette`, `Color`, `CustomThemeColors`, `OrbitColorTokens`, `OrbitSprings`, `Theme`, `Type`
+- `ui/`: `accounts`, `budgets`, `calculators` (`housing`, `retirement`), `cardperks`, `categories`, `components`, `dashboard`, `goals`, `household`, `login`, `mha`, `networth`, `rules`, `settings`, `transactions`, `trends`, `upcoming`
+- `androidMain/`: `AndroidGoogleDriveClient`, `BiometricAuthHelper`, `DevicePosture`, `DisplayRefreshRateHelper`, `FileImportExportHelper`, `FoldableDetector`, `OidcAuthLauncher`, `OrbitHaptics`, `PlatformRuntime`, `PlatformStorage`, `Theme`
+- `wasmJsMain/`: `main.kt`, `WasmGoogleDriveClient`, platform `util/` bindings, and `resources/` (`index.html`, `manifest.webmanifest`, `sw.js`, PNG/SVG icons, splash wordmarks)
+
+### Android Wrapper (`androidApp/src/`)
+
+- `main/`: `AndroidManifest.xml`, `MainActivity.kt`, launcher icons, splash assets, `res/xml/shortcuts.xml`, backup and file-provider configs
+- `beta/`: Beta-only icon and splash overlays (`app.overbay.orbit.beta`)
+
+### Backend (`backend/src/`)
+
+- Core: `server.js`, `config.js`, `auth.js`, `crypto.js`, `scheduler.js`
+- Database: `db/index.js`, `db/migrations.js`, `db/migrations/001` through `038`
+- Helpers (`lib/`): `editAssignments`, `effectiveSql`, `http`, `localDate`, `money`, `routeParams`, `upcomingProjection`, `upcomingSchedule`, `upcomingSuggestionConfidence`, `uploads`
+- Routes (`routes/`): `accounts`, `auth`, `budgets`, `cardCatalog`, `categories`, `data`, `goals`, `health`, `household`, `householdSharing`, `import`, `merchantLogos`, `mha`, `netWorth`, `notifications`, `preferences`, `rules`, `simplefin`, `spendingTrends`, `transactions`, `upcoming`
+- Services (`services/`): `accountBalanceRecordService`, `accountMerge`, `accountRealEstateService`, `budgetOverview`, `creditCardBenefitUsage`, `creditCardCatalog*`, `creditCardProfileService`, `csvImport`, `demoSeed`, `householdDefaults`, `householdSharing`, `institutionLogos`, `merchantLogos`, `mhaSummary`, `mhaTaxEstimate`, `monthlyBudgetOverview`, `notificationPreferences`, `notifications`, `oidc`, `orbitBackupRestore`, `orbitBackupSnapshotBridge`, `retirementHistoryService`, `ruleMatcher`, `sampleHouseholds`, `sessionStore`, `simplefinClient`, `simplefinSync`, `spendingTrends`, `taxData2026`, `transferMatcher`, `upcomingItemValidation`, `upcomingReconciliation`
+- Tests (`test/`): Node built-in test runner suites (`node --test`)
 
 ## Known Gotchas
-- **better-sqlite3 `.iterate()` + write transaction** = "database connection is busy" — always use `.all()` instead
-- **Node `fetch` rejects inline URL credentials** — strip from URL and send as Basic Auth header
-- **SQLite integer 0 renders as "0" in JSX** with `&&` pattern — must coerce with `!!` (e.g., `{!!account.is_archived && <Badge />}`)
-- **SQLite `ALTER TABLE ADD COLUMN`** cannot use function defaults like `datetime('now')` — must use constant default then backfill
-- **`touch-action: manipulation`** on draggable elements blocks `@dnd-kit` touch events — reorder mode removes competing touch targets entirely rather than fighting activation heuristics
-- **NavLink renders `<a>` elements** — need explicit `text-decoration: none; outline: none;` on all states to prevent flash-underline on tap
-- **SW needs a fetch listener** (even pass-through) to satisfy PWA install criteria in some browsers
-- **Rules with match counts** loads slowly with many rules — `withCounts=1` scans all transactions per rule. For 300+ rules × 8K+ transactions, expect 10–20 second initial load.
-- **Windows build tooling:** use Node.js 20.19+ on PATH or the private `.tools` runtime. `cmd /c scripts\build-frontend.cmd` runs the frontend production build from the repo root, and `cmd /c scripts\check-backend.cmd` runs the backend syntax smoke check and tests. Both helpers prefer `.tools` when it exists locally, then fall back to system Node/npm.
-- **Repeated page hero UI:** before adding or changing a page header, check `PageHero.jsx` first. Shared morph behavior belongs in `useMorphingPageHero`; page-specific stat/chrome content belongs in the page.
-- **Native browser dialogs:** use `useAppDialog()` instead of `alert()` / `confirm()` so confirmations animate and share the app's button styling.
-- **Button copy:** visible button labels should use Title Case for words, e.g. `+ New Category`, `Add Budget`, `Save`.
-- **Selectable rows:** use `SelectableListItem` before creating a new selectable card/list row. Keep selected states green and compact two-line rows unless there is a strong page-specific reason.
-- **Dropdown menus:** do not lock body scroll or blur the page. Keep them positionally anchored to the trigger.
-- **Hidden date/month inputs can trigger mobile-browser layout quirks** — use `AppSelect` for compact month/year picker pills instead of hidden input/select overlays.
-- **Rule chaining no longer works** — since conditions match against originals only, a rule can't match on a value a higher-priority rule just renamed to. This was an intentional v12 change (match counts were broken because of the old chaining semantics). If a hand-built rule relied on chained renames, rewrite it to condition on `original_description` or the unmodified upstream value.
 
-## Planned
-- **Phase 2 Budgets:** rollover (column already exists), income targets with proper direction, category groupings, spending pace
-- **Phase 2 Dashboard:** lightweight trend cards that can deep-link into Spending Trends and Net Worth
-- **Bulk merge suggestions:** Auto-pair SimpleFIN duplicates with RM accounts by institution + last-4
-- **Credit score:** possible future manual tracker or integration
+- **`better-sqlite3` `.iterate()` + write transaction:** Fails with "database connection is busy". Use `.all()` instead.
+- **Node `fetch` and inline URL credentials:** `fetch` rejects URLs containing `user:pass@`. Strip credentials from SimpleFIN URLs and pass an `Authorization: Basic` header.
+- **SQLite `ALTER TABLE ADD COLUMN` defaults:** SQLite rejects non-constant defaults like `datetime('now')` in `ALTER TABLE`. Use a constant default and backfill in a follow-up `UPDATE`.
+- **Rules do not chain:** Conditions match original imported values only so match counts stay deterministic. If a rule relied on an earlier rule's rename, condition on `original_description` or `original_merchant` instead.
+- **Rules with match counts:** `GET /api/rules?withCounts=1` evaluates every rule against all transactions; large datasets (300+ rules x 8K+ transactions) can take 10-20 seconds.
+- **Service worker fetch listener:** `sw.js` must keep a `fetch` event listener to satisfy PWA installability checks across Chromium browsers.
+- **Docker `wasmJs` build speed:** `Dockerfile` uses a pre-built `composeApp/build/dist/wasmJs/productionExecutable` directory if you run `./gradlew :composeApp:wasmJsBrowserDistribution` (or `scripts\build-frontend.cmd`) on the host first; otherwise Stage 1 downloads the Android SDK and compiles inside Docker, which is significantly slower.
+- **Gradle 9 + Skiko wasm unpack:** `composeApp/build.gradle.kts` marks `unpackSkikoWasmRuntime` with `doNotTrackState` for Gradle 9 compatibility.
+- **Beta Android builds:** `androidApp/build.gradle.kts` detects a `beta` branch from `.git/HEAD` (or `-PbetaBuild=true`) and automatically switches to `app.overbay.orbit.beta` and `OrbitBeta-debug.apk`.
+- **Windows backend test script:** `cmd /c scripts\check-backend.cmd` prefers a local `.tools` Node runtime when present and falls back to `node` on `PATH`.

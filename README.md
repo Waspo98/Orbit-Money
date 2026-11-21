@@ -1,55 +1,62 @@
 # Orbit Money
 
-Orbit Money is a self-hosted personal finance tracker built as an installable
-PWA. It imports Rocket Money CSV exports, syncs bank data through SimpleFIN,
-stores data in SQLite, and runs as a Docker Compose app.
+Orbit Money is a local-first personal finance tracker for Android and the web. Keep your data on your device or connect to your own Docker and SQLite server, import Rocket Money CSV exports, and sync bank accounts through SimpleFIN.
 
 ## Features
 
-- Dashboard with configurable cards, recent transaction review, budgets, goals,
-  subscriptions, upcoming items, net worth, retirement, and mortgage snapshots
-- Account, transaction, budget, spending trends, category, rule, savings goal,
-  upcoming, retirement calculator, housing calculator, household, MHA tracker,
-  and net worth screens
-- Rocket Money CSV import
-- SimpleFIN bank sync with encrypted access URL storage
-- Credit card profile tracking
-- Merchant logo enrichment with optional Logo.dev keys
-- Local login, optional OIDC login, or both, with household-scoped data
-- Household sharing for OIDC users by invited email
-- SQLite storage in a Docker volume
-- Installable PWA with manifest, icons, and service worker
-- Read-only offline PWA support after a successful online load
+- **Storage modes:** Run offline on-device in Local mode, or connect to a self-hosted Express and SQLite server for multi-device access and household sharing.
+- **Dashboard:** Configurable cards for accounts, budget pulse, top spending, monthly cash flow, biggest expenses, subscriptions, upcoming bills, goals, retirement, mortgage, MHA, and a recent transaction review queue.
+- **Accounts and real estate:** Track checking, savings, credit, investment, loan, mortgage, cash, and property accounts with dated balance snapshots, linked mortgages, account merging, and SimpleFIN closed-account prompts.
+- **Transactions and rules:** Search, filter, edit, split, and categorize transactions without overwriting imported bank values. Priority-ordered rules automatically rename, categorize, ignore, or flag transfers.
+- **Budgets and trends:** Set monthly category caps, inspect spending mix by category or merchant, and review 3, 6, or 12 months of income and category history.
+- **Credit card tracker:** Track annual fees, statement close and due dates, utilization, benefit credits across reset cadences, welcome bonus progress, and per-person Chase 5/24 slots.
+- **Goals and upcoming:** Allocate multiple asset accounts to savings goals by percent or fixed dollar amount with extra-savings ETA projections, and track recurring bills, subscriptions, and paychecks.
+- **Calculators and household:** Model retirement scenarios, drawdown runway, and home buying or selling costs from household profiles and linked retirement accounts. Includes an optional Ministerial Housing Allowance (MHA) tracker with per-year tax estimates.
+- **Bank sync and imports:** Import Rocket Money CSV exports, sync through SimpleFIN Bridge (server-side with AES-256-GCM encrypted credentials, or direct from the client in Local mode), and optionally enrich merchant logos with Logo.dev.
+- **Auth and sharing:** Local password login, OpenID Connect (OIDC) SSO, or both, plus partner sharing by invited email with read-only or read-write access.
+- **Backups and device controls:** Export and restore full JSON workspace backups, optionally sync backups to Google Drive, lock the Android app with biometrics, launch actions from Android shortcuts, and receive optional Web Push notifications.
 
-## Requirements
+## Platforms
+
+- **Android:** Native Compose Multiplatform app (Android 7.0+ / API 24+) supporting phones, foldables, and tablets. Rolling debug APKs are published in GitHub Releases (`OrbitMoney-debug.apk` under `debug-latest`, and side-by-side `OrbitBeta-debug.apk` under `beta-latest` using application ID `app.overbay.orbit.beta`).
+- **Web PWA and self-hosted server:** Docker Compose stack bundling the Express + SQLite API with the compiled Compose Multiplatform WebAssembly (`wasmJs`) PWA.
+
+## Self-Hosting Quick Start
+
+### Requirements
 
 - Docker and Docker Compose
 - A `.env` file based on `.env.example`
-- A Docker network named `web_proxy`
+- An external Docker network named `web_proxy`
 
-Create the external Docker network once if you do not already have it:
+Create the Docker network once if it does not exist yet:
 
-```powershell
+```sh
 docker network create web_proxy
 ```
 
-## Quick Start
+### Setup
 
-Copy the example environment file:
+Copy the example environment file and edit it:
 
-```powershell
-Copy-Item .env.example .env
-notepad .env
+```sh
+cp .env.example .env
 ```
 
-For a first local install with password login, set at least:
+For a password-protected install, set at least:
 
 - `AUTH_PROVIDER=local`
 - `ADMIN_USERNAME`
 - `ADMIN_PASSWORD`
 - `SESSION_SECRET`
 
-Generate a strong `SESSION_SECRET` with:
+Generate a 64-character hex secret for `SESSION_SECRET` (and later `SIMPLEFIN_ENCRYPTION_KEY` if you connect SimpleFIN):
+
+```sh
+openssl rand -hex 32
+```
+
+On Windows PowerShell:
 
 ```powershell
 $bytes = New-Object byte[] 32
@@ -57,297 +64,150 @@ $bytes = New-Object byte[] 32
 -join ($bytes | ForEach-Object { $_.ToString('x2') })
 ```
 
-Leave optional integrations blank until you use them. In particular, leave
-`API_KEY=` blank unless you intentionally want API-key access, and leave
-`SIMPLEFIN_ENCRYPTION_KEY=` blank until you connect SimpleFIN.
+Leave optional keys blank until you use them. In particular, leave `API_KEY=` blank unless you want programmatic header access, and leave `SIMPLEFIN_ENCRYPTION_KEY=` blank until you connect SimpleFIN. Orbit Money refuses to start if required secrets still contain placeholder text from `.env.example`.
 
-Start Orbit Money:
+Start the container:
 
-```powershell
+```sh
 docker compose pull
 docker compose up -d
 ```
 
-Open:
+Open `http://localhost:5008` in your browser, or point the Orbit Money Android app to your server URL.
 
-```text
-http://localhost:5008
+Verify health:
+
+```sh
+curl http://localhost:5008/api/health
 ```
 
-Check health:
+Stop the container:
 
-```powershell
-Invoke-RestMethod http://localhost:5008/api/health
-```
-
-Stop the app:
-
-```powershell
+```sh
 docker compose down
 ```
 
-## Environment
+### Updating an Existing Install
 
-Required values:
-
-- `AUTH_PROVIDER`, one of `local`, `oidc`, or `both`
-- `ADMIN_USERNAME`, when using local auth
-- `ADMIN_PASSWORD`, when using local auth or `AUTH_PROVIDER=both`
-- `SESSION_SECRET`
-
-Optional or feature-specific values:
-
-- `API_KEY` enables programmatic API access through the `X-API-Key` header.
-  Leave it blank unless you want this access path.
-- `OIDC_ISSUER_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, and
-  `OIDC_REDIRECT_URI` are required when `AUTH_PROVIDER=oidc` or `both`.
-- `OIDC_SCOPES` defaults to `openid email profile`.
-- `OIDC_LOGIN_LABEL` customizes the OIDC login button. The default is
-  `Log in with OIDC`.
-- Existing private installs that still use the old `AUTHENTIK_*` variable names
-  continue to work, but new installs should use `OIDC_*`.
-- `SIMPLEFIN_ENCRYPTION_KEY` is required before SimpleFIN sync can be used. It
-  must be a 64-character hex string.
-- `LOGO_DEV_PUBLISHABLE_KEY` enables merchant logo display.
-- `LOGO_DEV_SECRET_KEY` enables server-side brand search for manual logo
-  overrides.
-- `WEB_PUSH_PUBLIC_KEY`, `WEB_PUSH_PRIVATE_KEY`, and `WEB_PUSH_SUBJECT` enable
-  installable-PWA push notifications. Generate VAPID keys with
-  `npx web-push generate-vapid-keys`; `WEB_PUSH_SUBJECT` should be a contact
-  URL or mailto address such as `mailto:you@example.com`.
-- `ENABLE_SAMPLE_DATA=1` shows `Continue with sample data` on the login page
-  and allows temporary sample households. Leave it `0` for normal installs.
-- `SESSION_NAME` changes the session cookie name. The default is `connect.sid`.
-- `PORT` defaults to `5008`.
-- `TZ` defaults to `America/Chicago`.
-
-Orbit Money refuses to start with known placeholder values for required secrets.
-This is intentional: a copied `.env.example` should not accidentally become a
-public deployment with predictable credentials.
-
-## Auth And Multi-User Data
-
-Orbit Money stores users, households, memberships, and pending household shares
-in SQLite. Existing single-user data is migrated into household `1`. New public
-installs use the neutral default name `My Household`; existing installs only get
-renamed by migration if they still have the old default household label.
-
-For a simple self-hosted install, keep `AUTH_PROVIDER=local` and use the
-username/password login. For SSO, set `AUTH_PROVIDER=oidc`. To show both the
-local form and the OIDC button on the login page, set `AUTH_PROVIDER=both`.
-Authentik, Authelia, Keycloak, and similar providers should use this callback:
-
-```text
-https://your-orbit-domain.example/api/auth/oidc/callback
-```
-
-New OIDC users receive their own household with default app settings and
-categories. Household owners/admins can invite another OIDC user by email from
-Settings.
-
-## Offline PWA Behavior
-
-Orbit Money caches the app shell and last successful household API reads so an
-installed PWA can reopen without internet. Offline mode is read-only: create,
-edit, delete, import, restore, SimpleFIN sync, and sharing/admin actions require
-reconnection. The app shows an offline banner while disconnected and clears
-cached household financial data when the user signs out.
-
-Cached data is scoped to the signed-in user and household. Owner households can
-use their cached data offline without a time limit. Shared/member households
-must have a successful online access validation within the last 7 days before
-cached data is shown offline.
-
-When refreshing PWA shell assets, keep the cache suffix aligned across
-`frontend/index.html`, `frontend/public/manifest.webmanifest`,
-`frontend/public/sw.js`, and `frontend/src/brandAssets.js`. This cache suffix is
-separate from the visible app version.
-
-## Push Notifications
-
-When Web Push keys are configured, Preferences can enable push notifications for
-weekly snapshots, income arrivals, SimpleFIN sync issues, and manual account
-snapshot reminders. The backend scheduler decides when notifications are due,
-then the installed PWA service worker displays them even when Orbit is not open.
-Notification clicks deep-link back into Orbit, including directly opening the
-Add Record popup for account snapshot reminders.
-
-## Docker Layout
-
-The default Compose service uses:
-
-- Image: `ghcr.io/waspo98/orbit-money:latest`
-- Container name: `orbit-money`
-- Host/container port: `5008`
-- Docker network: external `web_proxy`
-- Docker volume: `orbit-money-data`
-- Data mount: `/app/data`
-
-Do not rename the service, port, network, or volume casually if you are updating
-an existing install. SQLite data lives in the Docker volume.
-
-Update an existing install with:
-
-```powershell
+```sh
 git pull
 docker compose pull
 docker compose up -d
 ```
 
-The Docker image is published to GitHub Container Registry. If you fork the repo
-and publish your own image, update the `image:` value in `docker-compose.yml`.
+### Default Docker Layout
+
+- **Image:** `ghcr.io/waspo98/orbit-money:latest`
+- **Container name:** `orbit-money`
+- **Port:** `5008`
+- **Network:** external `web_proxy`
+- **Volume:** `orbit-money-data` mounted at `/app/data` (`budget.db` and `sessions.db`)
+
+Keep the volume name intact when upgrading so your SQLite database stays mounted. If you fork the repository and publish your own image, update `image:` in `docker-compose.yml`.
+
+## Environment Variables
+
+Required values:
+
+- `AUTH_PROVIDER`: `local`, `oidc`, or `both`.
+- `ADMIN_USERNAME`: Local login username (used with `local` or `both`).
+- `ADMIN_PASSWORD`: Local login password (used with `local` or `both`).
+- `SESSION_SECRET`: Secret used to sign session cookies.
+
+Optional and feature-specific values:
+
+- `API_KEY`: Enables API access via the `X-API-Key` header. Leave blank if unused.
+- `OIDC_ISSUER_URL`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_REDIRECT_URI`: Required when `AUTH_PROVIDER` is `oidc` or `both`. Legacy `AUTHENTIK_*` variable names are still read as fallbacks.
+- `OIDC_SCOPES`: OIDC scopes, defaulting to `openid email profile`.
+- `OIDC_LOGIN_LABEL`: Custom label for the OIDC button (default: `Log in with OIDC`).
+- `SIMPLEFIN_ENCRYPTION_KEY`: 64-character hex string required before connecting SimpleFIN on the server.
+- `LOGO_DEV_PUBLISHABLE_KEY`: Enables merchant logo display.
+- `LOGO_DEV_SECRET_KEY`: Enables server-side brand search for manual logo overrides.
+- `WEB_PUSH_PUBLIC_KEY`, `WEB_PUSH_PRIVATE_KEY`, `WEB_PUSH_SUBJECT`: Enable PWA push notifications. Generate VAPID keys with `npx web-push generate-vapid-keys`; set `WEB_PUSH_SUBJECT` to a `mailto:` or HTTPS contact URL.
+- `ENABLE_SAMPLE_DATA`: Set to `1` to allow temporary sample households from the login screen. Leave `0` for normal installs.
+- `SESSION_NAME`: Session cookie name (default: `connect.sid`).
+- `PORT`: HTTP listen port (default: `5008`).
+- `TZ`: Server timezone (default: `America/Chicago`).
+
+## Auth, Sharing, and Offline Behavior
+
+Users, households, memberships, and pending invites live in SQLite. Existing single-user databases migrate into household `1`, and new installs default to `My Household`. When using OIDC with Authentik, Authelia, Keycloak, or another provider, configure the redirect URI as:
+
+```text
+https://your-orbit-domain.example/api/auth/oidc/callback
+```
+
+New OIDC users receive their own household with default categories and settings. Household owners can invite partners by email from Settings and grant read-only or read-write access.
+
+In Local mode, Orbit Money stores its snapshot on-device and works offline without a server. In Self-Hosted mode, both the Android app and the Web PWA cache the latest workspace snapshot locally (and the PWA service worker caches the app shell and WebAssembly bundle) so the app opens offline in read-only mode. Owner households can read cached data offline indefinitely; shared members must validate access online at least once every 7 days. Edits, syncs, imports, and admin actions require a server connection, and signing out clears cached household data.
+
+When Web Push VAPID keys are configured, Settings can enable browser push notifications for weekly summaries, paycheck arrivals, SimpleFIN sync issues, and manual balance snapshot reminders.
 
 ## Repository Layout
 
 ```text
 .
-|-- backend/             # Express API, SQLite setup, migrations, services
-|-- frontend/            # React/Vite PWA
+|-- androidApp/          # Android application wrapper, manifest, icons, shortcuts
+|-- composeApp/          # Shared Kotlin Multiplatform + Compose Multiplatform UI & engines
+|   `-- src/
+|       |-- commonMain/  # Screens, ViewModels, domain engines, repository, themes
+|       |-- androidMain/ # Biometrics, foldables, SAF import/export, 120Hz, Drive sync
+|       `-- wasmJsMain/  # Web PWA entry point, service worker, manifest, localStorage
+|-- backend/             # Node.js + Express API, SQLite migrations, SimpleFIN & push scheduler
 |-- deploy/
-|   `-- beta/            # Maintainer-only Docker beta deployment
+|   `-- beta/            # Maintainer Docker beta stack
 |-- docs/
-|   `-- reference.md     # Technical reference and feature notes
-|-- scripts/             # Docker-oriented deploy/build helpers
-|-- docker-compose.yml   # Main self-host Compose file
-|-- Dockerfile           # Multi-stage frontend build + backend runtime
-|-- AGENTS.md            # Coding-agent project instructions
+|   `-- reference.md     # Architecture, schema, API routes, and implementation notes
+|-- scripts/             # Build, test, APK release, and deploy helper scripts
+|-- docker-compose.yml   # Self-host Docker Compose file
+|-- Dockerfile           # Multi-stage wasmJs PWA + Express runtime image
+|-- .env.example         # Example environment configuration
 `-- README.md
 ```
 
-The repo intentionally does not track `.env`, local runtime tools, local
-databases, Docker volume backups, `node_modules`, build output, or private
-server notes.
+## Building and Testing
 
-## Build And Verification
+Prerequisites for building from source:
 
-Frontend production build:
+- JDK 17+ and Android SDK (compileSdk 35) for Android and Compose Multiplatform builds
+- Node.js 20.19+ for backend checks and tests
+- Docker for container builds
 
-```powershell
-cmd /c scripts\build-frontend.cmd
-```
+Common build and verification commands:
 
-Backend syntax smoke check and automated tests:
+```sh
+# Android debug APK (copies OrbitMoney-debug.apk or OrbitBeta-debug.apk to repo root)
+./gradlew :androidApp:assembleDebug
 
-```powershell
-cmd /c scripts\check-backend.cmd
-```
+# Shared KMP / Android unit tests
+./gradlew testDebugUnitTest
 
-Production-style Docker smoke test from the published image:
+# WebAssembly PWA distribution (outputs to composeApp/build/dist/wasmJs/productionExecutable)
+./gradlew :composeApp:wasmJsBrowserDistribution
 
-```powershell
-docker compose pull
-docker compose up -d
-Invoke-RestMethod http://localhost:5008/api/health
-```
+# Backend syntax check and Node test suite
+cd backend && node --check src/server.js && npm test
 
-Local source-build smoke test:
-
-```powershell
+# Local Docker image build and startup
 docker compose up --build -d
-Invoke-RestMethod http://localhost:5008/api/health
 ```
 
-There is not currently a root-level `check` script. When changing behavior,
-run the relevant package tests, manually smoke test the affected area, and at
-minimum confirm that the frontend builds, the container starts, `/api/health`
-returns `status: ok`, login still works, mobile layout remains usable, and the
-PWA manifest/service worker still load.
+On Windows, helper wrappers are available in `scripts/`:
 
-## Maintainer Deploys
+- `cmd /c scripts\check-backend.cmd` runs the backend syntax check and test suite.
+- `cmd /c scripts\build-frontend.cmd` builds the `wasmJs` PWA distribution.
+- `cmd /c scripts\build-apk.cmd` compiles the debug APK and uploads it to the matching GitHub pre-release (`debug-latest` or `beta-latest`; pass `-SkipUpload` to build locally only).
+- `cmd /c scripts\deploy-live.cmd` and `cmd /c scripts\deploy-beta.cmd` handle on-demand Docker builds and container restarts for maintainer deployments.
 
-This repo includes optional GitHub Actions workflows for GitHub Container
-Registry and the maintainer's self-hosted Windows runner:
+GitHub Actions workflows for live and beta Docker deployments (`.github/workflows/deploy-live.yml` and `.github/workflows/deploy-beta.yml`) run on manual `workflow_dispatch` only; pushing `v*` tags publishes versioned images via `.github/workflows/publish-release-image.yml`. Self-hosters do not need GitHub Actions to run Orbit Money.
 
-- Pushes to `main` call `scripts\deploy-live.cmd`, which builds and publishes
-  `ghcr.io/waspo98/orbit-money:latest`, `:main`, and a commit-specific
-  `:main-<sha>` tag before restarting the live container from a local build
-- Pushes to `Beta` call `scripts\deploy-beta.cmd`, which delegates to
-  `deploy\beta\deploy-beta.cmd`, builds and publishes
-  `ghcr.io/waspo98/orbit-money:beta` plus `:beta-<sha>`, then restarts beta
-  from a local build
-- Pushing a tag like `v0.76.0` publishes matching version image tags for
-  release installs
+## Storage and Backups
 
-The deploy jobs run on the maintainer's self-hosted Windows runner. The deploy
-scripts no longer pull from GHCR during maintainer deploys. They require a clean
-repo, update the target branch, build and push the branch image tags, build the
-matching Docker Compose service locally, restart that local container, and fail
-if the running container version does not match `backend/package.json`.
-Self-hosters do not need GitHub Actions to run the app.
+Back up the `orbit-money-data` Docker volume before upgrading or testing schema changes. Database updates run automatically on startup from versioned SQL files in `backend/src/db/migrations/`. You can also export and restore full household backups as JSON from Settings.
 
-Maintainer deploys require Docker push access to `ghcr.io/waspo98/orbit-money`.
-GitHub Actions provides `GITHUB_TOKEN`; manual runs use the existing Docker
-registry login unless `GITHUB_TOKEN` is set in the shell.
+All money totals are stored as integer cents in SQLite and Kotlin domain models (`Long`) rather than floating-point numbers. Percentages remain decimal percent values, and credit card APRs are stored in integer basis points.
 
-### Self-hosted runner service
+## Further Documentation
 
-The maintainer deploy workflows depend on the GitHub Actions runner installed at
-`C:\actions-runner`. On the maintainer Windows host, that runner should be
-registered as an automatic Windows service named
-`actions.runner.Waspo98-Orbit-Money.orbit-money-server`. If deploy jobs stay
-queued, first check whether the service is running:
-
-```powershell
-Get-Service "actions.runner.*"
-```
-
-To install or repair the service on the maintainer host, run PowerShell as
-Administrator from the repository root:
-
-```powershell
-.\scripts\install-actions-runner-service.ps1
-```
-
-The script registers the existing runner service host, writes the runner
-`.service` marker, enables automatic startup, configures restart-on-failure, and
-starts the service. It does not create a new GitHub runner registration token or
-replace the existing runner identity.
-
-## Releases
-
-Deploys and releases are intentionally separate. A maintainer Docker deploy
-builds, publishes, locally rebuilds, and restarts the running app from a branch.
-A GitHub Release marks a stable, named version with a Git tag, release notes,
-and GitHub's generated source archives.
-
-Use releases for meaningful milestones, not every rebuild. The maintainer flow
-is semi-automatic: inspect changes since the previous tag, choose the next
-semantic version, update version labels/files when approved, write clear release
-notes, tag the release commit, push the branch and tag, then publish the GitHub
-Release. Keep the app in `0.x` until it is considered public-ready.
-
-## Beta Deployment
-
-The beta deployment is maintainer infrastructure, not a second install path for
-normal users. It lives in `deploy/beta/`, builds/publishes the beta image, and
-runs a separate Docker container and volume:
-
-```powershell
-cmd /c scripts\deploy-beta.cmd
-```
-
-Beta is always deployed through Docker. Do not use a Vite dev server, preview
-server, or `start-beta` helper for beta. See `deploy/beta/README.md` for the
-beta port, volume, demo-data behavior, and maintainer deploy script.
-
-## Storage And Backups
-
-Back up the `orbit-money-data` Docker volume before upgrading, changing storage
-settings, or experimenting with migrations. Schema changes are applied through
-versioned SQL migrations in `backend/src/db/migrations/`.
-
-Money values are stored in SQLite as integer cents and serialized through the
-API as dollar values for the frontend. Percentage fields remain decimal percent
-values, not money.
-
-## Development
-
-Docker is the supported runtime. For code validation outside Docker, install
-Node.js 20.19+ or provide the private `.tools` runtime used by the helper
-scripts. Local dependency folders and build output are ignored by Git.
-
-## Documentation
-
-- `docs/reference.md` covers implementation details, API routes, data model
-  notes, and known gotchas.
-- `deploy/beta/README.md` covers the maintainer beta container.
+- [docs/reference.md](docs/reference.md): Architecture details, database migrations, engine behavior, and REST API routes.
+- [deploy/beta/README.md](deploy/beta/README.md): Maintainer Docker beta stack configuration.
