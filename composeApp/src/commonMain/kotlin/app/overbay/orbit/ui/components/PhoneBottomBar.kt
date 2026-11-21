@@ -60,9 +60,21 @@ import kotlinx.coroutines.flow.flow
 
 internal data class NavTabItem(val key: OrbitNavKey, val title: String, val icon: ImageVector)
 
+internal data class BottomBarVerticalPadding(val top: Dp, val bottom: Dp)
+
+internal val BOTTOM_BAR_MIN_HEIGHT = 60.dp
+
+internal fun bottomBarVerticalPadding(hasBottomInset: Boolean): BottomBarVerticalPadding =
+    if (hasBottomInset) {
+        // Keep a compact 8dp top margin under the divider and 4dp above system nav insets so touch bounds hug the tabs.
+        BottomBarVerticalPadding(top = 8.dp, bottom = 4.dp)
+    } else {
+        BottomBarVerticalPadding(top = 8.dp, bottom = 8.dp)
+    }
+
 /**
  * Symmetric 5-slot phone/tablet bottom navigation bar with equal 1/5th tab widths,
- * centered uppercase labels (even for wide labels like TRANSACTIONS), and balanced
+ * centered uppercase labels (even for wide labels like TRANSACTIONS), and compact
  * vertical seating above system navigation insets.
  */
 @Composable
@@ -75,9 +87,9 @@ internal fun PhoneBottomBar(
 ) {
     val navInsets = NavigationBarDefaults.windowInsets
     val hasBottomInset = navInsets.getBottom(LocalDensity.current) > 0
-    // Bias tabs slightly lower above system navigation insets while keeping balanced vertical centering without insets.
-    val topPadding = if (hasBottomInset) 18.dp else 11.dp
-    val bottomPadding = if (hasBottomInset) 5.dp else 11.dp
+    val verticalPadding = bottomBarVerticalPadding(hasBottomInset)
+    val topPadding = verticalPadding.top
+    val bottomPadding = verticalPadding.bottom
 
     Column(modifier = Modifier.fillMaxWidth()) {
         HorizontalDivider(thickness = 1.dp, color = OrbitTheme.colors.cardBorder)
@@ -95,7 +107,7 @@ internal fun PhoneBottomBar(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .defaultMinSize(minHeight = 72.dp)
+                        .defaultMinSize(minHeight = BOTTOM_BAR_MIN_HEIGHT)
                         .selectableGroup(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -174,7 +186,7 @@ private fun BottomNavTabItem(
 
     Column(
         modifier = modifier
-            .defaultMinSize(minHeight = 72.dp)
+            .defaultMinSize(minHeight = BOTTOM_BAR_MIN_HEIGHT)
             .onGloballyPositioned { tabOrigin.value = it.positionInRoot() }
             .selectable(
                 selected = selected,

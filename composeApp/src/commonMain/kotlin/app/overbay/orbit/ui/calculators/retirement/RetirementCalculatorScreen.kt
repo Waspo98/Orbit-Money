@@ -5,11 +5,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
@@ -147,7 +145,7 @@ fun RetirementCalculatorContent(
                     LazyColumn(
                         state = leftListState,
                         modifier = Modifier.weight(0.47f).fillMaxSize(),
-                        contentPadding = PaddingValues(top = 12.dp, bottom = 88.dp),
+                        contentPadding = PaddingValues(top = 12.dp, bottom = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
                         item(key = "hero", contentType = "hero") {
@@ -172,7 +170,7 @@ fun RetirementCalculatorContent(
                         LazyColumn(
                             state = rightListState,
                             modifier = Modifier.weight(1f).fillMaxWidth(),
-                            contentPadding = PaddingValues(top = 10.dp, bottom = 88.dp),
+                            contentPadding = PaddingValues(top = 10.dp, bottom = 16.dp),
                             verticalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
                             activeTabItems(
@@ -181,9 +179,6 @@ fun RetirementCalculatorContent(
                                 onDragStateChanged = { isDraggingControl = it },
                                 onOpenHousehold = { onNavigate(OrbitNavKey.Household) }
                             )
-                            item(key = "spacer_right", contentType = "spacer") {
-                                Spacer(modifier = Modifier.height(16.dp))
-                            }
                         }
                     }
                 }
@@ -192,7 +187,7 @@ fun RetirementCalculatorContent(
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 88.dp),
+                    contentPadding = PaddingValues(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     item(key = "hero", contentType = "hero") {
@@ -219,10 +214,6 @@ fun RetirementCalculatorContent(
                         onDragStateChanged = { isDraggingControl = it },
                         onOpenHousehold = { onNavigate(OrbitNavKey.Household) }
                     )
-
-                    item(key = "spacer_bottom", contentType = "spacer") {
-                        Spacer(modifier = Modifier.height(16.dp))
-                    }
                 }
             }
         }

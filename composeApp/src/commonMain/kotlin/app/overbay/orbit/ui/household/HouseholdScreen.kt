@@ -138,7 +138,7 @@ fun HouseholdScreen(
                     LazyColumn(
                         state = listState,
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(start = startPad, end = endPad, top = 12.dp, bottom = 88.dp),
+                        contentPadding = PaddingValues(start = startPad, end = endPad, top = 12.dp, bottom = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                             // 1. Planning Signals & KPI Tiles
@@ -280,10 +280,6 @@ fun HouseholdScreen(
                                         }
                                     }
                                 }
-                            }
-
-                            item {
-                                Spacer(modifier = Modifier.height(32.dp))
                             }
                         }
                 }

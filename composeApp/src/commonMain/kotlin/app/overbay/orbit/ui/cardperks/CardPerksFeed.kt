@@ -5,11 +5,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -49,7 +46,6 @@ internal fun CardPerksMasterContent(
     onNavigate: (OrbitNavKey) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val navBarBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val hPad = if (layoutState.isTwoPane) 20.dp else 16.dp
 
     when {
@@ -87,7 +83,7 @@ internal fun CardPerksMasterContent(
                         start = hPad,
                         end = if (layoutState.isDetailOpen) 0.dp else hPad,
                         top = 14.dp,
-                        bottom = 88.dp + navBarBottom
+                        bottom = 16.dp
                     ),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {

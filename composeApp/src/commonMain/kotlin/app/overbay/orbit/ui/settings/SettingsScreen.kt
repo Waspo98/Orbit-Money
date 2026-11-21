@@ -10,11 +10,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
@@ -129,7 +127,7 @@ fun SettingsScreen(
                             LazyColumn(
                                 state = rememberOrbitLazyListState(slotKey = "settings_master_index"),
                                 modifier = Modifier.fillMaxSize(),
-                                contentPadding = PaddingValues(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 88.dp),
+                                contentPadding = PaddingValues(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 16.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 settingsIndexItems(uiState, activeDetailSection, viewModel::openSection, onSignOutClick, onClearSearch)
@@ -146,7 +144,6 @@ fun SettingsScreen(
                                     verticalArrangement = Arrangement.spacedBy(14.dp)
                                 ) {
                                     settingsSectionItems(activeDetailSection, uiState, viewModel, onNavigate)
-                                    item(key = "detail_bottom_spacer") { Spacer(modifier = Modifier.height(24.dp)) }
                                 }
                             }
                         }
@@ -167,7 +164,7 @@ fun SettingsScreen(
                         LazyColumn(
                             state = rememberOrbitLazyListState(slotKey = section?.name ?: "settings_phone_index"),
                             modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 88.dp),
+                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp),
                             verticalArrangement = Arrangement.spacedBy(14.dp)
                         ) {
                             if (section == null) {
@@ -175,7 +172,6 @@ fun SettingsScreen(
                             } else {
                                 settingsSectionItems(section, uiState, viewModel, onNavigate)
                             }
-                            item(key = "phone_bottom_spacer") { Spacer(modifier = Modifier.height(24.dp)) }
                         }
                     }
                 }

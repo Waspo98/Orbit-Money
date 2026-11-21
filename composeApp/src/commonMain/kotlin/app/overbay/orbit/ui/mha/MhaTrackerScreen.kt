@@ -230,7 +230,7 @@ fun MhaTrackerScreen(
                         LazyColumn(
                             state = defaultsListState,
                             modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 88.dp),
+                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp),
                             verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
                             item {
@@ -254,7 +254,7 @@ fun MhaTrackerScreen(
                             LazyColumn(
                                 state = leftListState,
                                 modifier = Modifier.weight(1f),
-                                contentPadding = PaddingValues(bottom = 32.dp),
+                                contentPadding = PaddingValues(bottom = 16.dp),
                                 verticalArrangement = Arrangement.spacedBy(16.dp)
                             ) {
                                 summaryCard()
@@ -304,7 +304,7 @@ fun MhaTrackerScreen(
                                     LazyColumn(
                                         state = rightListState,
                                         modifier = Modifier.fillMaxSize(),
-                                        contentPadding = PaddingValues(bottom = 32.dp),
+                                        contentPadding = PaddingValues(bottom = 16.dp),
                                         verticalArrangement = Arrangement.spacedBy(10.dp)
                                     ) {
                                         transactionHeaderItem()
@@ -318,7 +318,7 @@ fun MhaTrackerScreen(
                         LazyColumn(
                             state = compactListState,
                             modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 88.dp),
+                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp),
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             summaryCard()

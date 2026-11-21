@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -110,7 +109,7 @@ fun HousingCalculatorScreen(
                     LazyColumn(
                         state = leftListState,
                         modifier = Modifier.weight(1f).fillMaxSize(),
-                        contentPadding = PaddingValues(top = 12.dp, bottom = 88.dp),
+                        contentPadding = PaddingValues(top = 12.dp, bottom = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         item {
@@ -139,7 +138,7 @@ fun HousingCalculatorScreen(
                     LazyColumn(
                         state = rightListState,
                         modifier = Modifier.weight(1f).fillMaxSize(),
-                        contentPadding = PaddingValues(top = 12.dp, bottom = 88.dp),
+                        contentPadding = PaddingValues(top = 12.dp, bottom = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         item {
@@ -174,10 +173,6 @@ fun HousingCalculatorScreen(
                                 Text("Reset", fontWeight = FontWeight.Bold)
                             }
                         }
-
-                        item {
-                            Spacer(modifier = Modifier.height(16.dp))
-                        }
                     }
                 }
             } else {
@@ -185,7 +180,7 @@ fun HousingCalculatorScreen(
                 LazyColumn(
                     state = compactListState,
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 88.dp),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     item {
@@ -239,10 +234,6 @@ fun HousingCalculatorScreen(
                         ) {
                             Text("Reset", fontWeight = FontWeight.Bold)
                         }
-                    }
-
-                    item {
-                        Spacer(modifier = Modifier.height(32.dp))
                     }
                 }
             }

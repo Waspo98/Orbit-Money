@@ -5,6 +5,7 @@ import androidx.compose.foundation.interaction.Interaction
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.unit.dp
 import app.overbay.orbit.OrbitNavKey
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
@@ -64,6 +65,18 @@ class PhoneBottomBarTest {
         assertClose(320f / 360f, navLabelWidthScale(320f))
         assertClose(344f / 360f, navLabelWidthScale(344f))
         assertClose(0.82f, navLabelWidthScale(240f))
+    }
+
+    @Test
+    fun bottomBarVerticalPadding_keepsCompactHeaderClearanceAndConsistentHeight() {
+        val withInset = bottomBarVerticalPadding(hasBottomInset = true)
+        assertEquals(8.dp, withInset.top)
+        assertEquals(4.dp, withInset.bottom)
+        assertEquals(60.dp, BOTTOM_BAR_MIN_HEIGHT)
+
+        val withoutInset = bottomBarVerticalPadding(hasBottomInset = false)
+        assertEquals(8.dp, withoutInset.top)
+        assertEquals(8.dp, withoutInset.bottom)
     }
 
     @Test
