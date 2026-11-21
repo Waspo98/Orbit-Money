@@ -3,8 +3,6 @@ package app.overbay.orbit.ui.dashboard
 import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.data.model.BudgetPaceStatus
 import app.overbay.orbit.data.model.CategoryEmojiMapper
-import app.overbay.orbit.data.model.DashboardWidgetConfig
-import app.overbay.orbit.data.model.OrbitPreferences
 import app.overbay.orbit.data.model.OrbitWorkspaceSnapshot
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.UpcomingKind
@@ -506,23 +504,18 @@ object DashboardDataTransform {
         )
 
         // 16. Cards Display & Customization
-        val rawWidgets = snapshot.preferences.dashboardWidgets.ifEmpty {
-            OrbitPreferences.defaultDashboardWidgets()
-        }
-        val cardConfigs = DashboardCardType.entries.map { type ->
-            val existing = rawWidgets.find {
-                it.widgetId.equals(type.widgetId, ignoreCase = true) ||
-                DashboardCardType.fromWidgetId(it.widgetId) == type
+        val cardConfigs = normalizeDashboardWidgets(snapshot.preferences.dashboardWidgets)
+            .mapNotNull { config ->
+                val type = DashboardCardType.fromWidgetId(config.widgetId) ?: return@mapNotNull null
+                DashboardCardConfigItem(
+                    type = type,
+                    title = config.title,
+                    description = type.defaultDescription,
+                    isVisible = config.isVisible,
+                    sortOrder = config.sortOrder,
+                    wideSpan = config.wideSpan
+                )
             }
-            DashboardCardConfigItem(
-                type = type,
-                title = existing?.title ?: type.defaultTitle,
-                description = type.defaultDescription,
-                isVisible = existing?.isVisible ?: true,
-                sortOrder = existing?.sortOrder ?: type.defaultSortOrder,
-                wideSpan = (existing?.wideSpan ?: type.defaultWideSpan).let { if (it == 2) 2 else 1 }
-            )
-        }.sortedBy { it.sortOrder }
 
         val visibleCards = cardConfigs
             .filter { it.isVisible }

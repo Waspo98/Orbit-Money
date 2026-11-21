@@ -117,7 +117,7 @@ Versioned migrations in `backend/src/db/migrations/` run automatically on server
 
 ### Dashboard
 
-Customizable card grid (`DashboardScreen`, 15 default widgets persisted via preferences): Accounts, Budget Pulse, Top Spending, This Month, Biggest Monthly Transactions (with dashboard-only hide that does not set transaction `is_ignored`), Subscriptions / Recurring, Categorize Recent Transactions (swipe-style review queue unifying uncategorized items, noisy merchant text, and category changes), Month vs Last Month, Goals Progress, Goal Focus, Retirement Snapshot, MHA Tracker Summary, Upcoming: Bills and Income, Mortgage Snapshot, and Recent Transactions.
+Customizable card grid (`DashboardScreen`, 15 widgets persisted via preferences, all 1-column by default; top 5 visible by default): Accounts, Recent Transactions, Categorize Recent Transactions (swipe-style review queue unifying uncategorized items, noisy merchant text, and category changes), Subscriptions / Recurring, and Retirement Snapshot; toggled off by default until enabled in Customize Dashboard: Top Spending, Budget Pulse, Biggest Monthly Transactions (with dashboard-only hide that does not set transaction `is_ignored`), This Month, Month vs Last Month, Goals Progress, Goal Focus, MHA Tracker Summary, Upcoming: Bills and Income, and Mortgage Snapshot.
 
 ### Transactions and Rules
 

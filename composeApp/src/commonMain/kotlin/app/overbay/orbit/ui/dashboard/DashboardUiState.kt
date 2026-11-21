@@ -18,23 +18,24 @@ enum class DashboardCardType(
     val defaultTitle: String,
     val defaultDescription: String,
     val defaultSortOrder: Int,
+    val defaultVisible: Boolean = false,
     val defaultWideSpan: Int = 1
 ) {
-    ACCOUNTS_OVERVIEW("accounts", "Accounts", "Net worth and account balance groups.", 0),
-    BUDGET_PULSE("budget_pulse", "Monthly Budget", "Budget usage, pace, and categories to watch.", 1),
-    TOP_SPENDING("top_spending", "Top Spending", "Largest spending categories this month.", 2),
-    CASHFLOW_HERO("this_month", "This Month", "Income, expenses, and net cash flow.", 3),
-    BIGGEST_TRANSACTIONS("biggest_transactions", "Biggest Monthly Transactions", "Top 5 current-month expense transactions with dashboard-only hiding.", 4),
-    SUBSCRIPTIONS("subscriptions", "Subscriptions / Recurring", "Saved subscription items from Upcoming.", 5),
-    CATEGORIZE_RECENT("categorize_recent", "Categorize Recent Transactions", "Swipe through transactions that need a quick category check.", 6),
-    MONTH_COMPARISON("month_comparison", "Month vs Last Month", "Spending, income, and net change.", 7),
-    GOALS_PROGRESS("goals_progress", "Goals Progress", "Overall progress across active goals.", 8),
-    GOAL_FOCUS("goal_focus", "Goal Focus", "One goal that deserves attention.", 9),
-    RETIREMENT_SNAPSHOT("retirement", "Retirement Snapshot", "Linked retirement balance and contributions.", 10),
-    MHA_SUMMARY("mha", "MHA Tracker Summary", "Year-to-date MHA eligible spending.", 11),
-    UPCOMING_BILLS("upcoming_bills", "Upcoming: Bills and Income", "Saved bills, subscriptions, and income.", 12),
-    MORTGAGE_SNAPSHOT("mortgage", "Mortgage Snapshot", "Home value, balance, and equity.", 13),
-    RECENT_TRANSACTIONS("recent_transactions", "Recent Transactions", "Latest activity with full transaction actions.", 14, defaultWideSpan = 2);
+    ACCOUNTS_OVERVIEW("accounts", "Accounts", "Net worth and account balance groups.", 0, defaultVisible = true),
+    RECENT_TRANSACTIONS("recent_transactions", "Recent Transactions", "Latest activity with full transaction actions.", 1, defaultVisible = true),
+    CATEGORIZE_RECENT("categorize_recent", "Categorize Recent Transactions", "Swipe through transactions that need a quick category check.", 2, defaultVisible = true),
+    SUBSCRIPTIONS("subscriptions", "Subscriptions / Recurring", "Saved subscription items from Upcoming.", 3, defaultVisible = true),
+    RETIREMENT_SNAPSHOT("retirement", "Retirement Snapshot", "Linked retirement balance and contributions.", 4, defaultVisible = true),
+    TOP_SPENDING("top_spending", "Top Spending", "Largest spending categories this month.", 5),
+    BUDGET_PULSE("budget_pulse", "Monthly Budget", "Budget usage, pace, and categories to watch.", 6),
+    BIGGEST_TRANSACTIONS("biggest_transactions", "Biggest Monthly Transactions", "Top 5 current-month expense transactions with dashboard-only hiding.", 7),
+    CASHFLOW_HERO("this_month", "This Month", "Income, expenses, and net cash flow.", 8),
+    MONTH_COMPARISON("month_comparison", "Month vs Last Month", "Spending, income, and net change.", 9),
+    GOALS_PROGRESS("goals_progress", "Goals Progress", "Overall progress across active goals.", 10),
+    GOAL_FOCUS("goal_focus", "Goal Focus", "One goal that deserves attention.", 11),
+    MHA_SUMMARY("mha", "MHA Tracker Summary", "Year-to-date MHA eligible spending.", 12),
+    UPCOMING_BILLS("upcoming_bills", "Upcoming: Bills and Income", "Saved bills, subscriptions, and income.", 13),
+    MORTGAGE_SNAPSHOT("mortgage", "Mortgage Snapshot", "Home value, balance, and equity.", 14);
 
     companion object {
         fun fromWidgetId(widgetId: String): DashboardCardType? {
@@ -370,7 +371,9 @@ data class DashboardUiState(
     companion object {
         fun initial(): DashboardUiState = DashboardUiState(
             isLoading = true,
-            visibleCards = DashboardCardType.entries.sortedBy { it.defaultSortOrder }
+            visibleCards = DashboardCardType.entries
+                .filter { it.defaultVisible }
+                .sortedBy { it.defaultSortOrder }
         )
     }
 }

@@ -4,6 +4,8 @@ import app.overbay.orbit.data.OrbitRepository
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.data.model.BudgetPaceStatus
+import app.overbay.orbit.data.model.DashboardWidgetConfig
+import app.overbay.orbit.data.model.OrbitPreferences
 import app.overbay.orbit.data.model.RecurrenceFrequency
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.UpcomingDirection
@@ -57,16 +59,42 @@ class DashboardViewModelTest {
     }
 
     @Test
-    fun testDefaultCardConfiguration_emitsAllSixCardsInOrder() = runTest(testDispatcher) {
+    fun testDefaultCardConfiguration_emitsTopFiveCardsInOrderAndSingleColumnDefaults() = runTest(testDispatcher) {
         val collectJob = launch(testDispatcher) {
             viewModel.uiState.collect {}
         }
         testScheduler.advanceUntilIdle()
 
         val state = viewModel.uiState.value
-        assertEquals(14, state.visibleCards.size, "Must have 14 default visible cards")
-        assertEquals(DashboardCardType.ACCOUNTS_OVERVIEW, state.visibleCards[0])
-        assertEquals(DashboardCardType.BUDGET_PULSE, state.visibleCards[1])
+        val expectedTopFive = listOf(
+            DashboardCardType.ACCOUNTS_OVERVIEW,
+            DashboardCardType.RECENT_TRANSACTIONS,
+            DashboardCardType.CATEGORIZE_RECENT,
+            DashboardCardType.SUBSCRIPTIONS,
+            DashboardCardType.RETIREMENT_SNAPSHOT
+        )
+        assertEquals(expectedTopFive, state.visibleCards, "Must show the top 5 cards in exact default order")
+
+        val configs = state.customization.cardConfigs
+        assertEquals(15, configs.size)
+        assertTrue(configs.all { it.wideSpan == 1 }, "All dashboard widgets must default to 1 column")
+        assertEquals(expectedTopFive, configs.take(5).map { it.type })
+        assertTrue(configs.take(5).all { it.isVisible })
+        assertTrue(configs.drop(5).none { it.isVisible })
+
+        val prefDefaults = OrbitPreferences.defaultDashboardWidgets()
+        assertEquals(configs.map { it.type.widgetId }, prefDefaults.map { it.widgetId })
+        assertEquals(configs.map { it.isVisible }, prefDefaults.map { it.isVisible })
+        assertEquals(configs.map { it.wideSpan }, prefDefaults.map { it.wideSpan })
+        assertEquals(
+            DashboardCardType.entries.sortedBy { it.defaultSortOrder }.map { it.widgetId },
+            prefDefaults.map { it.widgetId }
+        )
+        assertEquals(
+            DashboardCardType.entries.sortedBy { it.defaultSortOrder }.map { it.defaultVisible },
+            prefDefaults.map { it.isVisible }
+        )
+        assertTrue(DashboardCardType.entries.all { it.defaultWideSpan == 1 })
 
         collectJob.cancel()
     }
@@ -134,20 +162,31 @@ class DashboardViewModelTest {
         }
         testScheduler.advanceUntilIdle()
 
-        // Hide CASHFLOW_HERO
-        viewModel.toggleCardVisibility(DashboardCardType.CASHFLOW_HERO, isVisible = false)
-        testScheduler.advanceUntilIdle()
-
-        val state = viewModel.uiState.value
-        assertFalse(state.visibleCards.contains(DashboardCardType.CASHFLOW_HERO))
-        assertEquals(13, state.visibleCards.size)
-
-        // Show CASHFLOW_HERO again
+        // Show CASHFLOW_HERO (toggled off by default)
         viewModel.toggleCardVisibility(DashboardCardType.CASHFLOW_HERO, isVisible = true)
         testScheduler.advanceUntilIdle()
 
-        assertTrue(viewModel.uiState.value.visibleCards.contains(DashboardCardType.CASHFLOW_HERO))
-        assertEquals(14, viewModel.uiState.value.visibleCards.size)
+        val state = viewModel.uiState.value
+        assertTrue(state.visibleCards.contains(DashboardCardType.CASHFLOW_HERO))
+        assertEquals(6, state.visibleCards.size)
+
+        // Hide CASHFLOW_HERO again
+        viewModel.toggleCardVisibility(DashboardCardType.CASHFLOW_HERO, isVisible = false)
+        testScheduler.advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.visibleCards.contains(DashboardCardType.CASHFLOW_HERO))
+        assertEquals(5, viewModel.uiState.value.visibleCards.size)
+
+        // Hide a default-visible card and restore it
+        viewModel.toggleCardVisibility(DashboardCardType.RETIREMENT_SNAPSHOT, isVisible = false)
+        testScheduler.advanceUntilIdle()
+        assertFalse(viewModel.uiState.value.visibleCards.contains(DashboardCardType.RETIREMENT_SNAPSHOT))
+        assertEquals(4, viewModel.uiState.value.visibleCards.size)
+
+        viewModel.toggleCardVisibility(DashboardCardType.RETIREMENT_SNAPSHOT, isVisible = true)
+        testScheduler.advanceUntilIdle()
+        assertTrue(viewModel.uiState.value.visibleCards.contains(DashboardCardType.RETIREMENT_SNAPSHOT))
+        assertEquals(5, viewModel.uiState.value.visibleCards.size)
 
         collectJob.cancel()
     }
@@ -164,7 +203,7 @@ class DashboardViewModelTest {
         testScheduler.advanceUntilIdle()
 
         val updatedCards = viewModel.uiState.value.visibleCards
-        assertEquals(DashboardCardType.BUDGET_PULSE, updatedCards[0])
+        assertEquals(DashboardCardType.RECENT_TRANSACTIONS, updatedCards[0])
         assertEquals(DashboardCardType.ACCOUNTS_OVERVIEW, updatedCards[1])
 
         // Reset to default
@@ -172,6 +211,7 @@ class DashboardViewModelTest {
         testScheduler.advanceUntilIdle()
 
         assertEquals(DashboardCardType.ACCOUNTS_OVERVIEW, viewModel.uiState.value.visibleCards[0])
+        assertEquals(DashboardCardType.RECENT_TRANSACTIONS, viewModel.uiState.value.visibleCards[1])
 
         collectJob.cancel()
     }
@@ -274,28 +314,32 @@ class DashboardViewModelTest {
         val prefs = repository.preferences.value.dashboardWidgets.sortedBy { it.sortOrder }
         assertEquals(firstCard.widgetId, prefs[1].widgetId)
 
-        // Hide two cards
-        viewModel.toggleCardVisibility(DashboardCardType.BUDGET_PULSE, isVisible = false)
-        viewModel.toggleCardVisibility(DashboardCardType.GOALS_PROGRESS, isVisible = false)
+        // Hide two default-visible cards and show one hidden card
+        viewModel.toggleCardVisibility(DashboardCardType.RECENT_TRANSACTIONS, isVisible = false)
+        viewModel.toggleCardVisibility(DashboardCardType.RETIREMENT_SNAPSHOT, isVisible = false)
+        viewModel.toggleCardVisibility(DashboardCardType.BUDGET_PULSE, isVisible = true)
         testScheduler.advanceUntilIdle()
 
         val visible = viewModel.uiState.value.visibleCards
-        assertEquals(12, visible.size)
-        assertFalse(visible.contains(DashboardCardType.BUDGET_PULSE))
-        assertFalse(visible.contains(DashboardCardType.GOALS_PROGRESS))
+        assertEquals(4, visible.size)
+        assertFalse(visible.contains(DashboardCardType.RECENT_TRANSACTIONS))
+        assertFalse(visible.contains(DashboardCardType.RETIREMENT_SNAPSHOT))
+        assertTrue(visible.contains(DashboardCardType.BUDGET_PULSE))
 
         // Card configs in customization state still contain all 15 items
         val configs = viewModel.uiState.value.customization.cardConfigs
         assertEquals(15, configs.size)
-        assertFalse(configs.first { it.type == DashboardCardType.BUDGET_PULSE }.isVisible)
-        assertFalse(configs.first { it.type == DashboardCardType.GOALS_PROGRESS }.isVisible)
+        assertFalse(configs.first { it.type == DashboardCardType.RECENT_TRANSACTIONS }.isVisible)
+        assertFalse(configs.first { it.type == DashboardCardType.RETIREMENT_SNAPSHOT }.isVisible)
+        assertTrue(configs.first { it.type == DashboardCardType.BUDGET_PULSE }.isVisible)
 
         // Reset to default
         viewModel.resetCardsToDefault()
         testScheduler.advanceUntilIdle()
-        assertEquals(14, viewModel.uiState.value.visibleCards.size)
-        assertTrue(viewModel.uiState.value.visibleCards.contains(DashboardCardType.BUDGET_PULSE))
-        assertTrue(viewModel.uiState.value.visibleCards.contains(DashboardCardType.GOALS_PROGRESS))
+        assertEquals(5, viewModel.uiState.value.visibleCards.size)
+        assertTrue(viewModel.uiState.value.visibleCards.contains(DashboardCardType.RECENT_TRANSACTIONS))
+        assertTrue(viewModel.uiState.value.visibleCards.contains(DashboardCardType.RETIREMENT_SNAPSHOT))
+        assertFalse(viewModel.uiState.value.visibleCards.contains(DashboardCardType.BUDGET_PULSE))
 
         collectJob.cancel()
     }
@@ -795,7 +839,8 @@ class DashboardViewModelTest {
             .filter { it.type != DashboardCardType.MHA_SUMMARY }
             .map { it.type }
         assertEquals(14, visibleBefore.size)
-        val lastVisible = visibleBefore.last() // RECENT_TRANSACTIONS at visible index 13 (full index 14)
+        val lastVisible = visibleBefore.last() // MORTGAGE_SNAPSHOT at visible index 13 (full index 14)
+        val previousSecondToLast = visibleBefore[12] // UPCOMING_BILLS at visible index 12 (full index 13)
 
         // Move the last visible card (index 13) up one slot to visible index 12
         viewModel.onAction(DashboardAction.MoveCard(fromIndex = 13, toIndex = 12))
@@ -804,11 +849,11 @@ class DashboardViewModelTest {
         val visibleAfter = viewModel.uiState.value.customization.cardConfigs
             .filter { it.type != DashboardCardType.MHA_SUMMARY }
             .map { it.type }
-        assertEquals(lastVisible, visibleAfter[12], "RECENT_TRANSACTIONS should move to visible index 12")
+        assertEquals(lastVisible, visibleAfter[12], "MORTGAGE_SNAPSHOT should move to visible index 12")
         assertEquals(
-            DashboardCardType.MORTGAGE_SNAPSHOT,
+            previousSecondToLast,
             visibleAfter[13],
-            "MORTGAGE_SNAPSHOT should shift to visible index 13"
+            "UPCOMING_BILLS should shift to visible index 13"
         )
         assertTrue(
             viewModel.uiState.value.customization.cardConfigs.any { it.type == DashboardCardType.MHA_SUMMARY },
@@ -816,6 +861,27 @@ class DashboardViewModelTest {
         )
 
         collectJob.cancel()
+    }
+
+    @Test
+    fun testPartialSavedWidgets_preservesUserChoicesAndFillsMissingWithDefaults() {
+        val partial = listOf(
+            DashboardWidgetConfig("budget_pulse", "Budget Pulse", isVisible = true, sortOrder = 0, wideSpan = 2),
+            DashboardWidgetConfig("accounts", "Accounts", isVisible = false, sortOrder = 1, wideSpan = 1)
+        )
+        val normalized = normalizeDashboardWidgets(partial)
+        assertEquals(15, normalized.size)
+        val budget = normalized.first { it.widgetId == "budget_pulse" }
+        assertTrue(budget.isVisible)
+        assertEquals(2, budget.wideSpan)
+        val accounts = normalized.first { it.widgetId == "accounts" }
+        assertFalse(accounts.isVisible)
+        // Missing default-visible widget fills as visible & 1-col
+        assertTrue(normalized.first { it.widgetId == "recent_transactions" }.isVisible)
+        assertEquals(1, normalized.first { it.widgetId == "recent_transactions" }.wideSpan)
+        // Missing default-hidden widget fills as hidden & 1-col
+        assertFalse(normalized.first { it.widgetId == "top_spending" }.isVisible)
+        assertEquals(1, normalized.first { it.widgetId == "top_spending" }.wideSpan)
     }
 
     @Test

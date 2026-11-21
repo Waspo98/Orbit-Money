@@ -19,7 +19,7 @@ internal fun normalizeDashboardWidgets(
         DashboardWidgetConfig(
             widgetId = type.widgetId,
             title = existing?.title ?: type.defaultTitle,
-            isVisible = existing?.isVisible ?: true,
+            isVisible = existing?.isVisible ?: type.defaultVisible,
             sortOrder = existing?.sortOrder ?: type.defaultSortOrder,
             wideSpan = (existing?.wideSpan ?: type.defaultWideSpan).let { if (it == 2) 2 else 1 }
         )
