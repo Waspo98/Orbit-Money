@@ -222,7 +222,7 @@ fun BudgetsScreen(
                             LazyColumn(
                                 state = listState,
                                 modifier = Modifier.fillMaxSize(),
-                                contentPadding = PaddingValues(start = startPad, end = endPad, top = 12.dp, bottom = 88.dp),
+                                contentPadding = PaddingValues(start = startPad, end = endPad, top = 12.dp, bottom = 16.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 item(key = "budget_summary_hero", contentType = "summary_hero") {
