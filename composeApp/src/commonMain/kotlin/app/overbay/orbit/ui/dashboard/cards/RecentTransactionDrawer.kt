@@ -6,12 +6,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -22,6 +20,7 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -47,13 +46,11 @@ import app.overbay.orbit.ui.components.OrbitDropdownMenu
 import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.orbitTactilePress
 import app.overbay.orbit.ui.dashboard.DashboardRecentTransactionItem
-import app.overbay.orbit.ui.transactions.components.TransactionCategoryChip
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 /**
- * Non-clipping inline quick-action drawer for [RecentTransactionsCard].
- * Exposes a 1-tap Category selector row opening the searchable picker sheet plus
- * a 3-button action bar (Edit, Recurring, More overflow menu).
+ * Single-row inline drawer for [RecentTransactionsCard]: a category selector pill
+ * (opening the searchable picker sheet), an Edit button, and a 3-dot overflow menu.
  */
 @Composable
 internal fun RecentTransactionLeanDrawer(
@@ -83,152 +80,175 @@ internal fun RecentTransactionLeanDrawer(
             .fillMaxWidth()
             .padding(bottom = 10.dp)
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp)
+                .padding(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 48.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .clickable {
-                        haptics.tick()
-                        onOpenCategoryPicker()
-                    }
-                    .padding(horizontal = 4.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Category",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                TransactionCategoryChip(
-                    categoryLabel = categoryLabel,
-                    categoryColor = categoryColor,
-                    onClick = onOpenCategoryPicker,
-                    modifier = Modifier.weight(1f, fill = false)
-                )
-            }
-
-            HorizontalDivider(
-                thickness = 1.dp,
-                color = colors.cardBorder,
-                modifier = Modifier.padding(vertical = 8.dp)
+            DrawerCategorySelector(
+                categoryLabel = categoryLabel,
+                categoryColor = categoryColor,
+                onClick = onOpenCategoryPicker,
+                modifier = Modifier.weight(1f)
             )
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                DrawerActionButton(
-                    label = "Edit",
-                    icon = Icons.Default.Edit,
-                    onClick = onEdit,
-                    modifier = Modifier.weight(1f)
-                )
-                DrawerActionButton(
-                    label = "Recurring",
-                    icon = OrbitIcons.Upcoming,
-                    onClick = onRequestMarkRecurring,
-                    modifier = Modifier.weight(1f)
-                )
-                Box {
-                    val moreInteraction = remember { MutableInteractionSource() }
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        border = BorderStroke(1.dp, colors.cardBorder),
-                        modifier = Modifier
-                            .size(48.dp)
-                            .orbitTactilePress(interactionSource = moreInteraction)
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable(
-                                interactionSource = moreInteraction,
-                                indication = LocalIndication.current
-                            ) {
-                                haptics.tick()
-                                menuExpanded = true
-                            }
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = OrbitIcons.MoreHoriz,
-                                contentDescription = "More Actions",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
+            DrawerActionButton(
+                label = "Edit",
+                icon = Icons.Default.Edit,
+                onClick = onEdit
+            )
 
-                    OrbitDropdownMenu(
-                        expanded = menuExpanded,
-                        onDismissRequest = { menuExpanded = false }
-                    ) {
-                        DrawerOverflowItem(
-                            label = "View Details",
-                            icon = Icons.Default.Info,
-                            onClick = {
-                                menuExpanded = false
-                                onViewDetails()
-                            }
-                        )
-                        DrawerOverflowItem(
-                            label = if (item.isTransfer) "Unmark Transfer" else "Mark as Transfer",
-                            icon = if (item.isTransfer) Icons.Default.Check else Icons.Default.Refresh,
-                            isActive = item.isTransfer,
-                            onClick = {
-                                menuExpanded = false
-                                onToggleTransfer()
-                            }
-                        )
-                        DrawerOverflowItem(
-                            label = if (item.isIgnored) "Unignore" else "Ignore",
-                            icon = Icons.Default.Clear,
-                            onClick = {
-                                menuExpanded = false
-                                onToggleIgnore()
-                            }
-                        )
-                        if (mhaEnabled) {
-                            DrawerOverflowItem(
-                                label = if (item.isMhaEligible) "Remove MHA" else "Mark as MHA",
-                                icon = if (item.isMhaEligible) Icons.Default.Check else OrbitIcons.MhaTracker,
-                                isActive = item.isMhaEligible,
-                                onClick = {
-                                    menuExpanded = false
-                                    onToggleMha()
-                                }
-                            )
+            Box {
+                val moreInteraction = remember { MutableInteractionSource() }
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    border = BorderStroke(1.dp, colors.cardBorder),
+                    modifier = Modifier
+                        .size(48.dp)
+                        .orbitTactilePress(interactionSource = moreInteraction)
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable(
+                            interactionSource = moreInteraction,
+                            indication = LocalIndication.current
+                        ) {
+                            haptics.tick()
+                            menuExpanded = true
                         }
-                        if (item.hasEdits) {
-                            DrawerOverflowItem(
-                                label = "Reset Edits",
-                                icon = Icons.Default.Refresh,
-                                onClick = {
-                                    menuExpanded = false
-                                    onRequestResetEdits()
-                                }
-                            )
-                        }
-                        HorizontalDivider(color = colors.cardBorder)
-                        DrawerOverflowItem(
-                            label = "Delete",
-                            icon = Icons.Default.Delete,
-                            isDestructive = true,
-                            onClick = {
-                                menuExpanded = false
-                                onRequestDelete()
-                            }
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = OrbitIcons.MoreHoriz,
+                            contentDescription = "More Actions",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }
+
+                OrbitDropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false }
+                ) {
+                    DrawerOverflowItem(
+                        label = "View Details",
+                        icon = Icons.Default.Info,
+                        onClick = {
+                            menuExpanded = false
+                            onViewDetails()
+                        }
+                    )
+                    DrawerOverflowItem(
+                        label = "Mark as Recurring",
+                        icon = OrbitIcons.Upcoming,
+                        onClick = {
+                            menuExpanded = false
+                            onRequestMarkRecurring()
+                        }
+                    )
+                    DrawerOverflowItem(
+                        label = if (item.isTransfer) "Unmark Transfer" else "Mark as Transfer",
+                        icon = if (item.isTransfer) Icons.Default.Check else Icons.Default.Refresh,
+                        isActive = item.isTransfer,
+                        onClick = {
+                            menuExpanded = false
+                            onToggleTransfer()
+                        }
+                    )
+                    DrawerOverflowItem(
+                        label = if (item.isIgnored) "Unignore" else "Ignore",
+                        icon = Icons.Default.Clear,
+                        onClick = {
+                            menuExpanded = false
+                            onToggleIgnore()
+                        }
+                    )
+                    if (mhaEnabled) {
+                        DrawerOverflowItem(
+                            label = if (item.isMhaEligible) "Remove MHA" else "Mark as MHA",
+                            icon = if (item.isMhaEligible) Icons.Default.Check else OrbitIcons.MhaTracker,
+                            isActive = item.isMhaEligible,
+                            onClick = {
+                                menuExpanded = false
+                                onToggleMha()
+                            }
+                        )
+                    }
+                    if (item.hasEdits) {
+                        DrawerOverflowItem(
+                            label = "Reset Edits",
+                            icon = Icons.Default.Refresh,
+                            onClick = {
+                                menuExpanded = false
+                                onRequestResetEdits()
+                            }
+                        )
+                    }
+                    HorizontalDivider(color = colors.cardBorder)
+                    DrawerOverflowItem(
+                        label = "Delete",
+                        icon = Icons.Default.Delete,
+                        isDestructive = true,
+                        onClick = {
+                            menuExpanded = false
+                            onRequestDelete()
+                        }
+                    )
+                }
             }
+        }
+    }
+}
+
+@Composable
+private fun DrawerCategorySelector(
+    categoryLabel: String,
+    categoryColor: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val haptics = LocalOrbitHaptics.current
+    val interactionSource = remember { MutableInteractionSource() }
+
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = categoryColor.copy(alpha = 0.14f),
+        border = BorderStroke(1.dp, categoryColor.copy(alpha = 0.45f)),
+        modifier = modifier
+            .height(48.dp)
+            .orbitTactilePress(interactionSource = interactionSource)
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(
+                interactionSource = interactionSource,
+                indication = LocalIndication.current
+            ) {
+                haptics.tick()
+                onClick()
+            }
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = categoryLabel,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = categoryColor,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Icon(
+                imageVector = Icons.Default.KeyboardArrowDown,
+                contentDescription = "Change Category",
+                tint = categoryColor,
+                modifier = Modifier.size(16.dp)
+            )
         }
     }
 }
@@ -260,7 +280,7 @@ private fun DrawerActionButton(
             }
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 10.dp),
+            modifier = Modifier.padding(horizontal = 14.dp),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -276,8 +296,7 @@ private fun DrawerActionButton(
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                maxLines = 1
             )
         }
     }
