@@ -43,3 +43,7 @@ kotlin-js-store/
 .impeccable/
 DESIGN.md
 PRODUCT.md
+
+# Release signing secrets & build outputs
+*.jks
+*.keystore

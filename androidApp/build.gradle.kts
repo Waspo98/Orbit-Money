@@ -44,6 +44,17 @@ val resolvedKeystoreFile = releaseKeystorePath?.let { path ->
     val f = File(path)
     if (f.isAbsolute) f else rootProject.file(path)
 }
+val hasReleaseKeystore = resolvedKeystoreFile != null &&
+    resolvedKeystoreFile.exists() &&
+    !releaseKeystorePassword.isNullOrBlank() &&
+    !releaseKeyAlias.isNullOrBlank() &&
+    !releaseKeyPassword.isNullOrBlank()
+
+if (gradle.startParameter.taskNames.any { it.contains("Release", ignoreCase = true) } && !hasReleaseKeystore) {
+    throw GradleException(
+        "Release signing keystore is not configured. Set release.keystore.* in local.properties or KEYSTORE_* environment variables."
+    )
+}
 
 android {
     namespace = "app.overbay.orbit.android"
@@ -53,7 +64,7 @@ android {
         applicationId = if (isBeta) "app.overbay.orbit.beta" else "app.overbay.orbit"
         minSdk = 24
         targetSdk = 35
-        versionCode = 71
+        versionCode = 72
         versionName = if (isBeta) "0.8.0-beta" else "0.8.0"
         manifestPlaceholders["appName"] = if (isBeta) "Orbit Beta" else "Orbit Money"
         manifestPlaceholders["appScheme"] = if (isBeta) "orbitmoneybeta" else "orbitmoney"
@@ -74,13 +85,11 @@ android {
 
     signingConfigs {
         create("release") {
-            if (resolvedKeystoreFile != null && resolvedKeystoreFile.exists()) {
+            if (hasReleaseKeystore) {
                 storeFile = resolvedKeystoreFile
                 storePassword = releaseKeystorePassword
                 keyAlias = releaseKeyAlias
                 keyPassword = releaseKeyPassword
-            } else {
-                initWith(getByName("debug"))
             }
         }
     }
