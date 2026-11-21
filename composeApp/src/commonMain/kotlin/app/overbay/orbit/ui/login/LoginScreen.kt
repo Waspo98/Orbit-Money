@@ -36,6 +36,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.ui.components.OrbitHorizontalReveal
 import app.overbay.orbit.ui.components.OrbitTextField
+import app.overbay.orbit.ui.components.orbitTopSystemBarPadding
 import app.overbay.orbit.ui.login.components.ConfirmedServerPill
 import app.overbay.orbit.ui.login.components.LoginBrandLockup
 import app.overbay.orbit.ui.login.components.LoginErrorBanner
@@ -147,7 +148,7 @@ fun LoginScreen(
                     center = Offset(size.width * 0.82f, size.height * 0.88f)
                 )
             }
-            .statusBarsPadding()
+            .orbitTopSystemBarPadding()
             .navigationBarsPadding()
             .imePadding()
             .padding(horizontal = 20.dp, vertical = 12.dp),

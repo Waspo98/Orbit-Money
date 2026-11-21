@@ -4,7 +4,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
@@ -172,6 +171,7 @@ internal fun canopyBackdropFillTopLeft(slideOffsetX: Float): Offset = Offset(sli
  */
 internal fun canopyBackdropFillSize(width: Float, height: Float): Size = Size(width + 2f, height)
 
+@Composable
 fun Modifier.stationaryCanopyBackdrop(
     canopyStart: Color,
     canopyMid: Color,
@@ -246,7 +246,7 @@ fun Modifier.stationaryCanopyBackdrop(
             )
         }
     }
-    .statusBarsPadding()
+    .orbitTopSystemBarPadding()
     .clipToBounds()
     .layout { measurable, constraints ->
         val placeable = measurable.measure(constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity))

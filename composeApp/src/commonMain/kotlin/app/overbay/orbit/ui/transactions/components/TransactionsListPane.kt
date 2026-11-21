@@ -43,6 +43,7 @@ import app.overbay.orbit.ui.components.OrbitFloatingActionButton
 import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.OrbitMorphingSplitLayout
 import app.overbay.orbit.ui.components.orbitFadeContentTransform
+import app.overbay.orbit.ui.components.orbitTopSystemBarPadding
 import app.overbay.orbit.ui.components.rememberHeroScrollState
 import app.overbay.orbit.ui.components.rememberOrbitLazyListState
 import app.overbay.orbit.ui.transactions.TransactionsUiState
@@ -244,7 +245,7 @@ fun TransactionsListPane(
             visible = state.syncToastMessage != null,
             enter = slideInVertically { -it } + fadeIn(),
             exit = slideOutVertically { -it } + fadeOut(),
-            modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 12.dp, start = 16.dp, end = 16.dp)
+            modifier = Modifier.align(Alignment.TopCenter).orbitTopSystemBarPadding().padding(top = 12.dp, start = 16.dp, end = 16.dp)
         ) {
             Surface(shape = CircleShape, color = MaterialTheme.colorScheme.inverseSurface, tonalElevation = 6.dp, shadowElevation = 6.dp) {
                 Row(

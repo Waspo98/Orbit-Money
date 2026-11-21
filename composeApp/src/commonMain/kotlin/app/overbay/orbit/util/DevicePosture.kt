@@ -16,7 +16,8 @@ data class DevicePosture(
     val isFolded: Boolean = false,
     val isLandscape: Boolean = false,
     val screenWidthDp: Int = 360,
-    val screenHeightDp: Int = 640
+    val screenHeightDp: Int = 640,
+    val isInMultiWindowMode: Boolean = false
 ) {
     val mode: PostureMode
         get() = when {

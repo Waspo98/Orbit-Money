@@ -20,7 +20,8 @@ actual fun rememberDevicePosture(): DevicePosture {
             isFolded = false,
             isLandscape = isLandscape,
             screenWidthDp = widthDp,
-            screenHeightDp = heightDp
+            screenHeightDp = heightDp,
+            isInMultiWindowMode = false
         )
     }
 }
