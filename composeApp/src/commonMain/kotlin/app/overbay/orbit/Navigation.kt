@@ -41,6 +41,8 @@ import app.overbay.orbit.ui.goals.GoalsScreen
 import app.overbay.orbit.ui.goals.GoalsViewModel
 import app.overbay.orbit.ui.login.LoginScreen
 import app.overbay.orbit.ui.login.LoginViewModel
+import app.overbay.orbit.ui.onboarding.OnboardingScreen
+import app.overbay.orbit.ui.onboarding.OnboardingViewModel
 import app.overbay.orbit.ui.rules.RulesScreen
 import app.overbay.orbit.ui.rules.RulesViewModel
 import app.overbay.orbit.ui.transactions.TransactionsScreen
@@ -65,6 +67,7 @@ import app.overbay.orbit.util.PlatformStorage
 
 internal class OrbitViewModelHolder(repo: OrbitRepository) {
     val loginViewModel by lazy { LoginViewModel(repo) }
+    val onboardingViewModel by lazy { OnboardingViewModel(repo) }
     val dashboardViewModel by lazy { DashboardViewModel(repo) }
     val transactionsViewModel by lazy { TransactionsViewModel(repo) }
     val categoriesViewModel by lazy { CategoriesViewModel(repo) }
@@ -113,14 +116,14 @@ fun OrbitNavigation(
             preferences.storageMode == StorageMode.SELF_HOSTED &&
             !isAuthenticated &&
             currentKey != OrbitNavKey.Login &&
-            currentKey != OrbitNavKey.Onboarding
+            currentKey !is OrbitNavKey.Onboarding
         ) {
             backStackController.resetTo(OrbitNavKey.Login)
         } else if (
             preferences.storageMode == StorageMode.SELF_HOSTED &&
             isAuthenticated &&
             preferences.onboardingCompleted &&
-            (currentKey == OrbitNavKey.Login || currentKey == OrbitNavKey.Onboarding)
+            currentKey == OrbitNavKey.Login
         ) {
             backStackController.resetTo(OrbitNavKey.Dashboard)
         }
@@ -132,10 +135,10 @@ fun OrbitNavigation(
         }
     }
 
-    val isAuthRoute = currentKey == OrbitNavKey.Login || currentKey == OrbitNavKey.Onboarding
+    val isAuthRoute = currentKey == OrbitNavKey.Login || currentKey is OrbitNavKey.Onboarding
     var lastShellEntry by remember(initialKey) {
         mutableStateOf(
-            if (initialKey == OrbitNavKey.Login || initialKey == OrbitNavKey.Onboarding) {
+            if (initialKey == OrbitNavKey.Login || initialKey is OrbitNavKey.Onboarding) {
                 OrbitBackStackEntry(id = 0L, key = OrbitNavKey.Dashboard)
             } else {
                 OrbitBackStackEntry(id = 0L, key = initialKey)
@@ -164,17 +167,31 @@ fun OrbitNavigation(
         label = "authShellTransition"
     ) { showAuth ->
         if (showAuth) {
-            LaunchedEffect(currentKey) {
-                if (currentKey == OrbitNavKey.Onboarding) {
-                    viewModels.loginViewModel.resetToModeSelect()
+            val onboardingKey = currentKey as? OrbitNavKey.Onboarding
+            if (onboardingKey != null) {
+                LaunchedEffect(onboardingKey) {
+                    viewModels.onboardingViewModel.beginSession(isReplay = onboardingKey.isReplay)
                 }
+                OnboardingScreen(
+                    viewModel = viewModels.onboardingViewModel,
+                    posture = posture,
+                    onFinish = {
+                        if (onboardingKey.isReplay && backStackController.canPopBack) {
+                            navCoordinator.popBack()
+                        } else {
+                            backStackController.resetTo(OrbitNavKey.Dashboard)
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                LoginScreen(
+                    viewModel = viewModels.loginViewModel,
+                    onLoginSuccess = { backStackController.resetTo(OrbitNavKey.Dashboard) },
+                    onUseOfflineStorage = { backStackController.resetTo(OrbitNavKey.Dashboard) },
+                    modifier = Modifier.fillMaxSize()
+                )
             }
-            LoginScreen(
-                viewModel = viewModels.loginViewModel,
-                onLoginSuccess = { backStackController.resetTo(OrbitNavKey.Dashboard) },
-                onUseOfflineStorage = { backStackController.resetTo(OrbitNavKey.Dashboard) },
-                modifier = Modifier.fillMaxSize()
-            )
         } else {
             val activeShellEntry = if (!isAuthRoute) currentEntry else lastShellEntry
             val navTransition = updateTransition(targetState = activeShellEntry, label = "OrbitNavigationTransition")

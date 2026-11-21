@@ -234,11 +234,7 @@ class SettingsBackupController(
     }
 
     fun replayWalkthrough(onNavigateToOnboarding: () -> Unit) {
-        scope.launch {
-            val updated = uiState.value.preferences.copy(onboardingCompleted = false)
-            repository.updatePreferences(updated)
-            withContext(Dispatchers.Main) { onNavigateToOnboarding() }
-        }
+        onNavigateToOnboarding()
     }
 
     fun resetToDemoData() {

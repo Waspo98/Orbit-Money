@@ -91,7 +91,7 @@ fun LazyListScope.aboutSectionItems(
                         border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
                         modifier = Modifier.weight(1f).heightIn(min = 48.dp)
                     ) {
-                        Text("Replay Tour", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text("Run Setup Guide", maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     FilledTonalButton(
                         onClick = onSupportClick,

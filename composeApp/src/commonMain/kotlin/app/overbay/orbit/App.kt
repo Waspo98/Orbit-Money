@@ -160,13 +160,10 @@ fun App(
     val activeMode = themeMode ?: preferences.themeMode
     val activeDynamicColor = preferences.dynamicColor
 
-    val targetInitialNavKey = initialNavKey ?: if (
-        !preferences.onboardingCompleted ||
-        (preferences.storageMode == StorageMode.SELF_HOSTED && !isAuthenticated)
-    ) {
-        OrbitNavKey.Login
-    } else {
-        OrbitNavKey.Dashboard
+    val targetInitialNavKey = initialNavKey ?: when {
+        !preferences.onboardingCompleted -> OrbitNavKey.Onboarding(isReplay = false)
+        preferences.storageMode == StorageMode.SELF_HOSTED && !isAuthenticated -> OrbitNavKey.Login
+        else -> OrbitNavKey.Dashboard
     }
 
     CompositionLocalProvider(

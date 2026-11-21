@@ -106,7 +106,7 @@ sealed interface OrbitNavKey {
     data object Login : OrbitNavKey
 
     @Serializable
-    data object Onboarding : OrbitNavKey
+    data class Onboarding(val isReplay: Boolean = false) : OrbitNavKey
 
     @Serializable
     data object Dashboard : OrbitNavKey
@@ -199,7 +199,7 @@ sealed interface OrbitNavKey {
     val title: String
         get() = when (this) {
             Login -> "Sign In"
-            Onboarding -> "Welcome"
+            is Onboarding -> "Welcome"
             Dashboard -> "Dashboard"
             is Transactions -> "Transactions"
             Budgets -> "Budgets"
@@ -221,7 +221,7 @@ sealed interface OrbitNavKey {
     val routeName: String
         get() = when (this) {
             Login -> "login"
-            Onboarding -> "onboarding"
+            is Onboarding -> "onboarding"
             Dashboard -> "dashboard"
             is Transactions -> "transactions"
             Budgets -> "budgets"

@@ -1,8 +1,11 @@
 package app.overbay.orbit.data
 
 import app.overbay.orbit.data.engine.SelfHostedApiEngine
+import app.overbay.orbit.data.engine.SyncResult
 import app.overbay.orbit.data.model.OrbitPreferences
+import app.overbay.orbit.data.model.StorageMode
 import app.overbay.orbit.data.network.OrbitApiClient
+import app.overbay.orbit.data.network.ServerUrlNormalizer
 import app.overbay.orbit.util.OidcCallbackBridge
 import kotlinx.datetime.Clock
 
@@ -72,4 +75,35 @@ internal suspend fun OrbitRepository.refreshSelfHostedSessionImpl(
             }
         }
     }
+}
+
+internal suspend fun OrbitRepository.markAuthenticatedImpl(
+    serverUrl: String,
+    userLabel: String,
+    authMethod: String?,
+    completeOnboarding: Boolean
+) {
+    val normalizedUrl = ServerUrlNormalizer.normalize(serverUrl)
+    val resolvedOnboarding = if (completeOnboarding) true else _preferences.value.onboardingCompleted
+    val updatedPref = _preferences.value.copy(
+        storageMode = StorageMode.SELF_HOSTED,
+        selfHostedServerUrl = normalizedUrl,
+        onboardingCompleted = resolvedOnboarding
+    )
+    _preferences.value = updatedPref
+    _storageMode.value = StorageMode.SELF_HOSTED
+    _isAuthenticated.value = true
+    _currentUser.value = userLabel
+    if (!authMethod.isNullOrBlank()) {
+        persistAuthMethod(authMethod)
+    }
+    localEngine.saveStartupPreferences(updatedPref)
+    activeEngine = SelfHostedApiEngine(createApiClient(normalizedUrl), storage) { _preferences.value }
+    val fresh = activeEngine.loadSnapshot()
+    val finalSnap = fresh.copy(
+        preferences = fresh.preferences.copy(onboardingCompleted = resolvedOnboarding)
+    )
+    commitSnapshot(finalSnap, immediate = true)
+    refreshSimpleFinStatus()
+    _syncStatus.value = SyncResult.Success("Signed in as $userLabel (${fresh.transactions.size} transactions)")
 }

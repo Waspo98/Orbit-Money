@@ -72,7 +72,7 @@ fun AdaptiveNavigationShell(
 
     val isSecondaryRoute = remember(currentKey) {
         when (currentKey) {
-            OrbitNavKey.Onboarding, OrbitNavKey.Dashboard, is OrbitNavKey.Transactions,
+            is OrbitNavKey.Onboarding, OrbitNavKey.Dashboard, is OrbitNavKey.Transactions,
             OrbitNavKey.Budgets, is OrbitNavKey.Accounts, is OrbitNavKey.Settings -> false
             else -> true
         }

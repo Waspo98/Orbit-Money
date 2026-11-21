@@ -95,7 +95,7 @@ fun LazyListScope.settingsSectionItems(
         SettingsSection.ABOUT -> aboutSectionItems(
             preferences = uiState.preferences,
             onReplayWalkthrough = {
-                viewModel.replayWalkthrough { onNavigate(OrbitNavKey.Onboarding) }
+                viewModel.replayWalkthrough { onNavigate(OrbitNavKey.Onboarding(isReplay = true)) }
             },
             onSupportClick = { viewModel.showDialog(SettingsDialogState.SupportDevelopment) },
             onRequestSignOut = { viewModel.showDialog(SettingsDialogState.ConfirmSignOut) }

@@ -194,8 +194,11 @@ fun DashboardScreen(
                         if (uiState.isEmptyWorkspace) {
                             item(key = "empty_workspace_setup") {
                                 EmptyWorkspaceSetupCard(
+                                    onRunSetupGuide = {
+                                        onNavigate(OrbitNavKey.Onboarding(isReplay = true))
+                                    },
                                     onImportCsv = {
-                                        onNavigate(OrbitNavKey.Settings(SettingsSection.DATA_AND_BACKUPS))
+                                        onNavigate(OrbitNavKey.Transactions())
                                     },
                                     onConnectSimpleFin = {
                                         onNavigate(OrbitNavKey.Settings(SettingsSection.BANK_FEEDS))

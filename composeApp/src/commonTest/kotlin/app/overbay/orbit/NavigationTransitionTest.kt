@@ -45,7 +45,7 @@ class NavigationTransitionTest {
     fun `secondary and auth destinations have null primaryTabIndex`() {
         val secondaryKeys = listOf(
             OrbitNavKey.Login,
-            OrbitNavKey.Onboarding,
+            OrbitNavKey.Onboarding(),
             OrbitNavKey.Upcoming,
             OrbitNavKey.Goals,
             OrbitNavKey.Categories,

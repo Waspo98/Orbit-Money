@@ -120,7 +120,10 @@ class OrbitRepository(
         }
 
         val pref = if (!pendingOidcUrl.isNullOrBlank()) {
-            basePref.copy(storageMode = StorageMode.SELF_HOSTED, selfHostedServerUrl = if (pendingOidcUrl == "/") "" else pendingOidcUrl, onboardingCompleted = true)
+            basePref.copy(
+                storageMode = StorageMode.SELF_HOSTED,
+                selfHostedServerUrl = if (pendingOidcUrl == "/") "" else pendingOidcUrl
+            )
         } else basePref
         _preferences.value = pref
         _storageMode.value = pref.storageMode
@@ -212,23 +215,12 @@ class OrbitRepository(
         localEngine.saveStartupPreferences(updatedPref)
     }
 
-    suspend fun markAuthenticated(serverUrl: String, userLabel: String, authMethod: String? = null) {
-        val normalizedUrl = ServerUrlNormalizer.normalize(serverUrl)
-        val updatedPref = _preferences.value.copy(storageMode = StorageMode.SELF_HOSTED, selfHostedServerUrl = normalizedUrl, onboardingCompleted = true)
-        _preferences.value = updatedPref
-        _storageMode.value = StorageMode.SELF_HOSTED
-        _isAuthenticated.value = true
-        _currentUser.value = userLabel
-        if (!authMethod.isNullOrBlank()) {
-            persistAuthMethod(authMethod)
-        }
-        localEngine.saveStartupPreferences(updatedPref)
-        activeEngine = SelfHostedApiEngine(createApiClient(normalizedUrl), storage) { _preferences.value }
-        val fresh = activeEngine.loadSnapshot()
-        commitSnapshot(fresh, immediate = true)
-        refreshSimpleFinStatus()
-        _syncStatus.value = SyncResult.Success("Signed in as $userLabel (${fresh.transactions.size} transactions)")
-    }
+    suspend fun markAuthenticated(
+        serverUrl: String,
+        userLabel: String,
+        authMethod: String? = null,
+        completeOnboarding: Boolean = true
+    ) = markAuthenticatedImpl(serverUrl, userLabel, authMethod, completeOnboarding)
 
     suspend fun logout() {
         _isAuthenticated.value = false
@@ -251,7 +243,12 @@ class OrbitRepository(
         val client = createApiClient(serverUrl)
         val authMe = client.exchangeOidcCode(code).getOrThrow()
         val userLabel = authMe.displayName ?: authMe.username ?: authMe.email ?: "SSO User"
-        markAuthenticated(serverUrl, userLabel, authMe.authMethod ?: "oidc")
+        markAuthenticated(
+            serverUrl = serverUrl,
+            userLabel = userLabel,
+            authMethod = authMe.authMethod ?: "oidc",
+            completeOnboarding = _preferences.value.onboardingCompleted
+        )
         userLabel
     }
 

@@ -35,6 +35,7 @@ fun EmptyWorkspaceSetupCard(
     onImportCsv: () -> Unit,
     onConnectSimpleFin: () -> Unit,
     onAddManualAccount: () -> Unit,
+    onRunSetupGuide: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
@@ -87,9 +88,40 @@ fun EmptyWorkspaceSetupCard(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                if (onRunSetupGuide != null) {
+                    SelectableListRow(
+                        title = "Run Guided Setup",
+                        subtitle = "Walk through syncing, CSV import, accounts, household, and tools.",
+                        isSelected = false,
+                        onClick = {
+                            haptics.confirm()
+                            onRunSetupGuide()
+                        },
+                        leadingContent = { Text(text = "✨", fontSize = 24.sp) },
+                        trailingContent = {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                OrbitBadge(
+                                    text = "Guided",
+                                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    )
+                }
+
                 SelectableListRow(
-                    title = "Import Rocket Money CSV",
-                    subtitle = "Fast migration of accounts, transactions, and categories.",
+                    title = "Import Transactions CSV",
+                    subtitle = "Rocket Money, Mint, Monarch, YNAB, or any bank CSV export.",
                     isSelected = false,
                     onClick = {
                         haptics.confirm()
