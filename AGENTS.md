@@ -111,12 +111,14 @@ This repo lives inside the `C:\Docker` workspace as an **app & self-hosted stack
   - **Protected Surfaces:** Ask before touching auth, Docker configuration, ports, volume names, database schema/migrations, deployment scripts, or storage/backup behavior, and explain the impact first.
   - Non-trivial completed tasks must be committed and pushed with conventional commit prefixes (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`).
 - **Docker Beta & Live Deployment (On-Demand Only):**
-  - Public app ingress runs through Cloudflare Tunnel on external Docker network `web_proxy`.
+  - Public self-host installs use the standalone root `docker-compose.yml` (`ghcr.io/waspo98/orbit-money:latest`, no `build: .`, no `web_proxy`).
+  - Maintainer HAL 9000 live stack lives in `deploy/live/docker-compose.yml` (`orbit-money` on host port `5008`, `ghcr.io/waspo98/orbit-money:main`, external network `web_proxy`, volume `orbit-money-data`).
   - **Manual / Explicit Request Only:** Both `.github/workflows/deploy-beta.yml` and `.github/workflows/deploy-live.yml` use `workflow_dispatch` only (no automatic PWA/Docker rebuilds on `git push`). Never build the PWA or deploy Docker unless the user explicitly asks.
   - **Beta is Docker-only (`orbitmoney-beta` on host port `5019`):** When explicitly asked to deploy beta, run `cmd /c scripts\deploy-beta.cmd` from the repo root (which delegates to `deploy\beta\deploy-beta.cmd`).
-  - Public Docker installs pull `ghcr.io/waspo98/orbit-money:latest`. Maintainer beta publishes `ghcr.io/waspo98/orbit-money:beta`, then locally builds, restarts, and verifies the running beta container.
+  - **Release Images:** `.github/workflows/publish-release-image.yml` publishes multi-arch (`linux/amd64`, `linux/arm64`) release images (`vX.Y.Z`, `X.Y.Z`, `X.Y`, and `:latest`) on `release: [published]` and `workflow_dispatch`.
 - **Versioning & GitHub Releases (Milestone-Based):**
   - Treat version bumps as release milestones (promoting work from Beta to `main`, landing a major feature, changing calculation behavior, or batching fixes). Keep the app in `0.x` until public-ready.
+  - Keep `backend/package.json` (and `backend/package-lock.json`) `"version"` synced with `androidApp/build.gradle.kts` `versionName` on every release, and bump `CACHE_NAME` in `composeApp/src/wasmJsMain/resources/sw.js` when Web PWA assets change.
 - **Android Build, Standalone Beta Identity & GitHub Release Delivery:**
   - **Headless / No Emulator:** Never launch or inspect an Android emulator via ADB/CLI unless explicitly requested. Rely exclusively on Gradle compilation, unit tests, and GitHub release downloads.
   - **Automatic APK Root Copy & Standalone Beta Package Identity (CRITICAL):**

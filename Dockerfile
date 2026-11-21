@@ -4,7 +4,7 @@
 # ==============================================================================
 
 # ---- Stage 1: Prepare or Build Compose Multiplatform wasmJs PWA ----
-FROM eclipse-temurin:21-jdk AS build-wasm
+FROM --platform=$BUILDPLATFORM eclipse-temurin:21-jdk AS build-wasm
 WORKDIR /workspace
 
 # Copy pre-built host distribution if present, plus Gradle sources for fallback CI builds
@@ -36,10 +36,12 @@ RUN --mount=type=cache,target=/root/.gradle \
 
 # ---- Stage 2: Production runtime ----
 FROM node:20-alpine AS prod
+ARG APP_VERSION=dev
 WORKDIR /app
 
 LABEL org.opencontainers.image.source="https://github.com/Waspo98/Orbit-Money"
 LABEL org.opencontainers.image.description="Self-hosted personal finance tracker built with Jetpack Compose Multiplatform"
+LABEL org.opencontainers.image.version="${APP_VERSION}"
 
 # Install build tools for better-sqlite3 native compilation (removed after install).
 RUN apk add --no-cache sqlite wget \

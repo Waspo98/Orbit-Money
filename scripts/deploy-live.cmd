@@ -72,7 +72,7 @@ if "%EXPECTED_VERSION%"=="" (
 )
 
 set "IMAGE=ghcr.io/waspo98/orbit-money"
-set "COMPOSE_CMD=docker compose -p orbitmoney"
+set "COMPOSE_CMD=docker compose -f deploy\live\docker-compose.yml -p orbitmoney"
 
 if not "%GITHUB_SHA%"=="" set "DEPLOY_SHA=%GITHUB_SHA%"
 
@@ -88,19 +88,21 @@ if not "%GITHUB_TOKEN%"=="" (
   echo GITHUB_TOKEN is not set; docker push will use existing Docker registry credentials.
 )
 
+echo Ensuring Web PWA bundle is built on host...
+call scripts\build-frontend.cmd
+if errorlevel 1 (
+  popd
+  exit /b 1
+)
+
 echo Building live Docker image for %DEPLOY_SHA%...
-docker build -t %IMAGE%:latest -t %IMAGE%:main -t %IMAGE%:main-%DEPLOY_SHA% .
+docker build -t %IMAGE%:main -t %IMAGE%:main-%DEPLOY_SHA% --build-arg APP_VERSION=%EXPECTED_VERSION% .
 if errorlevel 1 (
   popd
   exit /b 1
 )
 
 echo Publishing live Docker image to ghcr.io/waspo98/orbit-money...
-docker push %IMAGE%:latest
-if errorlevel 1 (
-  echo WARNING: Could not push latest image to ghcr.io. Continuing with local deployment.
-)
-
 docker push %IMAGE%:main
 if errorlevel 1 (
   echo WARNING: Could not push main image to ghcr.io. Continuing with local deployment.
@@ -111,14 +113,8 @@ if errorlevel 1 (
   echo WARNING: Could not push main SHA image to ghcr.io. Continuing with local deployment.
 )
 
-echo Building local Compose image from the checked-out main branch...
-%COMPOSE_CMD% build orbit-money
-if errorlevel 1 (
-  popd
-  exit /b 1
-)
-
-%COMPOSE_CMD% up -d --no-deps orbit-money
+echo Starting orbit-money container from built main image...
+%COMPOSE_CMD% up -d --no-deps --force-recreate --no-build orbit-money
 if errorlevel 1 (
   popd
   exit /b 1

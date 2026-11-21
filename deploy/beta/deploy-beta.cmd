@@ -96,7 +96,7 @@ if errorlevel 1 (
 )
 
 echo Building beta Docker image for %DEPLOY_SHA%...
-docker build -t %IMAGE%:beta -t %IMAGE%:beta-%DEPLOY_SHA% .
+docker build -t %IMAGE%:beta -t %IMAGE%:beta-%DEPLOY_SHA% --build-arg APP_VERSION=%EXPECTED_VERSION%-beta .
 if errorlevel 1 (
   popd
   exit /b 1

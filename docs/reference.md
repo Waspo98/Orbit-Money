@@ -14,15 +14,16 @@ This document covers architecture, database migrations, engine rules, API routes
 
 `Dockerfile` uses a two-stage build:
 
-- **Stage 1 (`eclipse-temurin:21-jdk` as `build-wasm`):** Reuses a pre-built host bundle at `composeApp/build/dist/wasmJs/productionExecutable/index.html` when present. Otherwise downloads Android command-line tools (`platforms;android-35`, `build-tools;35.0.0`) inside the build container and runs `./gradlew :composeApp:wasmJsBrowserDistribution -x compileProductionExecutableKotlinWasmJsOptimize --no-daemon`.
-- **Stage 2 (`node:20-alpine` as `prod`):** Installs `sqlite` and `wget`, installs temporary build dependencies (`python3 make g++`) to compile `better-sqlite3`, runs `npm install --omit=dev --no-audit --no-fund`, removes build dependencies, copies `backend/src` to `/app/src` and the built `wasmJs` PWA bundle to `/app/public`, creates `/app/data`, and starts `node src/server.js` on port `5008`.
+- **Stage 1 (`--platform=$BUILDPLATFORM eclipse-temurin:21-jdk` as `build-wasm`):** Runs once on the host builder architecture and reuses a pre-built host bundle at `composeApp/build/dist/wasmJs/productionExecutable/index.html` when present. Otherwise downloads Android command-line tools (`platforms;android-35`, `build-tools;35.0.0`) inside the build container and runs `./gradlew :composeApp:wasmJsBrowserDistribution -x compileProductionExecutableKotlinWasmJsOptimize --no-daemon`.
+- **Stage 2 (`node:20-alpine` as `prod`):** Installs `sqlite` and `wget`, installs temporary build dependencies (`python3 make g++`) to compile `better-sqlite3`, runs `npm install --omit=dev --no-audit --no-fund`, removes build dependencies, copies `backend/src` to `/app/src` and the built `wasmJs` PWA bundle to `/app/public`, sets `org.opencontainers.image.version` from `APP_VERSION`, creates `/app/data`, and starts `node src/server.js` on port `5008`.
 
 Container image targets and workflows:
 
-- Public self-host installs pull `ghcr.io/waspo98/orbit-money:latest` via `docker-compose.yml` (host port `5008`, volume `orbit-money-data`).
-- Maintainer beta uses `ghcr.io/waspo98/orbit-money:beta` via `deploy/beta/docker-compose.yml` (host port `5019`, volume `orbitmoney-beta_orbit-money-beta-data`).
-- `.github/workflows/deploy-live.yml` and `.github/workflows/deploy-beta.yml` trigger only on manual `workflow_dispatch` (never automatically on push). Both build and publish branch image tags, rebuild/recreate the local container, and verify the running `backend/package.json` version.
-- `.github/workflows/publish-release-image.yml` also runs on manual `workflow_dispatch` (with an optional `tag` input defaulting to the latest `v*` tag) to build and push matching version tags (`vX.Y.Z`, `X.Y.Z`, `X.Y`) without external GitHub Actions.
+- Public self-host installs use the standalone root `docker-compose.yml` pulling `ghcr.io/waspo98/orbit-money:latest` (`linux/amd64` and `linux/arm64`, host port `5008`, volume `orbit-money-data`, default bridge network).
+- Maintainer live uses `deploy/live/docker-compose.yml` (`ghcr.io/waspo98/orbit-money:main`, host port `5008`, volume `orbit-money-data`, external `web_proxy` network).
+- Maintainer beta uses `deploy/beta/docker-compose.yml` (`ghcr.io/waspo98/orbit-money:beta`, host port `5019`, volume `orbitmoney-beta_orbit-money-beta-data`, external `web_proxy` network).
+- `.github/workflows/deploy-live.yml` and `.github/workflows/deploy-beta.yml` trigger only on manual `workflow_dispatch` (never automatically on push). Both build the `wasmJs` PWA bundle, build and publish branch image tags, recreate the local container, and verify the running `backend/package.json` version.
+- `.github/workflows/publish-release-image.yml` runs on `release: [published]` (non-prerelease `vX.Y.Z` tags) and manual `workflow_dispatch`, using `docker buildx` to publish multi-arch (`linux/amd64`, `linux/arm64`) release tags (`vX.Y.Z`, `X.Y.Z`, `X.Y`, and `:latest`) without external GitHub Actions.
 
 ## Data Storage and Sync Modes
 
@@ -34,6 +35,7 @@ All server state lives in Docker named volume `orbit-money-data` mounted at `/ap
 |---|---|
 | `budget.db` | SQLite database (accounts, transactions, categories, rules, budgets, goals, household, credit cards, sync config, logs) |
 | `sessions.db` | Express session store (separate `better-sqlite3` WAL connection via `backend/src/services/sessionStore.js`) |
+| `.session_secret` | Auto-generated 64-character hex cookie signing secret persisted when `SESSION_SECRET` is omitted from env |
 
 ### Client Storage Modes
 

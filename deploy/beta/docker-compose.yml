@@ -21,6 +21,8 @@ services:
       SEED_DEMO_DATA: "1"
     networks:
       - web_proxy
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:5008/api/health"]
       interval: 30s

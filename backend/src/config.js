@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { looksLikePlaceholder, resolveSessionSecret } from './lib/sessionSecret.js';
 
 function normalizeAuthProvider(value) {
   const provider = String(value || 'local').trim().toLowerCase();
@@ -11,9 +12,25 @@ function cleanOptional(value) {
   return text ? text : null;
 }
 
-function looksLikePlaceholder(value) {
-  const text = String(value || '').trim().toLowerCase();
-  return !text || text.includes('change_me') || text.includes('change_this');
+const dataDir = process.env.DATA_DIR || '/app/data';
+let sessionSecretResult;
+try {
+  sessionSecretResult = resolveSessionSecret({
+    envSecret: process.env.SESSION_SECRET,
+    dataDir
+  });
+} catch (err) {
+  if (err?.code === 'PLACEHOLDER_SECRET') {
+    console.error('FATAL: Replace placeholder secret values before starting Orbit Money:');
+    console.error('  - SESSION_SECRET');
+  } else {
+    console.error(`FATAL: Could not initialize SESSION_SECRET in ${dataDir}: ${err.message}`);
+  }
+  process.exit(1);
+}
+
+if (sessionSecretResult.source === 'generated') {
+  console.log(`Generated and persisted SESSION_SECRET at ${sessionSecretResult.filePath}`);
 }
 
 export const config = {
@@ -21,7 +38,7 @@ export const config = {
   authProvider: normalizeAuthProvider(process.env.AUTH_PROVIDER),
   adminUsername: process.env.ADMIN_USERNAME || 'admin',
   adminPassword: process.env.ADMIN_PASSWORD,
-  sessionSecret: process.env.SESSION_SECRET,
+  sessionSecret: sessionSecretResult.secret,
   sessionName: process.env.SESSION_NAME || 'connect.sid',
   apiKey: cleanOptional(process.env.API_KEY),
   oidcIssuerUrl: process.env.OIDC_ISSUER_URL || process.env.AUTHENTIK_ISSUER_URL || null,
@@ -36,7 +53,7 @@ export const config = {
   webPushPublicKey: cleanOptional(process.env.WEB_PUSH_PUBLIC_KEY),
   webPushPrivateKey: cleanOptional(process.env.WEB_PUSH_PRIVATE_KEY),
   webPushSubject: cleanOptional(process.env.WEB_PUSH_SUBJECT),
-  dataDir: process.env.DATA_DIR || '/app/data',
+  dataDir,
   tz: process.env.TZ || 'America/Chicago',
   seedDemoData: process.env.SEED_DEMO_DATA === '1',
   sampleDataEnabled: process.env.ENABLE_SAMPLE_DATA === '1' || process.env.SEED_DEMO_DATA === '1'
@@ -48,7 +65,7 @@ if (!['local', 'oidc', 'both'].includes(config.authProvider)) {
   process.exit(1);
 }
 
-const required = ['sessionSecret'];
+const required = [];
 if (config.authProvider === 'local' || config.authProvider === 'both') {
   required.push('adminPassword');
 }
@@ -60,7 +77,7 @@ if (missing.length > 0) {
     const envName = k.replace(/[A-Z]/g, (c) => '_' + c).toUpperCase();
     console.error(`  - ${envName}`);
   }
-  console.error('\nCheck your .env file against .env.example.');
+  console.error('\nSet them in docker-compose.yml or your .env file (see .env.example).');
   process.exit(1);
 }
 

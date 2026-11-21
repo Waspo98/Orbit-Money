@@ -1,28 +1,42 @@
+import fs from 'fs';
 import express from 'express';
 import { db } from '../db/index.js';
 import { sendOk, sendStatusPayload } from '../lib/http.js';
 
-const router = express.Router();
+const pkg = JSON.parse(
+  fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf8')
+);
+export const appVersion = pkg.version || '0.0.0';
 
 /**
- * GET /api/health
- * Returns basic DB counts so the frontend (and Docker healthcheck) can confirm
- * the DB is reachable and migrations ran. Public — no auth required.
+ * Builds the /api/health router backed by the given SQLite database handle.
  */
-router.get('/', (req, res) => {
-  try {
-    const transactions = db.prepare('SELECT COUNT(*) AS c FROM transactions').get().c;
-    const categories   = db.prepare('SELECT COUNT(*) AS c FROM categories').get().c;
-    const accounts     = db.prepare('SELECT COUNT(*) AS c FROM accounts').get().c;
-    const rules        = db.prepare('SELECT COUNT(*) AS c FROM rules').get().c;
+export function createHealthRouter(database, version = appVersion) {
+  const router = express.Router();
 
-    sendOk(res, {
-      status: 'ok',
-      counts: { transactions, categories, accounts, rules }
-    });
-  } catch (err) {
-    sendStatusPayload(res, 500, { status: 'error', error: err.message });
-  }
-});
+  /**
+   * GET /api/health
+   * Returns app version and basic DB counts so clients (and Docker healthcheck)
+   * can confirm the DB is reachable and migrations ran. Public — no auth required.
+   */
+  router.get('/', (req, res) => {
+    try {
+      const transactions = database.prepare('SELECT COUNT(*) AS c FROM transactions').get().c;
+      const categories   = database.prepare('SELECT COUNT(*) AS c FROM categories').get().c;
+      const accounts     = database.prepare('SELECT COUNT(*) AS c FROM accounts').get().c;
+      const rules        = database.prepare('SELECT COUNT(*) AS c FROM rules').get().c;
 
-export default router;
+      sendOk(res, {
+        status: 'ok',
+        version,
+        counts: { transactions, categories, accounts, rules }
+      });
+    } catch (err) {
+      sendStatusPayload(res, 500, { status: 'error', error: err.message });
+    }
+  });
+
+  return router;
+}
+
+export default createHealthRouter(db);

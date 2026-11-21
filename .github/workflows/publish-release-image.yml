@@ -1,13 +1,20 @@
 name: Publish Release Image
 
 on:
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag to build and publish (e.g. v0.8.0; leave blank for latest v* tag)'
+        description: 'Release tag to build and publish (e.g. v0.8.1; leave blank for latest v* tag)'
         required: false
         default: ''
         type: string
+      push_latest:
+        description: 'Also update the :latest tag on GHCR'
+        required: false
+        default: true
+        type: boolean
 
 concurrency:
   group: publish-release-image
@@ -23,30 +30,47 @@ env:
 
 jobs:
   publish:
-    name: Publish tagged Docker image
+    name: Publish multi-arch release image
     runs-on: [self-hosted, Windows, X64]
     steps:
-      - name: Build and push release image
+      - name: Build and push multi-arch release image
         shell: powershell
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_PRERELEASE: ${{ github.event.release.prerelease }}
           INPUT_TAG: ${{ inputs.tag }}
+          INPUT_PUSH_LATEST: ${{ inputs.push_latest }}
           REPO_URL: https://github.com/${{ github.repository }}.git
           GH_ACTOR: ${{ github.actor }}
         run: |
           $ErrorActionPreference = 'Stop'
 
-          $tag = "$env:INPUT_TAG".Trim()
-          if (-not $tag) {
-            $remoteTags = git ls-remote --tags --refs $env:REPO_URL "refs/tags/v*" |
-              ForEach-Object { ($_ -split "`t")[1] -replace '^refs/tags/', '' } |
-              Where-Object { $_ -match '^v\d+\.\d+\.\d+$' }
-            $tag = $remoteTags |
-              Sort-Object { [version]($_.TrimStart('v')) } -Descending |
-              Select-Object -First 1
-          }
-          if (-not $tag -or $tag -notmatch '^v\d+\.\d+\.\d+$') {
-            throw "Invalid or missing release tag '$tag'. Expected format vX.Y.Z."
+          $remoteTags = git ls-remote --tags --refs $env:REPO_URL "refs/tags/v*" |
+            ForEach-Object { ($_ -split "`t")[1] -replace '^refs/tags/', '' } |
+            Where-Object { $_ -match '^v\d+\.\d+\.\d+$' }
+          $highestTag = $remoteTags |
+            Sort-Object { [version]($_.TrimStart('v')) } -Descending |
+            Select-Object -First 1
+
+          if ($env:EVENT_NAME -eq 'release') {
+            $tag = "$env:RELEASE_TAG".Trim()
+            $isPrerelease = "$env:RELEASE_PRERELEASE".ToLowerInvariant() -eq 'true'
+            if ($isPrerelease -or $tag -notmatch '^v\d+\.\d+\.\d+$') {
+              Write-Host "Skipping Docker release publish for prerelease or non-semver tag '$tag'."
+              exit 0
+            }
+            $pushLatest = (-not $highestTag) -or ($tag -eq $highestTag)
+          } else {
+            $tag = "$env:INPUT_TAG".Trim()
+            if (-not $tag) {
+              $tag = $highestTag
+            }
+            if (-not $tag -or $tag -notmatch '^v\d+\.\d+\.\d+$') {
+              throw "Invalid or missing release tag '$tag'. Expected format vX.Y.Z."
+            }
+            $pushLatest = "$env:INPUT_PUSH_LATEST".ToLowerInvariant() -eq 'true'
           }
 
           $image = "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
@@ -55,6 +79,9 @@ jobs:
           $tags = @($tag, $version)
           if ($parts.Length -ge 2) {
             $tags += "$($parts[0]).$($parts[1])"
+          }
+          if ($pushLatest) {
+            $tags += "latest"
           }
 
           if (-not $env:ANDROID_HOME -and $env:LOCALAPPDATA) {
@@ -83,18 +110,26 @@ jobs:
               $env:GHCR_TOKEN | docker login "${{ env.REGISTRY }}" -u "$env:GH_ACTOR" --password-stdin
               if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+              docker buildx inspect orbit-builder *> $null
+              if ($LASTEXITCODE -ne 0) {
+                Write-Host "Creating multi-arch buildx builder 'orbit-builder'..."
+                docker buildx create --name orbit-builder --driver docker-container --bootstrap | Out-Null
+                if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+              }
+
               $buildArgs = @()
               foreach ($imageTag in ($tags | Select-Object -Unique)) {
                 $buildArgs += @("-t", "${image}:$imageTag")
               }
 
-              docker build @buildArgs .
+              Write-Host "Building and pushing multi-arch image tags: $($tags -join ', ')"
+              docker buildx build `
+                --builder orbit-builder `
+                --platform linux/amd64,linux/arm64 `
+                --build-arg "APP_VERSION=$version" `
+                @buildArgs `
+                --push .
               if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-              foreach ($imageTag in ($tags | Select-Object -Unique)) {
-                docker push "${image}:$imageTag"
-                if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-              }
             } finally {
               Pop-Location
             }
