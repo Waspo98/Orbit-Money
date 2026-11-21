@@ -22,7 +22,7 @@ Container image targets and workflows:
 - Public self-host installs pull `ghcr.io/waspo98/orbit-money:latest` via `docker-compose.yml` (host port `5008`, volume `orbit-money-data`).
 - Maintainer beta uses `ghcr.io/waspo98/orbit-money:beta` via `deploy/beta/docker-compose.yml` (host port `5019`, volume `orbitmoney-beta_orbit-money-beta-data`).
 - `.github/workflows/deploy-live.yml` and `.github/workflows/deploy-beta.yml` trigger only on manual `workflow_dispatch` (never automatically on push). Both build and publish branch image tags, rebuild/recreate the local container, and verify the running `backend/package.json` version.
-- Pushing a `v*` Git tag triggers `.github/workflows/publish-release-image.yml` to publish matching version tags (`vX.Y.Z`, `X.Y.Z`, `X.Y`).
+- `.github/workflows/publish-release-image.yml` also runs on manual `workflow_dispatch` (with an optional `tag` input defaulting to the latest `v*` tag) to build and push matching version tags (`vX.Y.Z`, `X.Y.Z`, `X.Y`) without external GitHub Actions.
 
 ## Data Storage and Sync Modes
 

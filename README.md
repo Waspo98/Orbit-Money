@@ -199,7 +199,7 @@ On Windows, helper wrappers are available in `scripts/`:
 - `cmd /c scripts\build-apk.cmd` compiles the debug APK and uploads it to the matching GitHub pre-release (`debug-latest` or `beta-latest`; pass `-SkipUpload` to build locally only).
 - `cmd /c scripts\deploy-live.cmd` and `cmd /c scripts\deploy-beta.cmd` handle on-demand Docker builds and container restarts for maintainer deployments.
 
-GitHub Actions workflows for live and beta Docker deployments (`.github/workflows/deploy-live.yml` and `.github/workflows/deploy-beta.yml`) run on manual `workflow_dispatch` only; pushing `v*` tags publishes versioned images via `.github/workflows/publish-release-image.yml`. Self-hosters do not need GitHub Actions to run Orbit Money.
+GitHub Actions workflows for Docker builds and deployments (`.github/workflows/deploy-live.yml`, `.github/workflows/deploy-beta.yml`, and `.github/workflows/publish-release-image.yml`) run on manual `workflow_dispatch` only. Self-hosters do not need GitHub Actions to run Orbit Money.
 
 ## Storage and Backups
 

@@ -1,9 +1,17 @@
 name: Publish Release Image
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to build and publish (e.g. v0.8.0; leave blank for latest v* tag)'
+        required: false
+        default: ''
+        type: string
+
+concurrency:
+  group: publish-release-image
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -18,16 +26,30 @@ jobs:
     name: Publish tagged Docker image
     runs-on: [self-hosted, Windows, X64]
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
       - name: Build and push release image
         shell: powershell
         env:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INPUT_TAG: ${{ inputs.tag }}
+          REPO_URL: https://github.com/${{ github.repository }}.git
+          GH_ACTOR: ${{ github.actor }}
         run: |
+          $ErrorActionPreference = 'Stop'
+
+          $tag = "$env:INPUT_TAG".Trim()
+          if (-not $tag) {
+            $remoteTags = git ls-remote --tags --refs $env:REPO_URL "refs/tags/v*" |
+              ForEach-Object { ($_ -split "`t")[1] -replace '^refs/tags/', '' } |
+              Where-Object { $_ -match '^v\d+\.\d+\.\d+$' }
+            $tag = $remoteTags |
+              Sort-Object { [version]($_.TrimStart('v')) } -Descending |
+              Select-Object -First 1
+          }
+          if (-not $tag -or $tag -notmatch '^v\d+\.\d+\.\d+$') {
+            throw "Invalid or missing release tag '$tag'. Expected format vX.Y.Z."
+          }
+
           $image = "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
-          $tag = "${{ github.ref_name }}"
           $version = $tag.TrimStart("v")
           $parts = $version.Split(".")
           $tags = @($tag, $version)
@@ -35,18 +57,49 @@ jobs:
             $tags += "$($parts[0]).$($parts[1])"
           }
 
-          $env:GHCR_TOKEN | docker login "${{ env.REGISTRY }}" -u "${{ github.actor }}" --password-stdin
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-          $buildArgs = @()
-          foreach ($imageTag in ($tags | Select-Object -Unique)) {
-            $buildArgs += @("-t", "${image}:$imageTag")
+          if (-not $env:ANDROID_HOME -and $env:LOCALAPPDATA) {
+            $defaultSdk = Join-Path $env:LOCALAPPDATA "Android\Sdk"
+            if (Test-Path $defaultSdk) {
+              $env:ANDROID_HOME = $defaultSdk
+            }
           }
 
-          docker build @buildArgs .
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $workDir = Join-Path $env:RUNNER_TEMP "orbit-release-$tag"
+          if (Test-Path $workDir) {
+            Remove-Item -Path $workDir -Recurse -Force
+          }
 
-          foreach ($imageTag in ($tags | Select-Object -Unique)) {
-            docker push "${image}:$imageTag"
+          try {
+            Write-Host "Cloning $tag into $workDir..."
+            git clone --depth 1 --branch $tag $env:REPO_URL $workDir
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+            Push-Location $workDir
+            try {
+              Write-Host "Building wasmJs PWA bundle on host..."
+              cmd /c scripts\build-frontend.cmd
+              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+              $env:GHCR_TOKEN | docker login "${{ env.REGISTRY }}" -u "$env:GH_ACTOR" --password-stdin
+              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+              $buildArgs = @()
+              foreach ($imageTag in ($tags | Select-Object -Unique)) {
+                $buildArgs += @("-t", "${image}:$imageTag")
+              }
+
+              docker build @buildArgs .
+              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+              foreach ($imageTag in ($tags | Select-Object -Unique)) {
+                docker push "${image}:$imageTag"
+                if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+              }
+            } finally {
+              Pop-Location
+            }
+          } finally {
+            if (Test-Path $workDir) {
+              Remove-Item -Path $workDir -Recurse -Force
+            }
           }
