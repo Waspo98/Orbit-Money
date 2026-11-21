@@ -8,7 +8,8 @@ enum class OrbitThemePreset(val displayName: String) {
     OCEAN_SLATE("Ocean Slate"),
     WARM_TERRACOTTA("Warm Terracotta"),
     ROYAL_INDIGO("Royal Indigo"),
-    MONOCHROME_INK("Monochrome Ink")
+    MONOCHROME_INK("Monochrome Ink"),
+    SPACESHIP_RED("Spaceship Red")
 }
 
 @Serializable

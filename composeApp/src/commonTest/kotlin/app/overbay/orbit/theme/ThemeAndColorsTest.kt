@@ -11,7 +11,12 @@ import kotlin.test.assertTrue
 class ThemeAndColorsTest {
 
     @Test
-    fun testAllFivePresetsProduceValidLightAndDarkColorSchemes() {
+    fun testAllPresetsProduceValidLightAndDarkColorSchemes() {
+        assertEquals(6, OrbitThemePreset.entries.size)
+        assertEquals("Spaceship Red", OrbitThemePreset.SPACESHIP_RED.displayName)
+        assertEquals(SpaceshipRedLightPrimary, getPresetColorScheme(OrbitThemePreset.SPACESHIP_RED, isDark = false).primary)
+        assertEquals(SpaceshipRedDarkPrimary, getPresetColorScheme(OrbitThemePreset.SPACESHIP_RED, isDark = true).primary)
+
         for (preset in OrbitThemePreset.entries) {
             val lightScheme = getPresetColorScheme(preset, isDark = false)
             val darkScheme = getPresetColorScheme(preset, isDark = true)

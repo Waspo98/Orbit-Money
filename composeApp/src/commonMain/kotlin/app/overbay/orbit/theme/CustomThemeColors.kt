@@ -210,6 +210,56 @@ fun monochromeInkCustomColors(isDark: Boolean): CustomThemeColors {
     }
 }
 
+fun spaceshipRedCustomColors(isDark: Boolean): CustomThemeColors {
+    val base = emeraldCustomColors(isDark)
+    return if (isDark) {
+        base.copy(
+            income = Color(0xFF3BAD49),
+            onIncome = Color(0xFF091B0C),
+            incomeContainer = Color(0xFF12361A),
+            onIncomeContainer = Color(0xFFB7F0BE),
+            expense = SpaceshipRedDarkOnSurface,
+            onExpense = SpaceshipRedDarkBackground,
+            danger = Color(0xFFF85151),
+            warning = Color(0xFFF6B60B),
+            transfer = SpaceshipRedDarkOnSurfaceVariant,
+            canopyStart = Color(0xFF2B080C),
+            canopyMid = Color(0xFF5E121A),
+            canopyEnd = Color(0xFFA3202B),
+            canopyGlow = Color(0x3DFF5A66),
+            canopyKicker = SpaceshipRedDarkPrimary,
+            onCanopy = SpaceshipRedDarkOnSurface,
+            cardBorder = SpaceshipRedDarkOutlineVariant,
+            chartPositive = Color(0xFF3BAD49),
+            chartNegative = Color(0xFFF85151),
+            chartNeutral = SpaceshipRedDarkOnSurfaceVariant,
+            heroStatCaution = Color(0xFFFFD6CE)
+        )
+    } else {
+        base.copy(
+            income = Color(0xFF298540),
+            onIncome = Color.White,
+            incomeContainer = Color(0xFFDFF4E4),
+            onIncomeContainer = Color(0xFF134821),
+            expense = SpaceshipRedLightOnSurface,
+            onExpense = Color.White,
+            danger = Color(0xFFC8102E),
+            transfer = SpaceshipRedLightOnSurfaceVariant,
+            canopyStart = Color(0xFFA3202B),
+            canopyMid = Color(0xFFC12A36),
+            canopyEnd = SpaceshipRedLightPrimary,
+            canopyGlow = Color(0x45FF8A93),
+            canopyKicker = SpaceshipRedLightPrimaryContainer,
+            onCanopy = Color.White,
+            cardBorder = Color(0xFFE3E3E3),
+            chartPositive = Color(0xFF298540),
+            chartNegative = Color(0xFFC8102E),
+            chartNeutral = SpaceshipRedLightOnSurfaceVariant,
+            heroStatCaution = Color(0xFFFFD6CE)
+        )
+    }
+}
+
 fun dynamicCustomColors(scheme: ColorScheme, isDark: Boolean): CustomThemeColors {
     val base = emeraldCustomColors(isDark)
     val start = if (isDark) scheme.surfaceContainerHigh else scheme.primary

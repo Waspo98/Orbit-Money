@@ -196,12 +196,65 @@ val MonochromeDarkColorScheme = darkColorScheme(
     surfaceContainerHigh = MonochromeDarkSurfaceContainerHigh
 )
 
+val SpaceshipRedLightColorScheme = lightColorScheme(
+    primary = SpaceshipRedLightPrimary,
+    onPrimary = SpaceshipRedLightOnPrimary,
+    primaryContainer = SpaceshipRedLightPrimaryContainer,
+    onPrimaryContainer = SpaceshipRedLightOnPrimaryContainer,
+    secondary = SpaceshipRedLightSecondary,
+    onSecondary = SpaceshipRedLightOnSecondary,
+    secondaryContainer = SpaceshipRedLightSecondaryContainer,
+    onSecondaryContainer = SpaceshipRedLightOnSecondaryContainer,
+    tertiary = SpaceshipRedLightTertiary,
+    onTertiary = SpaceshipRedLightOnTertiary,
+    tertiaryContainer = SpaceshipRedLightTertiaryContainer,
+    onTertiaryContainer = SpaceshipRedLightOnTertiaryContainer,
+    background = SpaceshipRedLightBackground,
+    onBackground = SpaceshipRedLightOnBackground,
+    surface = SpaceshipRedLightSurface,
+    onSurface = SpaceshipRedLightOnSurface,
+    surfaceVariant = SpaceshipRedLightSurfaceVariant,
+    onSurfaceVariant = SpaceshipRedLightOnSurfaceVariant,
+    outline = SpaceshipRedLightOutline,
+    outlineVariant = SpaceshipRedLightOutlineVariant,
+    surfaceContainer = SpaceshipRedLightSurfaceContainer,
+    surfaceContainerLow = SpaceshipRedLightSurfaceContainerLow,
+    surfaceContainerHigh = SpaceshipRedLightSurfaceContainerHigh
+)
+
+val SpaceshipRedDarkColorScheme = darkColorScheme(
+    primary = SpaceshipRedDarkPrimary,
+    onPrimary = SpaceshipRedDarkOnPrimary,
+    primaryContainer = SpaceshipRedDarkPrimaryContainer,
+    onPrimaryContainer = SpaceshipRedDarkOnPrimaryContainer,
+    secondary = SpaceshipRedDarkSecondary,
+    onSecondary = SpaceshipRedDarkOnSecondary,
+    secondaryContainer = SpaceshipRedDarkSecondaryContainer,
+    onSecondaryContainer = SpaceshipRedDarkOnSecondaryContainer,
+    tertiary = SpaceshipRedDarkTertiary,
+    onTertiary = SpaceshipRedDarkOnTertiary,
+    tertiaryContainer = SpaceshipRedDarkTertiaryContainer,
+    onTertiaryContainer = SpaceshipRedDarkOnTertiaryContainer,
+    background = SpaceshipRedDarkBackground,
+    onBackground = SpaceshipRedDarkOnBackground,
+    surface = SpaceshipRedDarkSurface,
+    onSurface = SpaceshipRedDarkOnSurface,
+    surfaceVariant = SpaceshipRedDarkSurfaceVariant,
+    onSurfaceVariant = SpaceshipRedDarkOnSurfaceVariant,
+    outline = SpaceshipRedDarkOutline,
+    outlineVariant = SpaceshipRedDarkOutlineVariant,
+    surfaceContainer = SpaceshipRedDarkSurfaceContainer,
+    surfaceContainerLow = SpaceshipRedDarkSurfaceContainerLow,
+    surfaceContainerHigh = SpaceshipRedDarkSurfaceContainerHigh
+)
+
 fun getPresetColorScheme(preset: OrbitThemePreset, isDark: Boolean): ColorScheme = when (preset) {
     OrbitThemePreset.ORBIT_EMERALD -> if (isDark) EmeraldDarkColorScheme else EmeraldLightColorScheme
     OrbitThemePreset.OCEAN_SLATE -> if (isDark) OceanDarkColorScheme else OceanLightColorScheme
     OrbitThemePreset.WARM_TERRACOTTA -> if (isDark) TerracottaDarkColorScheme else TerracottaLightColorScheme
     OrbitThemePreset.ROYAL_INDIGO -> if (isDark) IndigoDarkColorScheme else IndigoLightColorScheme
     OrbitThemePreset.MONOCHROME_INK -> if (isDark) MonochromeDarkColorScheme else MonochromeLightColorScheme
+    OrbitThemePreset.SPACESHIP_RED -> if (isDark) SpaceshipRedDarkColorScheme else SpaceshipRedLightColorScheme
 }
 
 fun getPresetCustomColors(preset: OrbitThemePreset, isDark: Boolean): CustomThemeColors = when (preset) {
@@ -210,6 +263,7 @@ fun getPresetCustomColors(preset: OrbitThemePreset, isDark: Boolean): CustomThem
     OrbitThemePreset.WARM_TERRACOTTA -> warmTerracottaCustomColors(isDark)
     OrbitThemePreset.ROYAL_INDIGO -> royalIndigoCustomColors(isDark)
     OrbitThemePreset.MONOCHROME_INK -> monochromeInkCustomColors(isDark)
+    OrbitThemePreset.SPACESHIP_RED -> spaceshipRedCustomColors(isDark)
 }
 
 @Composable
