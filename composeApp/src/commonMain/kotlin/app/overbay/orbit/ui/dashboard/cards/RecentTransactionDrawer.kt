@@ -78,7 +78,7 @@ internal fun RecentTransactionLeanDrawer(
         border = BorderStroke(1.dp, colors.cardBorder),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = 10.dp)
+            .padding(start = 18.dp, end = 18.dp, bottom = 12.dp)
     ) {
         Row(
             modifier = Modifier

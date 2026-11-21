@@ -4,6 +4,7 @@ import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -65,18 +66,22 @@ fun RecentTransactionsCard(
         actionText = "See All",
         onActionClick = onViewAll,
         onCardClick = null,
+        edgeToEdgeContent = true,
         modifier = modifier
     ) {
         if (state.transactions.isEmpty()) {
             Text(
                 text = "No recent transactions recorded yet.",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp)
             )
         } else {
             Column(modifier = Modifier.fillMaxWidth()) {
                 state.transactions.forEachIndexed { index, item ->
                     val isExpanded = state.expandedTransactionId == item.id
+                    val isFirst = index == 0
+                    val isLast = index == state.transactions.lastIndex
                     val catColor = (item.category?.color ?: item.categoryColor)
                         .toComposeColor(MaterialTheme.colorScheme.primary)
                     val categoryLabel = resolveCategoryLabel(item)
@@ -85,7 +90,9 @@ fun RecentTransactionsCard(
                         item = item,
                         categoryLabel = categoryLabel,
                         categoryColor = catColor,
-                        showTopDivider = index > 0,
+                        isFirst = isFirst,
+                        isLast = isLast,
+                        isExpanded = isExpanded,
                         onReportLogoStatus = onReportLogoStatus,
                         onClick = { onToggleExpand(item.id) }
                     )
@@ -135,7 +142,9 @@ private fun RecentTransactionRow(
     item: DashboardRecentTransactionItem,
     categoryLabel: String,
     categoryColor: Color,
-    showTopDivider: Boolean,
+    isFirst: Boolean,
+    isLast: Boolean,
+    isExpanded: Boolean,
     onReportLogoStatus: (String, String) -> Unit,
     onClick: () -> Unit
 ) {
@@ -144,14 +153,13 @@ private fun RecentTransactionRow(
     val rowInteractionSource = remember { MutableInteractionSource() }
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        if (showTopDivider) {
+        if (!isFirst) {
             HorizontalDivider(thickness = 1.dp, color = colors.cardBorder)
         }
 
-        Row(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .orbitTactilePress(interactionSource = rowInteractionSource)
                 .clickable(
                     interactionSource = rowInteractionSource,
                     indication = LocalIndication.current
@@ -159,9 +167,22 @@ private fun RecentTransactionRow(
                     haptics.tick()
                     onClick()
                 }
-                .padding(vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
         ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .orbitTactilePress(
+                        pressedScale = 0.985f,
+                        interactionSource = rowInteractionSource
+                    )
+                    .padding(
+                        start = 18.dp,
+                        end = 18.dp,
+                        top = if (isFirst) 12.dp else 10.dp,
+                        bottom = if (isLast && !isExpanded) 14.dp else 10.dp
+                    ),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
             TransactionMerchantMark(
                 transaction = item.transaction,
                 categoryIcon = item.category?.displayEmoji ?: item.categoryIcon,
@@ -254,6 +275,7 @@ private fun RecentTransactionRow(
                 color = amountColor,
                 maxLines = 1
             )
+            }
         }
     }
 }

@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -31,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -52,6 +55,7 @@ fun OrbitSectionCard(
     onCardClick: (() -> Unit)? = null,
     action: (@Composable () -> Unit)? = null,
     showHeaderDivider: Boolean = true,
+    edgeToEdgeContent: Boolean = false,
     shape: Shape = RoundedCornerShape(16.dp),
     containerColor: Color = MaterialTheme.colorScheme.surface,
     border: BorderStroke? = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
@@ -59,6 +63,7 @@ fun OrbitSectionCard(
     content: @Composable ColumnScope.() -> Unit
 ) {
     val haptics = LocalOrbitHaptics.current
+    val layoutDirection = LocalLayoutDirection.current
     val cardInteractionSource = remember { MutableInteractionSource() }
     val interactiveModifier = if (onCardClick != null) {
         modifier
@@ -85,12 +90,29 @@ fun OrbitSectionCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(contentPadding)
+                .then(
+                    if (edgeToEdgeContent) {
+                        Modifier.clip(shape)
+                    } else {
+                        Modifier.padding(contentPadding)
+                    }
+                )
         ) {
             val hasHeader = title != null || action != null || actionText != null || headerBadge != null
             if (hasHeader) {
+                val headerModifier = if (edgeToEdgeContent) {
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            start = contentPadding.calculateStartPadding(layoutDirection),
+                            end = contentPadding.calculateEndPadding(layoutDirection),
+                            top = contentPadding.calculateTopPadding()
+                        )
+                } else {
+                    Modifier.fillMaxWidth()
+                }
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = headerModifier,
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -166,7 +188,11 @@ fun OrbitSectionCard(
                     HorizontalDivider(
                         thickness = 1.dp,
                         color = OrbitTheme.colors.cardBorder,
-                        modifier = Modifier.padding(top = 10.dp, bottom = 12.dp)
+                        modifier = if (edgeToEdgeContent) {
+                            Modifier.padding(top = 10.dp)
+                        } else {
+                            Modifier.padding(top = 10.dp, bottom = 12.dp)
+                        }
                     )
                 } else {
                     Spacer(modifier = Modifier.height(10.dp))
