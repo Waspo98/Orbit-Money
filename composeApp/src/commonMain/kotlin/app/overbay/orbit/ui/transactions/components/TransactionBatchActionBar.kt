@@ -187,6 +187,7 @@ fun TransactionBatchActionBar(
                     }
 
                     OrbitScaleBadgeVisibility(visible = showMha) {
+                        val taxLabels = app.overbay.orbit.util.currentTaxTrackingLabels()
                         FilledTonalButton(
                             onClick = {
                                 haptics.tick()
@@ -196,10 +197,10 @@ fun TransactionBatchActionBar(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Home,
-                                contentDescription = "MHA",
+                                contentDescription = taxLabels.shortBadge,
                                 modifier = Modifier.padding(end = 6.dp)
                             )
-                            Text("MHA")
+                            Text(taxLabels.shortBadge)
                         }
                     }
 

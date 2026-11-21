@@ -96,15 +96,19 @@ fun TransactionQuickActionStrip(
         else -> false
     }
 
+    val taxTrackingMode = app.overbay.orbit.util.LocalTaxTrackingMode.current
+    val taxLabels = app.overbay.orbit.data.model.TaxTrackingLabels.forMode(taxTrackingMode)
+
     fun chipLabelFor(action: TransactionQuickAction): String = when (action) {
         TransactionQuickAction.IGNORE -> if (transaction.effectiveIsIgnored) "Ignored" else "Ignore"
+        TransactionQuickAction.MHA -> taxLabels.shortBadge
         else -> action.label
     }
 
     fun menuLabelFor(action: TransactionQuickAction): String = when (action) {
         TransactionQuickAction.RECURRING -> "Mark as Recurring"
         TransactionQuickAction.TRANSFER -> if (transaction.effectiveIsTransfer) "Unmark Transfer" else "Mark as Transfer"
-        TransactionQuickAction.MHA -> if (transaction.effectiveMhaEligible == true) "Remove MHA" else "Mark as MHA"
+        TransactionQuickAction.MHA -> if (transaction.effectiveMhaEligible == true) "Remove ${taxLabels.shortBadge}" else "Mark ${taxLabels.eligibleLabel}"
         TransactionQuickAction.IGNORE -> if (transaction.effectiveIsIgnored) "Unignore" else "Ignore"
         else -> action.label
     }

@@ -177,15 +177,16 @@ private fun CategoryInspectorDetailView(
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
+                        val taxLabels = app.overbay.orbit.util.currentTaxTrackingLabels()
                         if (showMhaOption && cat.mhaDefaultEligible) {
                             OrbitBadge(
-                                text = "MHA",
+                                text = taxLabels.shortBadge,
                                 containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.6f),
                                 contentColor = MaterialTheme.colorScheme.onTertiaryContainer
                             )
                         } else if (showMhaOption && cat.mhaDefaultIgnored) {
                             OrbitBadge(
-                                text = "MHA Ignored",
+                                text = "${taxLabels.shortBadge} Ignored",
                                 containerColor = MaterialTheme.colorScheme.surfaceVariant,
                                 contentColor = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -300,11 +301,12 @@ private fun CategoryInspectorDetailView(
                     }
                 )
                 if (showMhaOption) {
+                    val taxLabels = app.overbay.orbit.util.currentTaxTrackingLabels()
                     CategoryMetadataRow(
-                        label = "MHA Status",
+                        label = "${taxLabels.shortBadge} Status",
                         value = when {
-                            cat.mhaDefaultEligible -> "MHA Eligible (Parsonage)"
-                            cat.mhaDefaultIgnored -> "MHA Ignored"
+                            cat.mhaDefaultEligible -> if (taxLabels.showHousingCaps) "MHA Eligible (Parsonage)" else "Tax-Deductible Default"
+                            cat.mhaDefaultIgnored -> "${taxLabels.shortBadge} Ignored"
                             else -> "Standard"
                         }
                     )

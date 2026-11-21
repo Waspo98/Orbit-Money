@@ -42,6 +42,7 @@ import app.overbay.orbit.util.LocalDevicePosture
 import app.overbay.orbit.util.LocalFileImportExportHelper
 import app.overbay.orbit.util.LocalOidcAuthLauncher
 import app.overbay.orbit.util.LocalOrbitHaptics
+import app.overbay.orbit.util.LocalTaxTrackingMode
 import app.overbay.orbit.util.OidcCallbackBridge
 import app.overbay.orbit.util.PlatformStorage
 import app.overbay.orbit.util.rememberBiometricAuthHelper
@@ -104,6 +105,8 @@ fun App(
     }
 
     val preferences by repo.preferences.collectAsStateWithLifecycle()
+    val snapshot by repo.snapshot.collectAsStateWithLifecycle()
+    val taxTrackingMode = snapshot.mhaTaxProfile.trackingMode
     val haptics = rememberOrbitHaptics(enabled = preferences.hapticsEnabled)
     val isAuthenticated by repo.isAuthenticated.collectAsStateWithLifecycle()
     var hasEvaluatedInitialLock by remember(repo) { mutableStateOf(false) }
@@ -171,7 +174,8 @@ fun App(
         LocalOrbitHaptics provides haptics,
         LocalBiometricAuthHelper provides biometricHelper,
         LocalFileImportExportHelper provides fileHelper,
-        LocalOidcAuthLauncher provides oidcLauncher
+        LocalOidcAuthLauncher provides oidcLauncher,
+        LocalTaxTrackingMode provides taxTrackingMode
     ) {
         OrbitTheme(
             themePreset = activePreset,

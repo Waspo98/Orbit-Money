@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.MhaTaxProfile
 import app.overbay.orbit.data.model.MhaYearTaxRecord
+import app.overbay.orbit.data.model.TaxTrackingMode
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MhaTaxEngine
@@ -18,6 +19,7 @@ import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.OrbitAccordionVisibility
 import app.overbay.orbit.ui.components.OrbitModalScaffold
 import app.overbay.orbit.ui.components.OrbitModalSheet
+import app.overbay.orbit.ui.components.OrbitSegmentedTabRow
 import app.overbay.orbit.ui.components.OrbitSwitchRow
 import kotlin.math.max
 
@@ -80,6 +82,8 @@ fun MhaConfigContent(
     val globalProfileKey = remember(taxProfile) { taxProfile.copy(yearlyRecords = emptyMap()) }
 
     var currentMhaEnabled by remember(mhaEnabled) { mutableStateOf(mhaEnabled) }
+    var trackingMode by remember(globalProfileKey) { mutableStateOf(taxProfile.trackingMode) }
+    val isMhaMode = trackingMode == TaxTrackingMode.MHA
     var pinCustomYearRate by remember(selectedYear, activeYearRecord?.year, activeYearRecord?.isLocked, activeYearRecord?.useLiveProfile) {
         mutableStateOf(defaultPin)
     }
@@ -121,15 +125,16 @@ fun MhaConfigContent(
         onDismiss = onDismiss,
         confirmText = "Save",
         onConfirm = {
-            val resolvedCap = if (enableDesignatedCap) max(0L, inputDesignatedCapCents) else null
-            val resolvedFmrv = if (enableFmrv) max(0L, inputFmrvCents) else null
+            val resolvedCap = if (isMhaMode && enableDesignatedCap) max(0L, inputDesignatedCapCents) else null
+            val resolvedFmrv = if (isMhaMode && enableFmrv) max(0L, inputFmrvCents) else null
             val parsedYearRate = if (pinCustomYearRate) {
                 (customEffectiveRateText.toDoubleOrNull() ?: initialCustomRate).coerceIn(0.0, 100.0)
             } else null
             val updated = if (isHistorical && pinCustomYearRate) {
-                taxProfile
+                taxProfile.copy(trackingMode = trackingMode)
             } else {
                 taxProfile.copy(
+                    trackingMode = trackingMode,
                     mode = mode,
                     simpleFederalRatePercent = simpleFedRate.toDoubleOrNull() ?: 22.0,
                     simpleStateRatePercent = simpleStateRate.toDoubleOrNull() ?: 4.95,
@@ -144,14 +149,27 @@ fun MhaConfigContent(
             onSave(updated, resolvedCap, resolvedFmrv, parsedYearRate, pinCustomYearRate)
         },
         modifier = modifier,
-        title = "$selectedYear MHA Tax Rules",
-        subtitle = if (isHistorical) "Edit $selectedYear effective rate and Section 107 caps." else "Configure Section 107 limits and tax calculation rates.",
+        title = if (isMhaMode) "$selectedYear MHA Tax Rules" else "$selectedYear Tax Deduction Rules",
+        subtitle = if (isHistorical) {
+            if (isMhaMode) "Edit $selectedYear effective rate and Section 107 caps." else "Edit $selectedYear effective tax rate."
+        } else {
+            if (isMhaMode) "Configure Section 107 limits and tax calculation rates." else "Configure tracking mode and tax calculation rates."
+        },
         bodySpacing = 16.dp
     ) {
 
+        OrbitSegmentedTabRow(
+            items = listOf(TaxTrackingMode.GENERAL, TaxTrackingMode.MHA),
+            selected = trackingMode,
+            onSelect = { trackingMode = it },
+            label = { if (it == TaxTrackingMode.GENERAL) "General Deductions" else "Housing Allowance (MHA)" }
+        )
+
         OrbitSwitchRow(
-            title = "MHA Tracker Active",
-            subtitle = if (currentMhaEnabled) "Housing allowance tracking and tax calculations enabled" else "MHA calculations paused",
+            title = if (isMhaMode) "MHA Tracker Active" else "Tax Deductions Active",
+            subtitle = if (currentMhaEnabled) {
+                if (isMhaMode) "Housing allowance tracking and tax calculations enabled" else "Tax-deductible tracking and savings estimates enabled"
+            } else "Tax tracking paused",
             checked = currentMhaEnabled,
             onCheckedChange = {
                 currentMhaEnabled = it
@@ -169,34 +187,41 @@ fun MhaConfigContent(
             onCustomEffectiveRateChange = { customEffectiveRateText = it }
         )
 
-        OrbitSwitchRow(
-            title = "Housing Allowance Designation Cap",
-            subtitle = if (enableDesignatedCap) "Capped by official church/employer designation" else "No annual designation cap configured",
-            checked = enableDesignatedCap,
-            onCheckedChange = { enableDesignatedCap = it }
-        )
-        OrbitAccordionVisibility(visible = enableDesignatedCap) {
-            CurrencyTextField(
-                cents = inputDesignatedCapCents,
-                onCentsChange = { inputDesignatedCapCents = it },
-                label = "Annual Designated Cap ($)",
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
+        OrbitAccordionVisibility(visible = isMhaMode) {
+            androidx.compose.foundation.layout.Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)
+            ) {
+                OrbitSwitchRow(
+                    title = "Housing Allowance Designation Cap",
+                    subtitle = if (enableDesignatedCap) "Capped by official church/employer designation" else "No annual designation cap configured",
+                    checked = enableDesignatedCap,
+                    onCheckedChange = { enableDesignatedCap = it }
+                )
+                OrbitAccordionVisibility(visible = enableDesignatedCap) {
+                    CurrencyTextField(
+                        cents = inputDesignatedCapCents,
+                        onCentsChange = { inputDesignatedCapCents = it },
+                        label = "Annual Designated Cap ($)",
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
 
-        OrbitSwitchRow(
-            title = "Fair Market Rental Value (FMRV)",
-            subtitle = if (enableFmrv) "Capped by furnished fair market rental value + utilities" else "No annual FMRV cap configured",
-            checked = enableFmrv,
-            onCheckedChange = { enableFmrv = it }
-        )
-        OrbitAccordionVisibility(visible = enableFmrv) {
-            CurrencyTextField(
-                cents = inputFmrvCents,
-                onCentsChange = { inputFmrvCents = it },
-                label = "Annual Fair Market Rental Value ($)",
-                modifier = Modifier.fillMaxWidth()
-            )
+                OrbitSwitchRow(
+                    title = "Fair Market Rental Value (FMRV)",
+                    subtitle = if (enableFmrv) "Capped by furnished fair market rental value + utilities" else "No annual FMRV cap configured",
+                    checked = enableFmrv,
+                    onCheckedChange = { enableFmrv = it }
+                )
+                OrbitAccordionVisibility(visible = enableFmrv) {
+                    CurrencyTextField(
+                        cents = inputFmrvCents,
+                        onCentsChange = { inputFmrvCents = it },
+                        label = "Annual Fair Market Rental Value ($)",
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
         }
 
         if (!isHistorical || !pinCustomYearRate) {

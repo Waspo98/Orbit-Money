@@ -33,6 +33,7 @@ import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.ui.components.OrbitSegmentedTabRow
 import app.overbay.orbit.ui.components.OrbitStackedSegmentBar
 import app.overbay.orbit.ui.components.OrbitStatTile
+import app.overbay.orbit.util.currentTaxTrackingLabels
 import app.overbay.orbit.ui.components.RollingTickerCents
 import app.overbay.orbit.ui.dashboard.MhaSummaryState
 import app.overbay.orbit.ui.dashboard.MortgageSnapshotState
@@ -168,7 +169,7 @@ fun RetirementSnapshotCard(
 }
 
 /**
- * MHA Tracker Summary card showing YTD eligible military housing allowance spending
+ * Tax Deductions / MHA Summary card showing YTD eligible spending
  * and estimated tax savings in side-by-side stat tiles.
  */
 @Composable
@@ -178,12 +179,13 @@ fun MhaSummaryCard(
     modifier: Modifier = Modifier
 ) {
     val colors = OrbitTheme.colors
+    val taxLabels = currentTaxTrackingLabels()
     val noun = if (state.ytdTransactionCount == 1) "transaction" else "transactions"
 
     OrbitSectionCard(
-        title = "MHA Summary",
+        title = taxLabels.widgetTitle,
         subtitle = "${state.ytdTransactionCount} eligible $noun YTD",
-        actionText = "MHA Tracker",
+        actionText = taxLabels.navTitle,
         onActionClick = onClick,
         onCardClick = onClick,
         modifier = modifier

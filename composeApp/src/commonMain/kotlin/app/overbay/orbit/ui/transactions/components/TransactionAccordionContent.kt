@@ -196,8 +196,9 @@ fun TransactionAccordionContent(
                             )
                         }
                         OrbitScaleBadgeVisibility(visible = showMhaPill) {
+                            val taxLabels = app.overbay.orbit.util.currentTaxTrackingLabels()
                             StatusProvenancePill(
-                                text = "MHA Eligible",
+                                text = taxLabels.eligibleLabel,
                                 provenance = mhaProv,
                                 onReset = { onResetField("mha") },
                                 onViewRule = onViewRule

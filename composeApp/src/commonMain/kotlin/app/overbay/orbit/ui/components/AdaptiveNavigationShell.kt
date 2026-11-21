@@ -40,6 +40,7 @@ import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.util.LocalOrbitHaptics
 import app.overbay.orbit.util.PlatformRuntime
+import app.overbay.orbit.util.currentTaxTrackingLabels
 
 /**
  * Adaptive navigation shell:
@@ -141,7 +142,8 @@ private fun DesktopSidebar(
     hiddenRouteNames: List<String>,
     moreRouteOrder: List<String>
 ) {
-    val allSecondary = remember(mhaEnabled) {
+    val taxLabels = currentTaxTrackingLabels()
+    val allSecondary = remember(mhaEnabled, taxLabels.navTitle) {
         buildList {
             add(NavTabItem(OrbitNavKey.CardPerks(), "Credit Card Tracker", OrbitIcons.CardPerks))
             add(NavTabItem(OrbitNavKey.Upcoming, "Upcoming", OrbitIcons.Upcoming))
@@ -150,7 +152,7 @@ private fun DesktopSidebar(
             add(NavTabItem(OrbitNavKey.Rules, "Rules", OrbitIcons.Rules))
             add(NavTabItem(OrbitNavKey.SpendingTrends, "Spending Trends", OrbitIcons.SpendingTrends))
             add(NavTabItem(OrbitNavKey.NetWorth, "Net Worth", OrbitIcons.NetWorth))
-            if (mhaEnabled) add(NavTabItem(OrbitNavKey.MhaTracker, "MHA Tracker", OrbitIcons.MhaTracker))
+            if (mhaEnabled) add(NavTabItem(OrbitNavKey.MhaTracker, taxLabels.navTitle, OrbitIcons.MhaTracker))
             add(NavTabItem(OrbitNavKey.HousingCalculator, "Housing Calculator", OrbitIcons.HousingCalculator))
             add(NavTabItem(OrbitNavKey.RetirementCalculator, "Retirement Calculator", OrbitIcons.RetirementCalculator))
             add(NavTabItem(OrbitNavKey.Household, "Household", OrbitIcons.Household))

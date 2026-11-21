@@ -38,6 +38,7 @@ import app.overbay.orbit.ui.components.OrbitModalSheet
 import app.overbay.orbit.ui.components.OrbitSheetHeader
 import app.overbay.orbit.ui.mha.MhaTransactionItem
 import app.overbay.orbit.util.LocalOrbitHaptics
+import app.overbay.orbit.util.currentTaxTrackingLabels
 import kotlin.math.abs
 
 @Composable
@@ -51,6 +52,7 @@ fun MhaTransactionActionSheet(
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
+    val taxLabels = currentTaxTrackingLabels()
     val colors = OrbitTheme.colors
     val parsedDate = LocalDateUtils.parseIsoDate(item.effectiveDate)
     val displayDate = parsedDate?.let { LocalDateUtils.formatDisplayDate(it) } ?: item.effectiveDate
@@ -92,7 +94,7 @@ fun MhaTransactionActionSheet(
                             color = if (item.isEligible) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                         )
                         OrbitBadge(
-                            text = if (item.isEligible) "Counted in MHA" else "Excluded",
+                            text = if (item.isEligible) "Counted (${taxLabels.shortBadge})" else "Excluded",
                             containerColor = if (item.isEligible) {
                                 MaterialTheme.colorScheme.primaryContainer
                             } else {
@@ -150,7 +152,7 @@ fun MhaTransactionActionSheet(
                 modifier = Modifier.fillMaxWidth().height(48.dp)
             ) {
                 Text(
-                    text = if (item.isEligible) "Exclude From MHA" else "Count as MHA Eligible",
+                    text = if (item.isEligible) "Exclude From ${taxLabels.shortBadge}" else "Mark ${taxLabels.eligibleLabel}",
                     fontWeight = FontWeight.SemiBold
                 )
             }

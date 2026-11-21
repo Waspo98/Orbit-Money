@@ -36,6 +36,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.MhaTaxProfile
 import app.overbay.orbit.data.model.MhaYearTaxRecord
+import app.overbay.orbit.data.model.TaxTrackingLabels
+import app.overbay.orbit.data.model.TaxTrackingMode
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MhaTaxCalculationResult
@@ -73,6 +75,8 @@ fun MhaTaxSavingsCard(
     modifier: Modifier = Modifier
 ) {
     val colors = OrbitTheme.colors
+    val taxLabels = TaxTrackingLabels.forMode(taxProfile.trackingMode)
+    val isGeneralMode = taxProfile.trackingMode == TaxTrackingMode.GENERAL
     val isHousehold = taxProfile.mode.equals("household", ignoreCase = true)
     val totalSavings = taxResult?.totalSavingsCents ?: 0L
     val fedSavings = taxResult?.federalSavingsCents ?: 0L
@@ -99,7 +103,7 @@ fun MhaTaxSavingsCard(
         taxProfile.stateRateOverridePercent == null &&
         MhaTaxEngine.isGraduatedState(taxProfile.state)
 
-    val activeCap: Pair<String, Cents>? = when {
+    val activeCap: Pair<String, Cents>? = if (isGeneralMode) null else when {
         designatedCapCents != null && fairMarketRentalValueCents != null ->
             if (designatedCapCents <= fairMarketRentalValueCents) {
                 "Designation Cap" to designatedCapCents
@@ -180,7 +184,7 @@ fun MhaTaxSavingsCard(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.height(2.dp))
-                    val isCapped = excludableAllowanceCents < eligibleExpensesCents
+                    val isCapped = !isGeneralMode && excludableAllowanceCents < eligibleExpensesCents
                     val noun = if (eligibleTransactionCount == 1) "expense" else "expenses"
                     Text(
                         text = if (isCapped) {
@@ -250,12 +254,14 @@ fun MhaTaxSavingsCard(
                         SavingsLegendDot(stateColor, "State ${MoneyUtils.formatCents(stateSavings, showCents = false)}")
                     }
                 }
-                Spacer(modifier = Modifier.height(8.dp))
-                OrbitActionChip(
-                    label = "Set Section 107 Caps",
-                    onClick = onEditSettings
-                )
-            } else {
+                if (taxLabels.showHousingCaps) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OrbitActionChip(
+                        label = "Set Section 107 Caps",
+                        onClick = onEditSettings
+                    )
+                }
+            } else if (taxLabels.showHousingCaps) {
                 OrbitActionChip(
                     label = "Set Section 107 Caps",
                     onClick = onEditSettings
@@ -274,7 +280,11 @@ fun MhaTaxSavingsCard(
             if (hasStoredSingleRateOnly) {
                 OrbitMiniStatRow(
                     label = "Saved $selectedYear effective rate",
-                    detail = "Applied to ${MoneyUtils.formatCents(excludableAllowanceCents)} excludable housing",
+                    detail = if (isGeneralMode) {
+                        "Applied to ${MoneyUtils.formatCents(excludableAllowanceCents)} deductible expenses"
+                    } else {
+                        "Applied to ${MoneyUtils.formatCents(excludableAllowanceCents)} excludable housing"
+                    },
                     value = "${MhaTaxEngine.formatPercent(effectiveRatePercent)}%",
                     valueColor = MaterialTheme.colorScheme.primary
                 )
@@ -299,7 +309,7 @@ fun MhaTaxSavingsCard(
 
             if (isHousehold && !isUsingStoredYearRate) {
                 OrbitMiniStatRow(
-                    label = "Taxable income (before MHA)",
+                    label = if (isGeneralMode) "Taxable income (before deductions)" else "Taxable income (before MHA)",
                     detail = "Gross ${MoneyUtils.formatCents(grossIncome, showCents = false)} − ${MoneyUtils.formatCents(reduction, showCents = false)} deductions",
                     value = MoneyUtils.formatCents(taxableIncomeBeforeMha),
                     showTopDivider = true

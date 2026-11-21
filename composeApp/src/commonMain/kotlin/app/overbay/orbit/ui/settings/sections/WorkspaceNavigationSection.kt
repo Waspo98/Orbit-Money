@@ -29,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.OrbitPreferences
+import app.overbay.orbit.data.model.TaxTrackingLabels
 import app.overbay.orbit.data.model.TransactionQuickAction
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.OrbitBadge
@@ -38,6 +39,8 @@ import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.ui.components.dragReorderItem
 import app.overbay.orbit.ui.components.rememberDragReorderState
 import app.overbay.orbit.util.LocalOrbitHaptics
+import app.overbay.orbit.util.LocalTaxTrackingMode
+import app.overbay.orbit.util.currentTaxTrackingLabels
 
 private data class MoreRouteItem(
     val routeName: String,
@@ -55,8 +58,9 @@ fun LazyListScope.workspaceNavigationSectionItems(
     onMoveRoute: (fromIndex: Int, toIndex: Int, currentList: List<String>) -> Unit
 ) {
     item(key = "workspace_more_menu") {
-        val orderedRoutes = remember(preferences.moreRouteOrder) {
-            buildOrderedMoreRoutes(preferences.moreRouteOrder)
+        val taxLabels = currentTaxTrackingLabels()
+        val orderedRoutes = remember(preferences.moreRouteOrder, taxLabels) {
+            buildOrderedMoreRoutes(preferences.moreRouteOrder, taxLabels)
         }
         val routeOrderKeys = remember(orderedRoutes) {
             orderedRoutes.map { it.routeName }
@@ -88,6 +92,7 @@ fun LazyListScope.workspaceNavigationSectionItems(
 
     item(key = "workspace_quick_actions") {
         val haptics = LocalOrbitHaptics.current
+        val taxTrackingMode = LocalTaxTrackingMode.current
         val pinnedActions = remember(
             preferences.transactionPinnedActions,
             preferences.transactionActionOrder,
@@ -108,7 +113,7 @@ fun LazyListScope.workspaceNavigationSectionItems(
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     pinnedActions.forEach { action ->
                         OrbitBadge(
-                            text = action.label,
+                            text = action.displayLabel(taxTrackingMode),
                             containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f),
                             contentColor = MaterialTheme.colorScheme.primary
                         )
@@ -188,7 +193,10 @@ private fun MoreMenuDestinationList(
     }
 }
 
-private fun buildOrderedMoreRoutes(moreRouteOrder: List<String>): List<MoreRouteItem> {
+private fun buildOrderedMoreRoutes(
+    moreRouteOrder: List<String>,
+    taxLabels: TaxTrackingLabels
+): List<MoreRouteItem> {
     val defaultItems = listOf(
         MoreRouteItem("card_perks", "Credit Card Tracker"),
         MoreRouteItem("upcoming", "Upcoming"),
@@ -199,8 +207,8 @@ private fun buildOrderedMoreRoutes(moreRouteOrder: List<String>): List<MoreRoute
         MoreRouteItem("net_worth", "Net Worth"),
         MoreRouteItem(
             routeName = "mha",
-            title = "MHA Tracker",
-            subtitle = "Disabling removes all MHA features from the app"
+            title = taxLabels.navTitle,
+            subtitle = taxLabels.settingsSubtitle
         ),
         MoreRouteItem("housing_calculator", "Housing Calculator"),
         MoreRouteItem("retirement_calculator", "Retirement Calculator"),

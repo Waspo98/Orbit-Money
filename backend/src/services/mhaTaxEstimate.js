@@ -14,6 +14,7 @@ const SIMPLE_DEFAULT_STATE_RATE = 4.95;
 
 export function defaultMhaTaxProfile() {
   return {
+    trackingMode: 'mha',
     mode: 'simple',
     simpleFederalRate: SIMPLE_DEFAULT_FEDERAL_RATE,
     simpleStateRate: SIMPLE_DEFAULT_STATE_RATE,
@@ -84,12 +85,14 @@ function normalizeYearlyRecords(rawRecords) {
 export function normalizeMhaTaxProfile(value) {
   const defaults = defaultMhaTaxProfile();
   const source = value && typeof value === 'object' ? value : {};
+  const trackingMode = source.trackingMode === 'general' ? 'general' : 'mha';
   const filingStatus = FILING_STATUSES[source.filingStatus] ? source.filingStatus : defaults.filingStatus;
   const state = STATE_TAX_RATES[source.state] ? source.state : defaults.state;
   const deductionMode = source.deductionMode === 'itemized' ? 'itemized' : 'standard';
   const mode = source.mode === 'household' ? 'household' : 'simple';
 
   return {
+    trackingMode,
     mode,
     simpleFederalRate: clampPercent(source.simpleFederalRate, defaults.simpleFederalRate),
     simpleStateRate: clampPercent(source.simpleStateRate, defaults.simpleStateRate),
@@ -288,8 +291,9 @@ export function estimateMhaTaxSavings({
   const eligibleTotal = roundMoney(Math.max(0, toFiniteNumber(transactionTotal)));
   const targetYear = Number.isInteger(year) ? year : TAX_YEAR;
   const yearRecord = year !== null && year !== undefined ? normalized.yearlyRecords?.[String(year)] || null : null;
-  const cap = yearRecord?.capsConfigured ? yearRecord.designatedCap : normalized.designatedCap;
-  const fmrv = yearRecord?.capsConfigured ? yearRecord.fairMarketRentalValue : normalized.fairMarketRentalValue;
+  const isGeneralMode = normalized.trackingMode === 'general';
+  const cap = isGeneralMode ? null : (yearRecord?.capsConfigured ? yearRecord.designatedCap : normalized.designatedCap);
+  const fmrv = isGeneralMode ? null : (yearRecord?.capsConfigured ? yearRecord.fairMarketRentalValue : normalized.fairMarketRentalValue);
   const excludableTotal = applyParsonageCap(eligibleTotal, cap, fmrv);
 
   if (yearRecord && !yearRecord.useLiveProfile && (targetYear < currentYear || yearRecord.isLocked)) {

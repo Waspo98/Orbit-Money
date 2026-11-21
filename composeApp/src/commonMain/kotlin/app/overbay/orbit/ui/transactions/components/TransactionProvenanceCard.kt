@@ -107,10 +107,11 @@ fun TransactionProvenanceCard(
             originalText = if (transaction.isIgnored) "Yes" else "No"
         )
     ) + if (mhaEnabled) {
+        val taxLabels = app.overbay.orbit.util.currentTaxTrackingLabels()
         listOf(
             FieldProvenanceInfo(
                 fieldKey = "mha",
-                label = "MHA",
+                label = taxLabels.shortBadge,
                 isEdited = transaction.editedMhaEligibleSource != null,
                 source = transaction.editedMhaEligibleSource,
                 originalText = "Default"

@@ -299,9 +299,14 @@ fun AccountEditorContent(
             }
 
             OrbitAccordionVisibility(visible = showMhaOption && !selectedKind.isProperty) {
+                val taxLabels = app.overbay.orbit.util.currentTaxTrackingLabels()
                 OrbitSwitchRow(
-                    title = "MHA Expense Eligible",
-                    subtitle = "Treat transactions from this account as household-eligible by default",
+                    title = "${taxLabels.eligibleLabel} by Default",
+                    subtitle = if (taxLabels.showHousingCaps) {
+                        "Treat transactions from this account as housing-allowance eligible by default"
+                    } else {
+                        "Treat transactions from this account as tax-deductible by default"
+                    },
                     checked = mhaEligible,
                     onCheckedChange = { mhaEligible = it }
                 )

@@ -87,8 +87,9 @@ fun TransactionOptionsBlock(
             )
 
             OrbitScaleBadgeVisibility(visible = showMhaOption) {
+                val taxLabels = app.overbay.orbit.util.currentTaxTrackingLabels()
                 TransactionFlagPill(
-                    label = "MHA Eligible",
+                    label = taxLabels.eligibleLabel,
                     icon = OrbitIcons.MhaTracker,
                     checked = mhaEligible == true,
                     onCheckedChange = onMhaEligibleChange

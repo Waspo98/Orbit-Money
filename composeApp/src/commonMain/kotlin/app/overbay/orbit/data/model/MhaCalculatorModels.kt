@@ -17,6 +17,62 @@ enum class FilingStatus(val storageKey: String, val displayName: String) {
 }
 
 @Serializable
+enum class TaxTrackingMode(val storageKey: String, val displayName: String) {
+    GENERAL("general", "General Deductible Expenses"),
+    MHA("mha", "Ministerial Housing Allowance (MHA)");
+
+    companion object {
+        fun fromStorage(key: String?): TaxTrackingMode =
+            entries.firstOrNull { it.storageKey.equals(key, ignoreCase = true) } ?: MHA
+    }
+}
+
+data class TaxTrackingLabels(
+    val navTitle: String,
+    val navSubtitle: String,
+    val heroKicker: String,
+    val heroTitle: String,
+    val collapsedTitle: String,
+    val heroSubtitle: String,
+    val shortBadge: String,
+    val widgetTitle: String,
+    val eligibleLabel: String,
+    val settingsSubtitle: String,
+    val showHousingCaps: Boolean
+) {
+    companion object {
+        fun forMode(mode: TaxTrackingMode): TaxTrackingLabels = when (mode) {
+            TaxTrackingMode.GENERAL -> TaxTrackingLabels(
+                navTitle = "Tax Deductions",
+                navSubtitle = "Track tax-deductible expenses & estimated savings",
+                heroKicker = "TAX-DEDUCTIBLE EXPENSES",
+                heroTitle = "Tax Deductions",
+                collapsedTitle = "Tax Ded.",
+                heroSubtitle = "Track counted deductible expenses and projected tax savings",
+                shortBadge = "Tax Ded.",
+                widgetTitle = "Tax Deductions Summary",
+                eligibleLabel = "Tax-Deductible",
+                settingsSubtitle = "Disabling removes Tax Deductions from the app",
+                showHousingCaps = false
+            )
+            TaxTrackingMode.MHA -> TaxTrackingLabels(
+                navTitle = "Housing Allowance (MHA)",
+                navSubtitle = "Ministerial housing allowance & tax tracking",
+                heroKicker = "MINISTERIAL HOUSING ALLOWANCE",
+                heroTitle = "Housing Allowance (MHA)",
+                collapsedTitle = "MHA",
+                heroSubtitle = "Track counted housing expenses and projected tax savings",
+                shortBadge = "MHA",
+                widgetTitle = "Housing Allowance Summary",
+                eligibleLabel = "MHA Eligible",
+                settingsSubtitle = "Disabling removes all MHA features from the app",
+                showHousingCaps = true
+            )
+        }
+    }
+}
+
+@Serializable
 enum class MhaTaxMode {
     SIMPLE,
     HOUSEHOLD
@@ -45,6 +101,7 @@ data class MhaYearTaxRecord(
 
 @Serializable
 data class MhaTaxProfile(
+    val trackingMode: TaxTrackingMode = TaxTrackingMode.MHA,
     val mode: String = "simple", // simple | household
     val simpleFederalRatePercent: Double = 22.0,
     val simpleStateRatePercent: Double = 4.95,

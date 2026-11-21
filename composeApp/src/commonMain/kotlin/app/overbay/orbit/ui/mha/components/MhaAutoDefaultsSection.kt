@@ -34,7 +34,9 @@ import app.overbay.orbit.ui.components.OrbitExpandableChevron
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.ui.components.OrbitSwitchGroupCard
 import app.overbay.orbit.ui.components.OrbitSwitchRow
+import app.overbay.orbit.data.model.TaxTrackingMode
 import app.overbay.orbit.util.LocalOrbitHaptics
+import app.overbay.orbit.util.LocalTaxTrackingMode
 
 @Composable
 fun MhaAutoDefaultsSection(
@@ -45,33 +47,45 @@ fun MhaAutoDefaultsSection(
     onToggleCategoryIgnoreDefault: (Long, Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val isGeneral = LocalTaxTrackingMode.current == TaxTrackingMode.GENERAL
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         AutoIncludeAccountsCard(
             accounts = accounts,
+            isGeneral = isGeneral,
             onToggle = onToggleAccountDefault
         )
 
         CategoryDefaultsCard(
             title = "Auto-Include Categories",
-            subtitle = "Categories that qualify under Section 107",
-            sectionLabel = "Housing & Utility Categories",
+            subtitle = if (isGeneral) "Categories that count as tax-deductible by default" else "Categories that qualify under Section 107",
+            sectionLabel = if (isGeneral) "Deductible Categories" else "Housing & Utility Categories",
             emptyTitle = "No Categories Selected",
-            emptyDesc = "Mark categories like Mortgage, Rent, Utilities, or Maintenance to auto-include transactions.",
+            emptyDesc = if (isGeneral) {
+                "Mark categories like Charity, Medical/HSA, or Business Expenses to auto-include transactions."
+            } else {
+                "Mark categories like Mortgage, Rent, Utilities, or Maintenance to auto-include transactions."
+            },
             isIgnoredMode = false,
+            isGeneral = isGeneral,
             categories = categories,
             onToggle = onToggleCategoryDefault
         )
 
         CategoryDefaultsCard(
             title = "Auto-Ignore Categories",
-            subtitle = "Explicitly exclude non-housing expenditures even on designated accounts",
-            sectionLabel = "Exempt / Non-Housing Categories",
+            subtitle = if (isGeneral) "Explicitly exclude non-deductible expenses even on designated accounts" else "Explicitly exclude non-housing expenditures even on designated accounts",
+            sectionLabel = if (isGeneral) "Excluded Categories" else "Exempt / Non-Housing Categories",
             emptyTitle = "No Ignored Categories",
-            emptyDesc = "Categories tagged here will never count as MHA expenses.",
+            emptyDesc = if (isGeneral) {
+                "Categories tagged here will never count as tax-deductible expenses."
+            } else {
+                "Categories tagged here will never count as MHA expenses."
+            },
             isIgnoredMode = true,
+            isGeneral = isGeneral,
             categories = categories,
             onToggle = onToggleCategoryIgnoreDefault
         )
@@ -81,6 +95,7 @@ fun MhaAutoDefaultsSection(
 @Composable
 private fun AutoIncludeAccountsCard(
     accounts: List<Account>,
+    isGeneral: Boolean,
     onToggle: (Long, Boolean) -> Unit
 ) {
     val haptics = LocalOrbitHaptics.current
@@ -92,7 +107,11 @@ private fun AutoIncludeAccountsCard(
 
     OrbitSectionCard(
         title = "Auto-Include Accounts",
-        subtitle = "Expenses from these accounts default to MHA eligible (${eligibleAccounts.size} active)",
+        subtitle = if (isGeneral) {
+            "Expenses from these accounts default to tax-deductible (${eligibleAccounts.size} active)"
+        } else {
+            "Expenses from these accounts default to MHA eligible (${eligibleAccounts.size} active)"
+        },
         action = {
             IconButton(onClick = {
                 haptics.tick()
@@ -113,7 +132,7 @@ private fun AutoIncludeAccountsCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Designated Housing Accounts",
+                        text = if (isGeneral) "Designated Deductible Accounts" else "Designated Housing Accounts",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -169,6 +188,7 @@ private fun CategoryDefaultsCard(
     emptyTitle: String,
     emptyDesc: String,
     isIgnoredMode: Boolean,
+    isGeneral: Boolean,
     categories: List<Category>,
     onToggle: (Long, Boolean) -> Unit
 ) {
@@ -232,9 +252,13 @@ private fun CategoryDefaultsCard(
                         display.forEachIndexed { index, cat ->
                             val isChecked = if (isIgnoredMode) cat.mhaDefaultIgnored else cat.mhaDefaultEligible
                             val subText = if (isIgnoredMode) {
-                                if (isChecked) "Blocked from MHA eligibility" else "Normal eligibility evaluation"
+                                if (isChecked) {
+                                    if (isGeneral) "Blocked from tax deductions" else "Blocked from MHA eligibility"
+                                } else "Normal eligibility evaluation"
                             } else {
-                                if (isChecked) "Auto-included in MHA" else "Standard category"
+                                if (isChecked) {
+                                    if (isGeneral) "Auto-included in Tax Deductions" else "Auto-included in MHA"
+                                } else "Standard category"
                             }
 
                             OrbitSwitchRow(

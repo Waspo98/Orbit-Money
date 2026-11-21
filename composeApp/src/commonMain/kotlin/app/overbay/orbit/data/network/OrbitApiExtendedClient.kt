@@ -317,6 +317,7 @@ suspend fun OrbitApiClient.putMhaSettings(enabled: Boolean): Result<Boolean> = r
 
 suspend fun OrbitApiClient.putMhaTaxProfile(profile: MhaTaxProfile): Result<MhaTaxProfile> = runCatching {
     val req = MhaTaxProfileDto(
+        trackingMode = profile.trackingMode.storageKey,
         mode = profile.mode,
         simpleFederalRate = profile.simpleFederalRatePercent,
         simpleStateRate = profile.simpleStateRatePercent,

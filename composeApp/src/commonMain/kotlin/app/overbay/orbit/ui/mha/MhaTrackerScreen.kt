@@ -50,6 +50,7 @@ import app.overbay.orbit.ui.mha.components.mhaCountedTransactionsItems
 import app.overbay.orbit.ui.mha.dialogs.MhaConfigContent
 import app.overbay.orbit.ui.mha.dialogs.MhaConfigSheet
 import app.overbay.orbit.ui.mha.dialogs.MhaTransactionActionSheet
+import app.overbay.orbit.data.model.TaxTrackingLabels
 import app.overbay.orbit.util.DevicePosture
 import app.overbay.orbit.util.LocalDevicePosture
 
@@ -122,11 +123,12 @@ fun MhaTrackerScreen(
                     .padding(innerPadding)
                     .nestedScroll(heroScrollState.nestedScrollConnection)
             ) {
+                val taxLabels = TaxTrackingLabels.forMode(state.taxProfile.trackingMode)
                 MorphingPageHero(
-                    kicker = "MINISTERIAL HOUSING ALLOWANCE",
-                    title = "MHA Tracker",
-                    collapsedTitle = "MHA",
-                    subtitle = "Track counted housing expenses and projected tax savings",
+                    kicker = taxLabels.heroKicker,
+                    title = taxLabels.heroTitle,
+                    collapsedTitle = taxLabels.collapsedTitle,
+                    subtitle = taxLabels.heroSubtitle,
                     scrollState = heroScrollState,
                     canopyBar = { _, isCompact, barHeight ->
                         MhaCanopyBar(

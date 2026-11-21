@@ -161,3 +161,27 @@ test('historical year record with useLiveProfile=true uses live rates while pres
   assert.equal(est2025.savings, 5390);
   assert.equal(est2025.stateRateSource, 'manual');
 });
+
+test('trackingMode defaults to mha for legacy profiles and uncapped general mode ignores clergy caps', () => {
+  const legacy = normalizeMhaTaxProfile({ mode: 'simple' });
+  assert.equal(legacy.trackingMode, 'mha');
+
+  const general = normalizeMhaTaxProfile({
+    trackingMode: 'general',
+    mode: 'simple',
+    simpleFederalRate: 22,
+    simpleStateRate: 5,
+    designatedCap: 10000,
+    fairMarketRentalValue: 12000
+  });
+  assert.equal(general.trackingMode, 'general');
+
+  const est = estimateMhaTaxSavings({
+    transactionTotal: 25000,
+    profile: general,
+    year: 2026,
+    currentYear: 2026
+  });
+  assert.equal(est.excludableAllowance, 25000);
+  assert.equal(est.savings, 6750);
+});

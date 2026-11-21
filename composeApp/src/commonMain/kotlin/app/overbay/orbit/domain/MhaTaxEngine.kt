@@ -4,6 +4,7 @@ import app.overbay.orbit.data.model.FilingStatus
 import app.overbay.orbit.data.model.HouseholdMember
 import app.overbay.orbit.data.model.MhaTaxProfile
 import app.overbay.orbit.data.model.MhaYearTaxRecord
+import app.overbay.orbit.data.model.TaxTrackingMode
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
@@ -206,7 +207,10 @@ object MhaTaxEngine {
         designatedCapCents: Cents? = null,
         fairMarketRentalValueCents: Cents? = null
     ): MhaTaxCalculationResult {
-        val excludableCents = calculateParsonageCap(actualEligibleCents, designatedCapCents, fairMarketRentalValueCents)
+        val isGeneral = profile.trackingMode == TaxTrackingMode.GENERAL
+        val effectiveCap = if (isGeneral) null else designatedCapCents
+        val effectiveFmrv = if (isGeneral) null else fairMarketRentalValueCents
+        val excludableCents = calculateParsonageCap(actualEligibleCents, effectiveCap, effectiveFmrv)
 
         if (profile.mode.equals("simple", ignoreCase = true)) {
             val fedRate = profile.simpleFederalRatePercent / 100.0
@@ -323,8 +327,9 @@ object MhaTaxEngine {
         fairMarketRentalValueCents: Cents? = profile.fairMarketRentalValueCents
     ): MhaTaxCalculationResult {
         val yearRecord = profile.yearlyRecords[year.toString()]
-        val resolvedCap = if (yearRecord?.capsConfigured == true) yearRecord.designatedCapCents else designatedCapCents
-        val resolvedFmrv = if (yearRecord?.capsConfigured == true) yearRecord.fairMarketRentalValueCents else fairMarketRentalValueCents
+        val isGeneral = profile.trackingMode == TaxTrackingMode.GENERAL
+        val resolvedCap = if (isGeneral) null else if (yearRecord?.capsConfigured == true) yearRecord.designatedCapCents else designatedCapCents
+        val resolvedFmrv = if (isGeneral) null else if (yearRecord?.capsConfigured == true) yearRecord.fairMarketRentalValueCents else fairMarketRentalValueCents
 
         val useStoredRate = yearRecord != null && !yearRecord.useLiveProfile && (year < currentYear || yearRecord.isLocked)
         if (!useStoredRate) {

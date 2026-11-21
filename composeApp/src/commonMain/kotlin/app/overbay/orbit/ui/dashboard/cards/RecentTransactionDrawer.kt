@@ -160,8 +160,9 @@ internal fun RecentTransactionLeanDrawer(
                         }
                     )
                     if (mhaEnabled) {
+                        val taxLabels = app.overbay.orbit.util.currentTaxTrackingLabels()
                         DrawerOverflowItem(
-                            label = if (item.isMhaEligible) "Remove MHA" else "Mark as MHA",
+                            label = if (item.isMhaEligible) "Remove ${taxLabels.shortBadge}" else "Mark ${taxLabels.eligibleLabel}",
                             icon = if (item.isMhaEligible) Icons.Default.Check else OrbitIcons.MhaTracker,
                             isActive = item.isMhaEligible,
                             onClick = {

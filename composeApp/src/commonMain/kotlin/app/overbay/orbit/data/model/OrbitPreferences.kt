@@ -30,6 +30,9 @@ enum class TransactionQuickAction(val id: String, val label: String) {
     MHA("mha", "MHA"),
     DELETE("delete", "Delete");
 
+    fun displayLabel(taxTrackingMode: TaxTrackingMode): String =
+        if (this == MHA) TaxTrackingLabels.forMode(taxTrackingMode).shortBadge else label
+
     companion object {
         fun fromId(id: String): TransactionQuickAction? =
             entries.firstOrNull { it.id.equals(id, ignoreCase = true) }

@@ -205,16 +205,17 @@ private fun CategoryRowItem(
         },
         trailingContent = {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                val taxLabels = app.overbay.orbit.util.currentTaxTrackingLabels()
                 if (showMhaBadge && cat.mhaDefaultEligible) {
                     OrbitBadge(
-                        text = "MHA",
+                        text = taxLabels.shortBadge,
                         containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.6f),
                         contentColor = MaterialTheme.colorScheme.onTertiaryContainer
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                 } else if (showMhaBadge && cat.mhaDefaultIgnored) {
                     OrbitBadge(
-                        text = "MHA Ignored",
+                        text = "${taxLabels.shortBadge} Ignored",
                         containerColor = MaterialTheme.colorScheme.surfaceVariant,
                         contentColor = MaterialTheme.colorScheme.onSurfaceVariant
                     )

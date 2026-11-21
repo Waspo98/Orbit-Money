@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.sp
 import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.util.LocalOrbitHaptics
+import app.overbay.orbit.util.currentTaxTrackingLabels
 
 private data class DestinationItem(
     val key: OrbitNavKey,
@@ -55,6 +56,7 @@ fun MoreDestinationsSheet(
     moreRouteOrder: List<String> = emptyList()
 ) {
     val haptics = LocalOrbitHaptics.current
+    val taxLabels = currentTaxTrackingLabels()
 
     val allSecondary = buildList {
         add(DestinationItem(OrbitNavKey.CardPerks(), "Credit Card Tracker", "Statement credits, multipliers, bonuses & 5/24", OrbitIcons.CardPerks))
@@ -65,7 +67,7 @@ fun MoreDestinationsSheet(
         add(DestinationItem(OrbitNavKey.SpendingTrends, "Spending Trends", "Monthly income vs. spending breakdown", OrbitIcons.SpendingTrends))
         add(DestinationItem(OrbitNavKey.NetWorth, "Net Worth", "Assets, debts, and net worth over time", OrbitIcons.NetWorth))
         if (mhaEnabled) {
-            add(DestinationItem(OrbitNavKey.MhaTracker, "MHA Tracker", "Ministerial housing allowance & tax tracking", OrbitIcons.MhaTracker))
+            add(DestinationItem(OrbitNavKey.MhaTracker, taxLabels.navTitle, taxLabels.navSubtitle, OrbitIcons.MhaTracker))
         }
         add(DestinationItem(OrbitNavKey.HousingCalculator, "Housing Calculator", "Mortgage, rent vs. buy & affordability", OrbitIcons.HousingCalculator))
         add(DestinationItem(OrbitNavKey.RetirementCalculator, "Retirement Calculator", "Coast FIRE, nest egg & drawdowns", OrbitIcons.RetirementCalculator))

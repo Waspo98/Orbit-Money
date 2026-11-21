@@ -384,9 +384,10 @@ private fun CategoryEditorFormFields(
         }
 
         if (showMhaOption) {
+            val taxLabels = app.overbay.orbit.util.currentTaxTrackingLabels()
             Spacer(modifier = Modifier.height(16.dp))
             OrbitSwitchGroupCard {
-                OrbitSwitchRow("Default MHA Eligible", checked = mhaEligible, onCheckedChange = onMhaChange, showContainer = false)
+                OrbitSwitchRow("Default ${taxLabels.eligibleLabel}", checked = mhaEligible, onCheckedChange = onMhaChange, showContainer = false)
             }
         }
     }

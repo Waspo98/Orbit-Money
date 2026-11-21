@@ -289,6 +289,7 @@ data class MhaYearTaxRecordDto(
 
 @Serializable
 data class MhaTaxProfileDto(
+    val trackingMode: String? = null,
     val mode: String = "simple",
     val simpleFederalRate: Double = 22.0,
     val simpleStateRate: Double = 4.95,
@@ -303,6 +304,7 @@ data class MhaTaxProfileDto(
     val yearlyRecords: Map<String, MhaYearTaxRecordDto> = emptyMap()
 ) {
     fun toDomain(): MhaTaxProfile = MhaTaxProfile(
+        trackingMode = app.overbay.orbit.data.model.TaxTrackingMode.fromStorage(trackingMode),
         mode = mode,
         simpleFederalRatePercent = simpleFederalRate,
         simpleStateRatePercent = simpleStateRate,
