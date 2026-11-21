@@ -49,6 +49,7 @@ class DashboardViewModel(
     private val _reviewState = MutableStateFlow(CategorizeReviewState())
     private val _recentTxnOverlay = MutableStateFlow(RecentTransactionOverlayState())
     private val reviewPrefsMutex = Mutex()
+    private val widgetPrefsMutex = Mutex()
 
     init {
         viewModelScope.launch(computeDispatcher) {
@@ -153,73 +154,73 @@ class DashboardViewModel(
         _isCustomizing.value = false
     }
 
-    private fun normalizedWidgets(): MutableList<DashboardWidgetConfig> {
-        val raw = repository.preferences.value.dashboardWidgets.ifEmpty {
-            OrbitPreferences.defaultDashboardWidgets()
-        }
-        return DashboardCardType.entries.map { type ->
-            val existing = raw.find {
-                it.widgetId.equals(type.widgetId, ignoreCase = true) ||
-                    DashboardCardType.fromWidgetId(it.widgetId) == type
-            }
-            DashboardWidgetConfig(
-                widgetId = type.widgetId,
-                title = existing?.title ?: type.defaultTitle,
-                isVisible = existing?.isVisible ?: true,
-                sortOrder = existing?.sortOrder ?: type.defaultSortOrder,
-                wideSpan = (existing?.wideSpan ?: type.defaultWideSpan).let { if (it == 2) 2 else 1 }
-            )
-        }.sortedBy { it.sortOrder }
-            .mapIndexed { idx, item -> item.copy(sortOrder = idx) }
-            .toMutableList()
-    }
+    private fun normalizedWidgets(): MutableList<DashboardWidgetConfig> =
+        normalizeDashboardWidgets(repository.preferences.value.dashboardWidgets)
 
     fun toggleCardVisibility(type: DashboardCardType, isVisible: Boolean? = null) {
         viewModelScope.launch(computeDispatcher) {
-            val widgets = normalizedWidgets()
-            val index = widgets.indexOfFirst { DashboardCardType.fromWidgetId(it.widgetId) == type }
-            if (index >= 0) {
-                val current = widgets[index]
-                val newVisibility = isVisible ?: !current.isVisible
-                widgets[index] = current.copy(isVisible = newVisibility)
-            }
-            val updated = repository.preferences.value.copy(dashboardWidgets = widgets)
-            repository.updatePreferences(updated)
-        }
-    }
-
-    fun setCardWideSpan(type: DashboardCardType, wideSpan: Int) {
-        viewModelScope.launch(computeDispatcher) {
-            val normalizedSpan = if (wideSpan == 2) 2 else 1
-            val widgets = normalizedWidgets()
-            val index = widgets.indexOfFirst { DashboardCardType.fromWidgetId(it.widgetId) == type }
-            if (index >= 0) {
-                widgets[index] = widgets[index].copy(wideSpan = normalizedSpan)
+            widgetPrefsMutex.withLock {
+                val widgets = normalizedWidgets()
+                val index = widgets.indexOfFirst { DashboardCardType.fromWidgetId(it.widgetId) == type }
+                if (index >= 0) {
+                    val current = widgets[index]
+                    val newVisibility = isVisible ?: !current.isVisible
+                    widgets[index] = current.copy(isVisible = newVisibility)
+                }
                 val updated = repository.preferences.value.copy(dashboardWidgets = widgets)
                 repository.updatePreferences(updated)
             }
         }
     }
 
+    fun setCardWideSpan(type: DashboardCardType, wideSpan: Int) {
+        viewModelScope.launch(computeDispatcher) {
+            widgetPrefsMutex.withLock {
+                val normalizedSpan = if (wideSpan == 2) 2 else 1
+                val widgets = normalizedWidgets()
+                val index = widgets.indexOfFirst { DashboardCardType.fromWidgetId(it.widgetId) == type }
+                if (index >= 0) {
+                    widgets[index] = widgets[index].copy(wideSpan = normalizedSpan)
+                    val updated = repository.preferences.value.copy(dashboardWidgets = widgets)
+                    repository.updatePreferences(updated)
+                }
+            }
+        }
+    }
+
     fun moveCard(fromIndex: Int, toIndex: Int) {
         viewModelScope.launch(computeDispatcher) {
-            val current = normalizedWidgets()
-            if (fromIndex in current.indices && toIndex in current.indices && fromIndex != toIndex) {
-                val item = current.removeAt(fromIndex)
-                current.add(toIndex, item)
-                val reordered = current.mapIndexed { idx, config -> config.copy(sortOrder = idx) }
-                val updated = repository.preferences.value.copy(dashboardWidgets = reordered)
-                repository.updatePreferences(updated)
+            widgetPrefsMutex.withLock {
+                val current = normalizedWidgets()
+                val mhaEnabled = repository.preferences.value.mhaTrackerEnabled
+                val reordered = moveVisibleDashboardWidget(current, mhaEnabled, fromIndex, toIndex)
+                if (reordered != current) {
+                    repository.updatePreferences(repository.preferences.value.copy(dashboardWidgets = reordered))
+                }
+            }
+        }
+    }
+
+    fun reorderCards(orderedVisibleTypes: List<DashboardCardType>) {
+        viewModelScope.launch(computeDispatcher) {
+            widgetPrefsMutex.withLock {
+                val current = normalizedWidgets()
+                val reordered = reorderVisibleDashboardWidgets(current, orderedVisibleTypes)
+                if (reordered != current) {
+                    repository.updatePreferences(repository.preferences.value.copy(dashboardWidgets = reordered))
+                }
             }
         }
     }
 
     fun resetCardsToDefault() {
         viewModelScope.launch(computeDispatcher) {
-            val updated = repository.preferences.value.copy(
-                dashboardWidgets = OrbitPreferences.defaultDashboardWidgets()
-            )
-            repository.updatePreferences(updated)
+            widgetPrefsMutex.withLock {
+                val updated = repository.preferences.value.copy(
+                    dashboardWidgets = OrbitPreferences.defaultDashboardWidgets()
+                )
+                repository.updatePreferences(updated)
+            }
         }
     }
 
@@ -485,6 +486,7 @@ class DashboardViewModel(
             is DashboardAction.ToggleCardVisibility -> toggleCardVisibility(action.cardType)
             is DashboardAction.SetCardWideSpan -> setCardWideSpan(action.cardType, action.wideSpan)
             is DashboardAction.MoveCard -> moveCard(action.fromIndex, action.toIndex)
+            is DashboardAction.ReorderCards -> reorderCards(action.orderedTypes)
             DashboardAction.ResetCardsToDefault -> resetCardsToDefault()
             is DashboardAction.MarkBillPaid -> markUpcomingPaid(action.upcomingItemId, action.dueDateIso)
             is DashboardAction.HideBiggestTransaction -> hideBiggestTransaction(action.transactionId)

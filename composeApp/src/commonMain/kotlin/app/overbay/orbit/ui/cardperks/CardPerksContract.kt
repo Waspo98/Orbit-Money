@@ -260,3 +260,28 @@ fun moveVisibleCardPerksWidget(
     }
     return merged.toWidgetConfigs()
 }
+
+/**
+ * Atomically applies a full [orderedVisibleKeys] sequence to the currently visible subset while
+ * preserving the relative slot positions and settings of hidden strategy cards.
+ */
+fun reorderVisibleCardPerksWidgets(
+    savedWidgets: List<DashboardWidgetConfig>,
+    rewardsToolsEnabled: Boolean,
+    orderedVisibleKeys: List<CardPerksCardType>
+): List<DashboardWidgetConfig> {
+    val allResolved = resolveCardPerksItems(savedWidgets, rewardsToolsEnabled = true)
+    val visibleSlots = allResolved.indices.filter { idx ->
+        rewardsToolsEnabled || !allResolved[idx].key.isStrategyTool
+    }
+    if (orderedVisibleKeys.size != visibleSlots.size) return allResolved.toWidgetConfigs()
+    val byKey = visibleSlots.associate { idx -> allResolved[idx].key to allResolved[idx] }
+    val reorderedVisible = orderedVisibleKeys.mapNotNull { byKey[it] }
+    if (reorderedVisible.size != visibleSlots.size) return allResolved.toWidgetConfigs()
+
+    val merged = allResolved.toMutableList()
+    visibleSlots.forEachIndexed { pos, fullIdx ->
+        merged[fullIdx] = reorderedVisible[pos]
+    }
+    return merged.toWidgetConfigs()
+}

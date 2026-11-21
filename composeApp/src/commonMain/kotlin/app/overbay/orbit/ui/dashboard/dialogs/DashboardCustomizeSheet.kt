@@ -15,12 +15,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
+import app.overbay.orbit.ui.components.DragReorderAutoScrollEffect
 import app.overbay.orbit.ui.components.LocalOrbitSheetDismiss
 import app.overbay.orbit.ui.components.OrbitActionChip
 import app.overbay.orbit.ui.components.OrbitDragHandle
@@ -63,6 +66,7 @@ fun DashboardCustomizeSheet(
         onToggleVisibility = { onAction(DashboardAction.ToggleCardVisibility(it)) },
         onSetWideSpan = { type, span -> onAction(DashboardAction.SetCardWideSpan(type, span)) },
         onMoveCard = { from, to -> onAction(DashboardAction.MoveCard(from, to)) },
+        onReorderCards = { ordered -> onAction(DashboardAction.ReorderCards(ordered)) },
         onReset = { onAction(DashboardAction.ResetCardsToDefault) },
         onDismiss = onDismiss,
         modifier = modifier
@@ -75,6 +79,7 @@ fun DashboardCustomizeSheet(
     onToggleVisibility: (DashboardCardType) -> Unit,
     onSetWideSpan: (DashboardCardType, Int) -> Unit = { _, _ -> },
     onMoveCard: (Int, Int) -> Unit = { _, _ -> },
+    onReorderCards: ((List<DashboardCardType>) -> Unit)? = null,
     onReset: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
@@ -88,6 +93,7 @@ fun DashboardCustomizeSheet(
         onToggleVisibility = onToggleVisibility,
         onSetWideSpan = onSetWideSpan,
         onMoveItem = onMoveCard,
+        onCommitOrder = onReorderCards,
         onReset = onReset,
         onDismiss = onDismiss,
         modifier = modifier
@@ -101,6 +107,7 @@ fun <K : Any> OrbitBentoCustomizeSheet(
     onToggleVisibility: (K) -> Unit,
     onSetWideSpan: (K, Int) -> Unit = { _, _ -> },
     onMoveItem: (Int, Int) -> Unit = { _, _ -> },
+    onCommitOrder: ((List<K>) -> Unit)? = null,
     onReset: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
@@ -108,13 +115,60 @@ fun <K : Any> OrbitBentoCustomizeSheet(
 ) {
     val haptics = LocalOrbitHaptics.current
     val showWidthPicker = true
-    val standardPlacements = remember(items) { computeStandardPlacements(items) }
+    var draftItems by remember { mutableStateOf(items) }
+    var pendingCommittedKeys by remember { mutableStateOf<List<K>?>(null) }
+
+    val scrollState = rememberScrollState()
+    var viewportTopRootY by remember { mutableFloatStateOf(0f) }
+    var viewportBottomRootY by remember { mutableFloatStateOf(0f) }
+
     val reorderState = rememberDragReorderState(
-        items = items,
+        items = draftItems,
         keySelector = { it.key },
-        onMove = onMoveItem,
-        itemSpacingDp = 8.dp
+        onMove = { from, to ->
+            val current = draftItems
+            if (from in current.indices && to in current.indices && from != to) {
+                val next = current.toMutableList()
+                val moved = next.removeAt(from)
+                next.add(to, moved)
+                draftItems = next
+                if (onCommitOrder == null) {
+                    onMoveItem(from, to)
+                }
+            }
+        },
+        itemSpacingDp = 8.dp,
+        onDragEnd = if (onCommitOrder != null) { orderedKeys ->
+            pendingCommittedKeys = orderedKeys
+            onCommitOrder(orderedKeys)
+        } else null
     )
+
+    LaunchedEffect(items, reorderState.draggingKey) {
+        if (reorderState.draggingKey != null) return@LaunchedEffect
+        val pending = pendingCommittedKeys
+        val upstreamKeys = items.map { it.key }
+        if (pending != null) {
+            if (upstreamKeys == pending || upstreamKeys.toSet() != pending.toSet()) {
+                pendingCommittedKeys = null
+                draftItems = items
+            } else {
+                val byKey = items.associateBy { it.key }
+                draftItems = draftItems.mapNotNull { byKey[it.key] }
+            }
+        } else {
+            draftItems = items
+        }
+    }
+
+    DragReorderAutoScrollEffect(
+        state = reorderState,
+        scrollState = scrollState,
+        viewportTopRootYProvider = { viewportTopRootY },
+        viewportBottomRootYProvider = { viewportBottomRootY }
+    )
+
+    val standardPlacements = remember(draftItems) { computeStandardPlacements(draftItems) }
 
     OrbitModalSheet(
         onDismissRequest = onDismiss,
@@ -137,7 +191,11 @@ fun <K : Any> OrbitBentoCustomizeSheet(
             trailingActions = {
                 OrbitActionChip(
                     label = "Reset",
-                    onClick = { haptics.tick(); onReset() }
+                    onClick = {
+                        haptics.tick()
+                        pendingCommittedKeys = null
+                        onReset()
+                    }
                 )
             },
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
@@ -149,12 +207,17 @@ fun <K : Any> OrbitBentoCustomizeSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f, fill = false)
-                .verticalScroll(rememberScrollState())
+                .onGloballyPositioned { coords ->
+                    val top = coords.positionInRoot().y
+                    viewportTopRootY = top
+                    viewportBottomRootY = top + coords.size.height
+                }
+                .verticalScroll(scrollState, enabled = reorderState.draggingKey == null)
                 .padding(horizontal = 20.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             headerContent?.invoke()
-            items.forEach { config ->
+            draftItems.forEach { config ->
                 key(config.key) {
                     CustomizeCardRow(
                         config = config,

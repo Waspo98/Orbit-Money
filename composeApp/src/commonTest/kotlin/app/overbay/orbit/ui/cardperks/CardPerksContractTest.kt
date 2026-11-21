@@ -101,4 +101,33 @@ class CardPerksContractTest {
         assertTrue(rows[3].isFullSpan)
         assertEquals(CardPerksCardType.CHASE_524, rows[3].leftCard)
     }
+
+    @Test
+    fun reorderVisibleCardPerksWidgets_preservesHiddenStrategyCardsAtomically() {
+        val initial = listOf(
+            DashboardWidgetConfig("card_wallet_roi", "Card Wallet", true, 0, 2),
+            DashboardWidgetConfig("which_card_where", "Which Card Where", false, 1, 2),
+            DashboardWidgetConfig("perks_this_period", "Perks This Period", true, 2, 2),
+            DashboardWidgetConfig("welcome_bonuses", "Welcome Bonuses", true, 3, 2),
+            DashboardWidgetConfig("chase_524", "Chase 5/24 Status", false, 4, 1),
+            DashboardWidgetConfig("annual_fees_ahead", "Annual Fees Ahead", true, 5, 1),
+            DashboardWidgetConfig("payments_due", "Billing & Payments Due", true, 6, 1)
+        )
+        val newVisibleOrder = listOf(
+            CardPerksCardType.PAYMENTS_DUE,
+            CardPerksCardType.ANNUAL_FEES_AHEAD,
+            CardPerksCardType.CARD_WALLET_ROI,
+            CardPerksCardType.PERKS_THIS_PERIOD
+        )
+        val reordered = reorderVisibleCardPerksWidgets(
+            savedWidgets = initial,
+            rewardsToolsEnabled = false,
+            orderedVisibleKeys = newVisibleOrder
+        )
+        val restored = resolveCardPerksItems(reordered, rewardsToolsEnabled = true)
+        assertEquals(newVisibleOrder, restored.filter { !it.key.isStrategyTool }.map { it.key })
+        assertEquals(1, restored.indexOfFirst { it.key == CardPerksCardType.WHICH_CARD_WHERE })
+        assertEquals(3, restored.indexOfFirst { it.key == CardPerksCardType.WELCOME_BONUSES })
+        assertEquals(4, restored.indexOfFirst { it.key == CardPerksCardType.CHASE_524 })
+    }
 }

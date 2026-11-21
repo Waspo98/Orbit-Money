@@ -204,6 +204,11 @@ internal fun CardPerksCustomizeModal(
                 moveVisibleCardPerksWidget(existing, rewardsToolsEnabled, fromIndex, toIndex)
             }
         },
+        onCommitOrder = { orderedKeys ->
+            actions.onUpdateWidgets { existing ->
+                reorderVisibleCardPerksWidgets(existing, rewardsToolsEnabled, orderedKeys)
+            }
+        },
         onReset = {
             actions.onUpdateWidgets { OrbitPreferences.defaultCardPerksWidgets() }
         },

@@ -782,4 +782,68 @@ class DashboardViewModelTest {
 
         collectJob.cancel()
     }
+
+    @Test
+    fun testMoveCard_whenMhaDisabled_movesExactVisibleCardWithoutOffByOneCorruption() = runTest(testDispatcher) {
+        val collectJob = launch(testDispatcher) {
+            viewModel.uiState.collect {}
+        }
+        testScheduler.advanceUntilIdle()
+
+        // Default has mhaEnabled = false, so customizable visible list omits MHA_SUMMARY (14 cards).
+        val visibleBefore = viewModel.uiState.value.customization.cardConfigs
+            .filter { it.type != DashboardCardType.MHA_SUMMARY }
+            .map { it.type }
+        assertEquals(14, visibleBefore.size)
+        val lastVisible = visibleBefore.last() // RECENT_TRANSACTIONS at visible index 13 (full index 14)
+
+        // Move the last visible card (index 13) up one slot to visible index 12
+        viewModel.onAction(DashboardAction.MoveCard(fromIndex = 13, toIndex = 12))
+        testScheduler.advanceUntilIdle()
+
+        val visibleAfter = viewModel.uiState.value.customization.cardConfigs
+            .filter { it.type != DashboardCardType.MHA_SUMMARY }
+            .map { it.type }
+        assertEquals(lastVisible, visibleAfter[12], "RECENT_TRANSACTIONS should move to visible index 12")
+        assertEquals(
+            DashboardCardType.MORTGAGE_SNAPSHOT,
+            visibleAfter[13],
+            "MORTGAGE_SNAPSHOT should shift to visible index 13"
+        )
+        assertTrue(
+            viewModel.uiState.value.customization.cardConfigs.any { it.type == DashboardCardType.MHA_SUMMARY },
+            "Hidden MHA_SUMMARY config must be preserved"
+        )
+
+        collectJob.cancel()
+    }
+
+    @Test
+    fun testReorderCards_whenMhaDisabled_commitsFullOrderAtomicallyAndPreservesHiddenMhaSlot() = runTest(testDispatcher) {
+        val collectJob = launch(testDispatcher) {
+            viewModel.uiState.collect {}
+        }
+        testScheduler.advanceUntilIdle()
+
+        val initialFull = viewModel.uiState.value.customization.cardConfigs
+        val initialMhaSlot = initialFull.indexOfFirst { it.type == DashboardCardType.MHA_SUMMARY }
+        assertTrue(initialMhaSlot >= 0)
+
+        val visibleBefore = initialFull.filter { it.type != DashboardCardType.MHA_SUMMARY }.map { it.type }
+        val targetOrder = listOf(visibleBefore.last()) + visibleBefore.dropLast(1)
+
+        viewModel.onAction(DashboardAction.ReorderCards(targetOrder))
+        testScheduler.advanceUntilIdle()
+
+        val afterFull = viewModel.uiState.value.customization.cardConfigs
+        val visibleAfter = afterFull.filter { it.type != DashboardCardType.MHA_SUMMARY }.map { it.type }
+        assertEquals(targetOrder, visibleAfter)
+        assertEquals(
+            initialMhaSlot,
+            afterFull.indexOfFirst { it.type == DashboardCardType.MHA_SUMMARY },
+            "Hidden MHA_SUMMARY slot should remain intact"
+        )
+
+        collectJob.cancel()
+    }
 }
