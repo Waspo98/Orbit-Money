@@ -9,19 +9,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -61,11 +58,11 @@ fun EmptyWorkspaceSetupCard(
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.Top,
+                verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text(text = "🚀", fontSize = 28.sp)
-                Column(modifier = Modifier.weight(1f)) {
+                Column {
                     Text(
                         text = "Welcome to Orbit Money",
                         style = MaterialTheme.typography.titleLarge,
@@ -77,26 +74,6 @@ fun EmptyWorkspaceSetupCard(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                }
-                if (onDismiss != null) {
-                    FilledTonalIconButton(
-                        onClick = {
-                            haptics.tick()
-                            onDismiss()
-                        },
-                        shape = CircleShape,
-                        colors = IconButtonDefaults.filledTonalIconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                        ),
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Dismiss welcome card",
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
                 }
             }
 
@@ -215,19 +192,26 @@ fun EmptyWorkspaceSetupCard(
             }
 
             if (onDismiss != null) {
-                Spacer(modifier = Modifier.height(8.dp))
-                TextButton(
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedButton(
                     onClick = {
                         haptics.tick()
                         onDismiss()
                     },
-                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                    shape = MaterialTheme.shapes.medium,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.55f),
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp)
                 ) {
                     Text(
                         text = "Dismiss",
                         style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
             }
