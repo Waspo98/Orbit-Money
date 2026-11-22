@@ -31,6 +31,7 @@ import app.overbay.orbit.ui.onboarding.OnboardingIntent
 import app.overbay.orbit.ui.onboarding.OnboardingUiState
 import app.overbay.orbit.ui.onboarding.components.OnboardingCardContainer
 import app.overbay.orbit.ui.onboarding.components.OnboardingHeroHeader
+import app.overbay.orbit.ui.settings.components.AccentColorModeSelector
 import app.overbay.orbit.ui.settings.components.ThemeSwatchGrid
 import app.overbay.orbit.util.DevicePosture
 import app.overbay.orbit.util.PlatformRuntime
@@ -60,7 +61,8 @@ fun OnboardingAppearanceStep(
                 isDark = isDarkPreview,
                 amoledDark = prefs.amoledDarkMode,
                 useCustomTheme = prefs.useCustomTheme,
-                customAccentHex = prefs.customAccentHex
+                customAccentHex = prefs.customAccentHex,
+                accentColorMode = prefs.accentColorMode
             )
         }
     }
@@ -158,6 +160,7 @@ private fun AppearanceControlsBlock(
             selectedPreset = if (prefs.useCustomTheme) null else prefs.themePreset,
             isDarkPreview = isDarkPreview,
             isOverriddenByDynamicColor = !PlatformRuntime.isWeb && prefs.dynamicColor,
+            accentColorMode = prefs.accentColorMode,
             onPresetSelected = { onIntent(OnboardingIntent.SetThemePreset(it)) }
         )
         if (!PlatformRuntime.isWeb) {
@@ -170,5 +173,29 @@ private fun AppearanceControlsBlock(
                 showContainer = false
             )
         }
+    }
+
+    OnboardingCardContainer(contentPaddingDp = 14) {
+        Text(
+            text = "Accent Colors",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Text(
+            text = "Choose how positive, warning, and negative values are colored",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        AccentColorModeSelector(
+            selectedMode = prefs.accentColorMode,
+            themePreset = prefs.themePreset,
+            isDarkPreview = isDarkPreview,
+            amoledDark = prefs.amoledDarkMode,
+            useCustomTheme = prefs.useCustomTheme,
+            customAccentHex = prefs.customAccentHex,
+            useDynamicColor = !PlatformRuntime.isWeb && prefs.dynamicColor,
+            onModeSelected = { onIntent(OnboardingIntent.SetAccentColorMode(it)) }
+        )
     }
 }

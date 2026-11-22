@@ -20,6 +20,25 @@ enum class OrbitThemeMode(val shortLabel: String) {
 }
 
 @Serializable
+enum class OrbitAccentColorMode(
+    val title: String,
+    val description: String
+) {
+    ALWAYS_GREEN_RED(
+        title = "Always Green & Red",
+        description = "Positive values are green, negatives are red"
+    ),
+    TINTED_GREEN_RED(
+        title = "Tinted Green & Red",
+        description = "Green and red, slightly tinted to match your theme"
+    ),
+    MATCH_THEME(
+        title = "Match Theme",
+        description = "Use your theme's colors everywhere instead of green and red"
+    )
+}
+
+@Serializable
 enum class TransactionQuickAction(val id: String, val label: String) {
     EDIT("edit", "Edit"),
     SPLIT("split", "Split"),
@@ -72,6 +91,7 @@ data class OrbitPreferences(
     val dynamicColor: Boolean = false,
     val useCustomTheme: Boolean = false,
     val customAccentHex: String? = null,
+    val accentColorMode: OrbitAccentColorMode = OrbitAccentColorMode.MATCH_THEME,
     val biometricLockEnabled: Boolean = false,
     val biometricTimeoutSeconds: Int = 300, // 5 minutes
     val hapticsEnabled: Boolean = true,

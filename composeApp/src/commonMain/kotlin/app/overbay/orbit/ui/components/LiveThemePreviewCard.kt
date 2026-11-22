@@ -61,8 +61,12 @@ fun LiveThemePreviewCard(
     val primaryColor by animateColorAsState(scheme.primary, spec, label = "previewPrimary")
     val onSurface by animateColorAsState(scheme.onSurface, spec, label = "previewOnSurface")
     val onSurfaceVariant by animateColorAsState(scheme.onSurfaceVariant, spec, label = "previewOnSurfaceVar")
+    val incomeColor by animateColorAsState(custom.income, spec, label = "previewIncome")
     val incomeContainer by animateColorAsState(custom.incomeContainer, spec, label = "previewIncomeCont")
     val onIncomeContainer by animateColorAsState(custom.onIncomeContainer, spec, label = "previewOnIncomeCont")
+    val dangerColor by animateColorAsState(custom.danger, spec, label = "previewDanger")
+    val dangerContainer by animateColorAsState(custom.dangerContainer, spec, label = "previewDangerCont")
+    val onDangerContainer by animateColorAsState(custom.onDangerContainer, spec, label = "previewOnDangerCont")
 
     Surface(
         shape = RoundedCornerShape(20.dp),
@@ -180,16 +184,43 @@ fun LiveThemePreviewCard(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "Everyday Checking",
+                                text = "Paycheck Deposit",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = onSurfaceVariant
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "\$6,420.00",
+                                text = "+\$2,450.00",
                                 style = TabularNumStyle.copy(fontSize = 13.sp, fontWeight = FontWeight.Bold),
-                                color = onSurface
+                                color = incomeColor
                             )
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Dining Out",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = onSurfaceVariant
+                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                OrbitBadge(
+                                    text = "Over",
+                                    containerColor = dangerContainer,
+                                    contentColor = onDangerContainer
+                                )
+                                Text(
+                                    text = "-\$64.50",
+                                    style = TabularNumStyle.copy(fontSize = 13.sp, fontWeight = FontWeight.Bold),
+                                    color = dangerColor
+                                )
+                            }
                         }
                     }
                 }

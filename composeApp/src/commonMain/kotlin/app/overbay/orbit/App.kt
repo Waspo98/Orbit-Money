@@ -182,7 +182,8 @@ fun App(
             dynamicColor = activeDynamicColor,
             amoledDark = preferences.amoledDarkMode,
             useCustomTheme = preferences.useCustomTheme,
-            customAccentHex = preferences.customAccentHex
+            customAccentHex = preferences.customAccentHex,
+            accentColorMode = preferences.accentColorMode
         ) {
             Surface(
                 modifier = modifier.fillMaxSize(),

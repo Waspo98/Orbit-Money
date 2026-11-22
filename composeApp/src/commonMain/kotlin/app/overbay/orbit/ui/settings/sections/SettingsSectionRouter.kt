@@ -25,6 +25,7 @@ fun LazyListScope.settingsSectionItems(
             onEnableSavedCustomTheme = viewModel::enableSavedCustomTheme,
             onOpenCustomThemePicker = viewModel::openCustomThemePicker,
             onDynamicColorChange = viewModel::setDynamicColor,
+            onAccentColorModeChange = viewModel::setAccentColorMode,
             onHapticsChange = viewModel::setHapticsEnabled
         )
         SettingsSection.NOTIFICATIONS -> notificationsSectionItems(

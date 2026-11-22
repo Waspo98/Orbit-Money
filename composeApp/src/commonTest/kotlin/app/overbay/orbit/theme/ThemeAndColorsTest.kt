@@ -3,7 +3,10 @@ package app.overbay.orbit.theme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
+import app.overbay.orbit.data.model.OrbitAccentColorMode
+import app.overbay.orbit.data.model.OrbitPreferences
 import app.overbay.orbit.data.model.OrbitThemePreset
+import kotlinx.serialization.json.Json
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -255,5 +258,116 @@ class ThemeAndColorsTest {
             val roundTripHex = hslToColor(hsl.hue, hsl.saturation, hsl.lightness).toHexString()
             assertEquals(hex.uppercase(), roundTripHex, "$name round-trip mismatch")
         }
+    }
+
+    @Test
+    fun testAccentColorModesAcrossAllPresetsLightDarkAndAmoled() {
+        val variants = listOf(
+            Triple(false, false, "Light"),
+            Triple(true, false, "Dark"),
+            Triple(true, true, "AMOLED")
+        )
+
+        for (preset in OrbitThemePreset.entries) {
+            for ((isDark, amoled, variantLabel) in variants) {
+                val minBrandContrast = if (!isDark && preset == OrbitThemePreset.ORBIT_EMERALD) 3.7 else 4.5
+                val basePreset = getPresetPalette(preset, isDark)
+
+                for (mode in OrbitAccentColorMode.entries) {
+                    val resolved = resolveOrbitPalette(
+                        themePreset = preset,
+                        isDark = isDark,
+                        amoledDark = amoled,
+                        accentColorMode = mode
+                    )
+                    val label = "${preset.name} $variantLabel ${mode.name}"
+                    assertPaletteContrast(
+                        palette = resolved,
+                        label = label,
+                        minPrimaryContrast = minBrandContrast,
+                        minIncomeContrast = if (mode == OrbitAccentColorMode.ALWAYS_GREEN_RED) 4.5 else minBrandContrast
+                    )
+
+                    when (mode) {
+                        OrbitAccentColorMode.ALWAYS_GREEN_RED -> {
+                            assertEquals(if (isDark) AbsoluteIncomeDark else AbsoluteIncomeLight, resolved.customColors.income, label)
+                            assertEquals(if (isDark) AbsoluteWarningDark else AbsoluteWarningLight, resolved.customColors.warning, label)
+                            assertEquals(if (isDark) AbsoluteDangerDark else AbsoluteDangerLight, resolved.customColors.danger, label)
+                            assertEquals(resolved.customColors.danger, resolved.colorScheme.error, label)
+                            assertEquals(resolved.customColors.income, resolved.customColors.chartPositive, label)
+                            assertEquals(resolved.customColors.danger, resolved.customColors.chartNegative, label)
+                        }
+                        OrbitAccentColorMode.TINTED_GREEN_RED -> {
+                            assertEquals(basePreset.customColors.income, resolved.customColors.income, label)
+                            assertEquals(basePreset.customColors.warning, resolved.customColors.warning, label)
+                            assertEquals(basePreset.customColors.danger, resolved.customColors.danger, label)
+                            assertEquals(basePreset.colorScheme.error, resolved.colorScheme.error, label)
+                        }
+                        OrbitAccentColorMode.MATCH_THEME -> {
+                            assertEquals(resolved.colorScheme.primary, resolved.customColors.income, label)
+                            assertEquals(resolved.colorScheme.primaryContainer, resolved.customColors.incomeContainer, label)
+                            assertEquals(resolved.colorScheme.secondaryContainer, resolved.customColors.warningContainer, label)
+                            assertEquals(resolved.colorScheme.tertiaryContainer, resolved.customColors.dangerContainer, label)
+                            assertEquals(resolved.customColors.danger, resolved.colorScheme.error, label)
+                            assertEquals(resolved.customColors.dangerContainer, resolved.colorScheme.errorContainer, label)
+                            assertEquals(resolved.colorScheme.primary, resolved.customColors.chartPositive, label)
+                            assertEquals(resolved.customColors.danger, resolved.customColors.chartNegative, label)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun testAccentColorModesWithCustomSeedsAndDynamicScheme() {
+        val seeds = listOf("#0D9488", "#E11D48", "#7C3AED", "#3F3F46", "#FFFF00", "#000000")
+        for (hex in seeds) {
+            for (isDark in listOf(false, true)) {
+                for (mode in OrbitAccentColorMode.entries) {
+                    val palette = resolveOrbitPalette(
+                        themePreset = OrbitThemePreset.ORBIT_EMERALD,
+                        isDark = isDark,
+                        useCustomTheme = true,
+                        customAccentHex = hex,
+                        accentColorMode = mode
+                    )
+                    assertPaletteContrast(palette, "Seed $hex dark=$isDark ${mode.name}")
+                    if (mode == OrbitAccentColorMode.MATCH_THEME) {
+                        assertEquals(palette.colorScheme.primary, palette.customColors.income)
+                        assertEquals(palette.customColors.danger, palette.colorScheme.error)
+                    }
+                }
+            }
+        }
+
+        val dynamicLight = getPresetColorScheme(OrbitThemePreset.ROYAL_INDIGO, isDark = false)
+        val dynamicMatch = resolveOrbitPalette(
+            themePreset = OrbitThemePreset.ORBIT_EMERALD,
+            isDark = false,
+            dynamicScheme = dynamicLight,
+            accentColorMode = OrbitAccentColorMode.MATCH_THEME
+        )
+        assertEquals(dynamicLight.primary, dynamicMatch.customColors.income)
+        assertEquals(dynamicLight.tertiaryContainer, dynamicMatch.colorScheme.errorContainer)
+        assertPaletteContrast(dynamicMatch, "Dynamic Light MATCH_THEME")
+
+        val dynamicAbsolute = resolveOrbitPalette(
+            themePreset = OrbitThemePreset.ORBIT_EMERALD,
+            isDark = false,
+            dynamicScheme = dynamicLight,
+            accentColorMode = OrbitAccentColorMode.ALWAYS_GREEN_RED
+        )
+        assertEquals(AbsoluteIncomeLight, dynamicAbsolute.customColors.income)
+        assertEquals(AbsoluteDangerLight, dynamicAbsolute.colorScheme.error)
+        assertPaletteContrast(dynamicAbsolute, "Dynamic Light ALWAYS_GREEN_RED")
+    }
+
+    @Test
+    fun testOrbitPreferencesAccentColorModeDefaultAndSerializationFallback() {
+        assertEquals(OrbitAccentColorMode.MATCH_THEME, OrbitPreferences().accentColorMode)
+        val json = Json { ignoreUnknownKeys = true }
+        val legacyDecoded = json.decodeFromString(OrbitPreferences.serializer(), "{}")
+        assertEquals(OrbitAccentColorMode.MATCH_THEME, legacyDecoded.accentColorMode)
     }
 }

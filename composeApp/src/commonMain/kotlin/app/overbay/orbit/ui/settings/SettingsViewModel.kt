@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import app.overbay.orbit.data.OrbitRepository
 import app.overbay.orbit.data.fetchPushNotificationConfig
 import app.overbay.orbit.data.model.NotificationPreferencesConfig
+import app.overbay.orbit.data.model.OrbitAccentColorMode
 import app.overbay.orbit.data.model.OrbitThemeMode
 import app.overbay.orbit.data.model.OrbitThemePreset
 import app.overbay.orbit.data.model.StorageMode
@@ -193,6 +194,12 @@ class SettingsViewModel(
 
     fun setDynamicColor(enabled: Boolean) {
         val updated = _uiState.value.preferences.copy(dynamicColor = enabled)
+        _uiState.update { it.copy(preferences = updated) }
+        scope.launch { repository.updatePreferences(updated) }
+    }
+
+    fun setAccentColorMode(mode: OrbitAccentColorMode) {
+        val updated = _uiState.value.preferences.copy(accentColorMode = mode)
         _uiState.update { it.copy(preferences = updated) }
         scope.launch { repository.updatePreferences(updated) }
     }

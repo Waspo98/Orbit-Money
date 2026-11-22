@@ -206,6 +206,7 @@ fun SettingsDialogsHost(
                 initialHex = dialog.initialHex,
                 initialDarkPreview = isDarkNow,
                 amoledDark = prefs.amoledDarkMode,
+                accentColorMode = prefs.accentColorMode,
                 onApply = viewModel::applyCustomAccentTheme,
                 onDismiss = viewModel::dismissDialog
             )

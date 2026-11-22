@@ -11,6 +11,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.unit.dp
+import app.overbay.orbit.data.model.OrbitAccentColorMode
 import app.overbay.orbit.data.model.OrbitThemeMode
 import app.overbay.orbit.data.model.OrbitThemePreset
 
@@ -38,6 +39,7 @@ fun getPresetCustomColors(preset: OrbitThemePreset, isDark: Boolean): CustomThem
  * 2. Seed-generated Custom Accent palette (when enabled with a valid hex seed)
  * 3. Curated built-in preset palette
  * 4. Pure-black AMOLED surface & border calibration (when dark + AMOLED active)
+ * 5. Accent color mode semantics ([OrbitAccentColorMode])
  */
 fun resolveOrbitPalette(
     themePreset: OrbitThemePreset,
@@ -45,7 +47,8 @@ fun resolveOrbitPalette(
     amoledDark: Boolean = false,
     useCustomTheme: Boolean = false,
     customAccentHex: String? = null,
-    dynamicScheme: ColorScheme? = null
+    dynamicScheme: ColorScheme? = null,
+    accentColorMode: OrbitAccentColorMode = OrbitAccentColorMode.MATCH_THEME
 ): ResolvedOrbitPalette {
     val base = when {
         dynamicScheme != null -> ResolvedOrbitPalette(
@@ -58,7 +61,8 @@ fun resolveOrbitPalette(
         }
         else -> getPresetPalette(themePreset, isDark)
     }
-    return if (isDark && amoledDark) applyAmoledOverrides(base) else base
+    val surfaced = if (isDark && amoledDark) applyAmoledOverrides(base) else base
+    return applyAccentColorMode(surfaced, accentColorMode, isDark)
 }
 
 @Composable
@@ -72,6 +76,7 @@ fun OrbitTheme(
     amoledDark: Boolean = false,
     useCustomTheme: Boolean = false,
     customAccentHex: String? = null,
+    accentColorMode: OrbitAccentColorMode = OrbitAccentColorMode.MATCH_THEME,
     content: @Composable () -> Unit
 ) {
     val darkTheme = when (themeMode) {
@@ -81,14 +86,23 @@ fun OrbitTheme(
     }
 
     val dynamicScheme = getPlatformColorScheme(darkTheme = darkTheme, dynamicColor = dynamicColor)
-    val palette = remember(themePreset, darkTheme, amoledDark, useCustomTheme, customAccentHex, dynamicScheme) {
+    val palette = remember(
+        themePreset,
+        darkTheme,
+        amoledDark,
+        useCustomTheme,
+        customAccentHex,
+        dynamicScheme,
+        accentColorMode
+    ) {
         resolveOrbitPalette(
             themePreset = themePreset,
             isDark = darkTheme,
             amoledDark = amoledDark,
             useCustomTheme = useCustomTheme,
             customAccentHex = customAccentHex,
-            dynamicScheme = dynamicScheme
+            dynamicScheme = dynamicScheme,
+            accentColorMode = accentColorMode
         )
     }
 
@@ -117,6 +131,7 @@ fun OrbitMoneyTheme(
     amoledDark: Boolean = false,
     useCustomTheme: Boolean = false,
     customAccentHex: String? = null,
+    accentColorMode: OrbitAccentColorMode = OrbitAccentColorMode.MATCH_THEME,
     content: @Composable () -> Unit
 ) = OrbitTheme(
     themePreset = themePreset,
@@ -125,6 +140,7 @@ fun OrbitMoneyTheme(
     amoledDark = amoledDark,
     useCustomTheme = useCustomTheme,
     customAccentHex = customAccentHex,
+    accentColorMode = accentColorMode,
     content = content
 )
 

@@ -2,6 +2,7 @@ package app.overbay.orbit.theme
 
 import androidx.compose.material3.ColorScheme
 import androidx.compose.ui.graphics.Color
+import app.overbay.orbit.data.model.OrbitAccentColorMode
 
 /**
  * Curated quick-pick accent seeds exposed in Settings -> Appearance -> Custom Accent.
@@ -352,4 +353,137 @@ fun dynamicCustomColors(scheme: ColorScheme, isDark: Boolean): CustomThemeColors
         cardBorder = border,
         chartNeutral = scheme.onSurfaceVariant
     )
+}
+
+/**
+ * Applies the user's [OrbitAccentColorMode] onto a resolved palette:
+ * - [OrbitAccentColorMode.TINTED_GREEN_RED]: preserves the palette's curated theme-tinted semantics.
+ * - [OrbitAccentColorMode.ALWAYS_GREEN_RED]: locks positive, warning, negative, and error tokens
+ *   to pure classic traffic-light green/amber/red calibrated for Light vs. Dark contrast.
+ * - [OrbitAccentColorMode.MATCH_THEME]: maps positive -> primary, warning -> secondary, and
+ *   negative/error -> tertiary (with WCAG AA contrast guards against surface).
+ */
+fun applyAccentColorMode(
+    palette: ResolvedOrbitPalette,
+    mode: OrbitAccentColorMode,
+    isDark: Boolean
+): ResolvedOrbitPalette {
+    val scheme = palette.colorScheme
+    val custom = palette.customColors
+
+    return when (mode) {
+        OrbitAccentColorMode.TINTED_GREEN_RED -> palette
+
+        OrbitAccentColorMode.ALWAYS_GREEN_RED -> {
+            val income = if (isDark) AbsoluteIncomeDark else AbsoluteIncomeLight
+            val onIncome = if (isDark) AbsoluteIncomeOnDark else AbsoluteIncomeOnLight
+            val incomeContainer = if (isDark) AbsoluteIncomeContainerDark else AbsoluteIncomeContainerLight
+            val onIncomeContainer = if (isDark) AbsoluteOnIncomeContainerDark else AbsoluteOnIncomeContainerLight
+
+            val danger = if (isDark) AbsoluteDangerDark else AbsoluteDangerLight
+            val onDanger = if (isDark) AbsoluteDangerOnDark else AbsoluteDangerOnLight
+            val dangerContainer = if (isDark) AbsoluteDangerContainerDark else AbsoluteDangerContainerLight
+            val onDangerContainer = if (isDark) AbsoluteOnDangerContainerDark else AbsoluteOnDangerContainerLight
+
+            val warning = if (isDark) AbsoluteWarningDark else AbsoluteWarningLight
+            val onWarning = if (isDark) AbsoluteWarningOnDark else AbsoluteWarningOnLight
+            val warningContainer = if (isDark) AbsoluteWarningContainerDark else AbsoluteWarningContainerLight
+            val onWarningContainer = if (isDark) AbsoluteOnWarningContainerDark else AbsoluteOnWarningContainerLight
+
+            ResolvedOrbitPalette(
+                colorScheme = scheme.copy(
+                    error = danger,
+                    onError = onDanger,
+                    errorContainer = dangerContainer,
+                    onErrorContainer = onDangerContainer
+                ),
+                customColors = custom.copy(
+                    income = income,
+                    onIncome = onIncome,
+                    incomeContainer = incomeContainer,
+                    onIncomeContainer = onIncomeContainer,
+                    expenseContainer = dangerContainer,
+                    onExpenseContainer = onDangerContainer,
+                    danger = danger,
+                    onDanger = onDanger,
+                    dangerContainer = dangerContainer,
+                    onDangerContainer = onDangerContainer,
+                    warning = warning,
+                    onWarning = onWarning,
+                    warningContainer = warningContainer,
+                    onWarningContainer = onWarningContainer,
+                    chartPositive = income,
+                    chartNegative = danger,
+                    heroStatGood = Color(0xFF86EFAC),
+                    heroStatWarn = Color(0xFFFDE047),
+                    heroStatCaution = Color(0xFFFCA5A5)
+                )
+            )
+        }
+
+        OrbitAccentColorMode.MATCH_THEME -> {
+            val positive = scheme.primary
+            val onPositive = scheme.onPrimary
+            val positiveContainer = scheme.primaryContainer
+            val onPositiveContainer = scheme.onPrimaryContainer
+
+            val warning = ensureMinContrast(
+                color = scheme.secondary,
+                against = scheme.surface,
+                minRatio = 4.5,
+                preferDarker = !isDark
+            )
+            val onWarning = if (warning == scheme.secondary) {
+                scheme.onSecondary
+            } else {
+                ensureMinContrast(bestOnColor(warning), warning, minRatio = 4.6)
+            }
+            val warningContainer = scheme.secondaryContainer
+            val onWarningContainer = scheme.onSecondaryContainer
+
+            val negative = ensureMinContrast(
+                color = scheme.tertiary,
+                against = scheme.surface,
+                minRatio = 4.5,
+                preferDarker = !isDark
+            )
+            val onNegative = if (negative == scheme.tertiary) {
+                scheme.onTertiary
+            } else {
+                ensureMinContrast(bestOnColor(negative), negative, minRatio = 4.6)
+            }
+            val negativeContainer = scheme.tertiaryContainer
+            val onNegativeContainer = scheme.onTertiaryContainer
+
+            ResolvedOrbitPalette(
+                colorScheme = scheme.copy(
+                    error = negative,
+                    onError = onNegative,
+                    errorContainer = negativeContainer,
+                    onErrorContainer = onNegativeContainer
+                ),
+                customColors = custom.copy(
+                    income = positive,
+                    onIncome = onPositive,
+                    incomeContainer = positiveContainer,
+                    onIncomeContainer = onPositiveContainer,
+                    expenseContainer = negativeContainer,
+                    onExpenseContainer = onNegativeContainer,
+                    danger = negative,
+                    onDanger = onNegative,
+                    dangerContainer = negativeContainer,
+                    onDangerContainer = onNegativeContainer,
+                    warning = warning,
+                    onWarning = onWarning,
+                    warningContainer = warningContainer,
+                    onWarningContainer = onWarningContainer,
+                    chartPositive = positive,
+                    chartNegative = negative,
+                    heroStatGood = custom.canopyKicker,
+                    heroStatWarn = ensureMinContrast(scheme.secondaryContainer, custom.canopyEnd, 4.5, preferDarker = false),
+                    heroStatCaution = ensureMinContrast(scheme.tertiaryContainer, custom.canopyEnd, 4.5, preferDarker = false)
+                )
+            )
+        }
+    }
 }

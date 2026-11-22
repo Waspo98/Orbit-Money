@@ -9,6 +9,7 @@ import app.overbay.orbit.data.model.Goal
 import app.overbay.orbit.data.model.HouseholdInfo
 import app.overbay.orbit.data.model.MhaTaxProfile
 import app.overbay.orbit.data.model.NotificationPreferencesConfig
+import app.overbay.orbit.data.model.OrbitAccentColorMode
 import app.overbay.orbit.data.model.OrbitPreferences
 import app.overbay.orbit.data.model.OrbitThemeMode
 import app.overbay.orbit.data.model.OrbitThemePreset
@@ -171,6 +172,9 @@ class SelfHostedApiEngine(
             } else {
                 currentPrefs.customAccentHex
             },
+            accentColorMode = remotePrefs?.prefOr<String?>("accentColorMode", null)?.let { name ->
+                OrbitAccentColorMode.entries.firstOrNull { it.name.equals(name, ignoreCase = true) }
+            } ?: currentPrefs.accentColorMode,
             hiddenRouteNames = remotePrefs?.prefOr("hiddenRouteNames", currentPrefs.hiddenRouteNames) ?: currentPrefs.hiddenRouteNames,
             moreRouteOrder = remotePrefs?.prefOr("moreRouteOrder", currentPrefs.moreRouteOrder) ?: currentPrefs.moreRouteOrder,
             budgetSortOption = remotePrefs?.prefOr<String?>("budgetSortOption", null)?.let { name ->
@@ -454,6 +458,7 @@ class SelfHostedApiEngine(
             map["amoledDarkMode"] = JsonPrimitive(preferences.amoledDarkMode)
             map["useCustomTheme"] = JsonPrimitive(preferences.useCustomTheme)
             map["customAccentHex"] = normalizeAccentHex(preferences.customAccentHex)?.let { JsonPrimitive(it) } ?: JsonNull
+            map["accentColorMode"] = JsonPrimitive(preferences.accentColorMode.name)
             map["dismissedEmptyWorkspaceCard"] = JsonPrimitive(preferences.dismissedEmptyWorkspaceCard)
             map["budgetSortOption"] = JsonPrimitive(preferences.budgetSortOption.name)
             map["dashboardRetirementAge"] = JsonPrimitive(preferences.dashboardRetirementAge)

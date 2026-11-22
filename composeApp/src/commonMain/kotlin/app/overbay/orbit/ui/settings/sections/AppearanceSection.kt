@@ -35,6 +35,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import app.overbay.orbit.data.model.OrbitAccentColorMode
 import app.overbay.orbit.data.model.OrbitPreferences
 import app.overbay.orbit.data.model.OrbitThemeMode
 import app.overbay.orbit.data.model.OrbitThemePreset
@@ -51,6 +52,7 @@ import app.overbay.orbit.ui.components.OrbitSectionCard
 import app.overbay.orbit.ui.components.OrbitSegmentedTabRow
 import app.overbay.orbit.ui.components.OrbitSwitchRow
 import app.overbay.orbit.ui.components.orbitTactilePress
+import app.overbay.orbit.ui.settings.components.AccentColorModeSelector
 import app.overbay.orbit.ui.settings.components.ThemeSwatchGrid
 import app.overbay.orbit.util.LocalOrbitHaptics
 import app.overbay.orbit.util.PlatformRuntime
@@ -63,6 +65,7 @@ fun LazyListScope.appearanceSectionItems(
     onEnableSavedCustomTheme: () -> Unit,
     onOpenCustomThemePicker: () -> Unit,
     onDynamicColorChange: (Boolean) -> Unit,
+    onAccentColorModeChange: (OrbitAccentColorMode) -> Unit,
     onHapticsChange: (Boolean) -> Unit
 ) {
     item(key = "appearance_live_preview") {
@@ -83,7 +86,8 @@ fun LazyListScope.appearanceSectionItems(
                     isDark = isDarkPreview,
                     amoledDark = preferences.amoledDarkMode,
                     useCustomTheme = preferences.useCustomTheme,
-                    customAccentHex = preferences.customAccentHex
+                    customAccentHex = preferences.customAccentHex,
+                    accentColorMode = preferences.accentColorMode
                 )
             }
         }
@@ -146,6 +150,7 @@ fun LazyListScope.appearanceSectionItems(
                 selectedPreset = if (preferences.useCustomTheme) null else preferences.themePreset,
                 isDarkPreview = isDarkPreview,
                 isOverriddenByDynamicColor = isOverriddenByDynamic,
+                accentColorMode = preferences.accentColorMode,
                 onPresetSelected = onPresetChange
             )
 
@@ -177,6 +182,29 @@ fun LazyListScope.appearanceSectionItems(
                     showContainer = false
                 )
             }
+        }
+    }
+
+    item(key = "appearance_accent_colors") {
+        OrbitSectionCard(
+            title = "Accent Colors",
+            subtitle = "Choose how positive, warning, and negative values are colored"
+        ) {
+            val isDarkPreview = when (preferences.themeMode) {
+                OrbitThemeMode.DARK -> true
+                OrbitThemeMode.LIGHT -> false
+                OrbitThemeMode.SYSTEM -> isSystemInDarkTheme()
+            }
+            AccentColorModeSelector(
+                selectedMode = preferences.accentColorMode,
+                themePreset = preferences.themePreset,
+                isDarkPreview = isDarkPreview,
+                amoledDark = preferences.amoledDarkMode,
+                useCustomTheme = preferences.useCustomTheme,
+                customAccentHex = preferences.customAccentHex,
+                useDynamicColor = !PlatformRuntime.isWeb && preferences.dynamicColor,
+                onModeSelected = onAccentColorModeChange
+            )
         }
     }
 

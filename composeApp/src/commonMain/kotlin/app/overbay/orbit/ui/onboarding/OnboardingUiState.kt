@@ -4,6 +4,7 @@ import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.data.model.FilingStatus
 import app.overbay.orbit.data.model.HouseholdMember
+import app.overbay.orbit.data.model.OrbitAccentColorMode
 import app.overbay.orbit.data.model.OrbitPreferences
 import app.overbay.orbit.data.model.OrbitThemeMode
 import app.overbay.orbit.data.model.OrbitThemePreset
@@ -121,6 +122,7 @@ sealed interface OnboardingIntent {
     data class SetAmoledDark(val enabled: Boolean) : OnboardingIntent
     data class SetThemePreset(val preset: OrbitThemePreset) : OnboardingIntent
     data class SetDynamicColor(val enabled: Boolean) : OnboardingIntent
+    data class SetAccentColorMode(val mode: OrbitAccentColorMode) : OnboardingIntent
 
     // Storage Mode & Local Workspace
     data class SelectStorageMode(val mode: StorageMode) : OnboardingIntent

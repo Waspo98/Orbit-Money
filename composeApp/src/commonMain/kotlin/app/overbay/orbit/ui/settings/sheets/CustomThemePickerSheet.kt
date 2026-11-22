@@ -44,6 +44,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.overbay.orbit.data.model.OrbitAccentColorMode
 import app.overbay.orbit.data.model.OrbitThemePreset
 import app.overbay.orbit.theme.CuratedSeedSwatches
 import app.overbay.orbit.theme.DEFAULT_CUSTOM_ACCENT_HEX
@@ -75,7 +76,8 @@ fun CustomThemePickerSheet(
     amoledDark: Boolean,
     onApply: (String) -> Unit,
     onDismiss: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    accentColorMode: OrbitAccentColorMode = OrbitAccentColorMode.MATCH_THEME
 ) {
     val haptics = LocalOrbitHaptics.current
     val safeInitialHex = remember(initialHex) {
@@ -99,13 +101,14 @@ fun CustomThemePickerSheet(
     val hexError = hexInput.isNotBlank() && normalizedInput == null
     val activeHex = normalizedInput ?: draftHex
 
-    val previewPalette = remember(activeHex, previewDark, amoledDark) {
+    val previewPalette = remember(activeHex, previewDark, amoledDark, accentColorMode) {
         resolveOrbitPalette(
             themePreset = OrbitThemePreset.ORBIT_EMERALD,
             isDark = previewDark,
             amoledDark = amoledDark,
             useCustomTheme = true,
-            customAccentHex = activeHex
+            customAccentHex = activeHex,
+            accentColorMode = accentColorMode
         )
     }
 

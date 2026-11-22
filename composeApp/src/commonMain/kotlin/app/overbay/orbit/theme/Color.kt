@@ -238,6 +238,39 @@ val FinanceWarningDark = Color(0xFFFBBF24)
 val FinanceWarningContainerLight = Color(0xFFFEF3C7)
 val FinanceWarningContainerDark = Color(0xFF3F2A08)
 
+// =============================================================================
+// Absolute Traffic-Light Semantic Constants (Always Green & Red Mode)
+// =============================================================================
+val AbsoluteIncomeLight = Color(0xFF15803D)
+val AbsoluteIncomeOnLight = Color.White
+val AbsoluteIncomeContainerLight = Color(0xFFDCFCE7)
+val AbsoluteOnIncomeContainerLight = Color(0xFF14532D)
+
+val AbsoluteIncomeDark = Color(0xFF4ADE80)
+val AbsoluteIncomeOnDark = Color(0xFF052E16)
+val AbsoluteIncomeContainerDark = Color(0xFF0A361E)
+val AbsoluteOnIncomeContainerDark = Color(0xFFBBF7D0)
+
+val AbsoluteDangerLight = Color(0xFFC81E1E)
+val AbsoluteDangerOnLight = Color.White
+val AbsoluteDangerContainerLight = Color(0xFFFEE2E2)
+val AbsoluteOnDangerContainerLight = Color(0xFF7F1D1D)
+
+val AbsoluteDangerDark = Color(0xFFF87171)
+val AbsoluteDangerOnDark = Color(0xFF450A0A)
+val AbsoluteDangerContainerDark = Color(0xFF450A0A)
+val AbsoluteOnDangerContainerDark = Color(0xFFFECACA)
+
+val AbsoluteWarningLight = Color(0xFFB45309)
+val AbsoluteWarningOnLight = Color.White
+val AbsoluteWarningContainerLight = Color(0xFFFEF3C7)
+val AbsoluteOnWarningContainerLight = Color(0xFF78350F)
+
+val AbsoluteWarningDark = Color(0xFFFBBF24)
+val AbsoluteWarningOnDark = Color(0xFF451A03)
+val AbsoluteWarningContainerDark = Color(0xFF451A03)
+val AbsoluteOnWarningContainerDark = Color(0xFFFDE68A)
+
 /**
  * Safely parses a hex color string (e.g. "#RRGGBB", "RRGGBB", "#AARRGGBB", or "AARRGGBB")
  * into a Compose [Color], returning [fallback] if parsing fails.

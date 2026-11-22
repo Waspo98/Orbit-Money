@@ -187,6 +187,7 @@ class OnboardingViewModel(
                 it.copy(themePreset = intent.preset, useCustomTheme = false, dynamicColor = false)
             }
             is OnboardingIntent.SetDynamicColor -> updatePrefs { it.copy(dynamicColor = intent.enabled) }
+            is OnboardingIntent.SetAccentColorMode -> updatePrefs { it.copy(accentColorMode = intent.mode) }
 
             is OnboardingIntent.SelectStorageMode -> selectStorageMode(intent.mode)
             is OnboardingIntent.SelectLocalSeed -> _uiState.update { it.copy(selectedLocalSeed = intent.seed, authError = null) }

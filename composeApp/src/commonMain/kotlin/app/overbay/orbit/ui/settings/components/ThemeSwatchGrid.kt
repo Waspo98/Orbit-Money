@@ -36,11 +36,11 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.overbay.orbit.data.model.OrbitAccentColorMode
 import app.overbay.orbit.data.model.OrbitThemePreset
 import app.overbay.orbit.theme.OrbitSprings
 import app.overbay.orbit.theme.OrbitTheme
-import app.overbay.orbit.theme.getPresetColorScheme
-import app.overbay.orbit.theme.getPresetCustomColors
+import app.overbay.orbit.theme.resolveOrbitPalette
 import app.overbay.orbit.ui.components.OrbitIcons
 import app.overbay.orbit.ui.components.orbitTactilePress
 import app.overbay.orbit.util.LocalOrbitHaptics
@@ -51,7 +51,8 @@ fun ThemeSwatchGrid(
     isDarkPreview: Boolean,
     isOverriddenByDynamicColor: Boolean,
     onPresetSelected: (OrbitThemePreset) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    accentColorMode: OrbitAccentColorMode = OrbitAccentColorMode.MATCH_THEME
 ) {
     val gridAlpha by animateFloatAsState(
         targetValue = if (isOverriddenByDynamicColor) 0.5f else 1f,
@@ -76,6 +77,7 @@ fun ThemeSwatchGrid(
                             preset = preset,
                             isSelected = !isOverriddenByDynamicColor && preset == selectedPreset,
                             isDarkPreview = isDarkPreview,
+                            accentColorMode = accentColorMode,
                             onClick = { onPresetSelected(preset) },
                             modifier = Modifier.weight(1f)
                         )
@@ -92,13 +94,26 @@ private fun ThemeSwatchCard(
     preset: OrbitThemePreset,
     isSelected: Boolean,
     isDarkPreview: Boolean,
+    accentColorMode: OrbitAccentColorMode,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val haptics = LocalOrbitHaptics.current
     val interactionSource = remember { MutableInteractionSource() }
-    val scheme = getPresetColorScheme(preset, isDarkPreview)
-    val custom = getPresetCustomColors(preset, isDarkPreview)
+    val palette = remember(preset, isDarkPreview, accentColorMode) {
+        resolveOrbitPalette(
+            themePreset = preset,
+            isDark = isDarkPreview,
+            accentColorMode = accentColorMode
+        )
+    }
+    val scheme = palette.colorScheme
+    val custom = palette.customColors
+    val thirdDotColor = if (accentColorMode == OrbitAccentColorMode.MATCH_THEME) {
+        scheme.tertiary
+    } else {
+        custom.income
+    }
 
     Surface(
         modifier = modifier
@@ -192,7 +207,7 @@ private fun ThemeSwatchCard(
                             modifier = Modifier
                                 .size(11.dp)
                                 .clip(CircleShape)
-                                .background(custom.income)
+                                .background(thirdDotColor)
                         )
                     }
                 }
