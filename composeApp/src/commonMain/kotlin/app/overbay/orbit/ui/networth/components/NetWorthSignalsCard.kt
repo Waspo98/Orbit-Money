@@ -11,7 +11,7 @@ import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.domain.NetWorthEngine
-import app.overbay.orbit.theme.OrbitColorTokens
+import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.OrbitMiniStatRow
 import app.overbay.orbit.ui.components.OrbitSectionCard
 import kotlin.math.abs
@@ -43,7 +43,7 @@ fun NetWorthSignalsCard(
                 label = "Largest Asset",
                 detail = assetLabel,
                 value = assetVal,
-                valueColor = OrbitColorTokens.Green
+                valueColor = OrbitTheme.colors.income
             )
 
             Spacer(modifier = Modifier.height(4.dp))
@@ -62,7 +62,7 @@ fun NetWorthSignalsCard(
                 detail = liabLabel,
                 value = liabVal,
                 valueColor = if (largestLiability != null && abs(largestLiability.currentBalanceCents) > 0L) {
-                    OrbitColorTokens.Red
+                    OrbitTheme.colors.danger
                 } else {
                     MaterialTheme.colorScheme.onSurface
                 },

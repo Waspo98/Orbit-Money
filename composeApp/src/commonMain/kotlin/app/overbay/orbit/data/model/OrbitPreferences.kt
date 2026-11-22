@@ -70,6 +70,8 @@ data class OrbitPreferences(
     val themePreset: OrbitThemePreset = OrbitThemePreset.ORBIT_EMERALD,
     val themeMode: OrbitThemeMode = OrbitThemeMode.SYSTEM,
     val dynamicColor: Boolean = false,
+    val useCustomTheme: Boolean = false,
+    val customAccentHex: String? = null,
     val biometricLockEnabled: Boolean = false,
     val biometricTimeoutSeconds: Int = 300, // 5 minutes
     val hapticsEnabled: Boolean = true,

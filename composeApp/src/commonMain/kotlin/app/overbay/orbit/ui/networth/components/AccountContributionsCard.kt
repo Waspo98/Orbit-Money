@@ -26,7 +26,7 @@ import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.domain.NetWorthBucket
 import app.overbay.orbit.domain.NetWorthEngine
-import app.overbay.orbit.theme.OrbitColorTokens
+import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.ui.components.EmptyStateCard
 import app.overbay.orbit.ui.components.OrbitBadge
@@ -63,15 +63,16 @@ fun AccountContributionsCard(
                 contributions.forEach { item ->
                     val acct = item.account
                     val isPositive = item.signedContributionCents >= 0L
-                    val color = if (isPositive) OrbitColorTokens.Green else OrbitColorTokens.Red
+                    val themeColors = OrbitTheme.colors
+                    val color = if (isPositive) themeColors.income else themeColors.danger
 
                     val bucket = NetWorthEngine.bucketForAccount(acct)
                     val bucketColor = when (bucket) {
                         NetWorthBucket.CASH -> MaterialTheme.colorScheme.primary
                         NetWorthBucket.INVESTMENTS -> MaterialTheme.colorScheme.secondary
                         NetWorthBucket.REAL_ESTATE -> MaterialTheme.colorScheme.tertiary
-                        NetWorthBucket.CREDIT -> OrbitColorTokens.Amber
-                        NetWorthBucket.LOANS -> OrbitColorTokens.Red
+                        NetWorthBucket.CREDIT -> themeColors.warning
+                        NetWorthBucket.LOANS -> themeColors.danger
                         NetWorthBucket.OTHER -> MaterialTheme.colorScheme.outline
                     }
 

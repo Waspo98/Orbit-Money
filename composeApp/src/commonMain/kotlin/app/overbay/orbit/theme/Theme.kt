@@ -6,11 +6,10 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.OrbitThemeMode
 import app.overbay.orbit.data.model.OrbitThemePreset
@@ -23,247 +22,57 @@ val OrbitShapes = Shapes(
     extraLarge = RoundedCornerShape(24.dp)
 )
 
-// Preset Material 3 Color Schemes
-val EmeraldLightColorScheme = lightColorScheme(
-    primary = EmeraldLightPrimary,
-    onPrimary = EmeraldLightOnPrimary,
-    primaryContainer = EmeraldLightPrimaryContainer,
-    onPrimaryContainer = EmeraldLightOnPrimaryContainer,
-    secondary = EmeraldLightSecondary,
-    onSecondary = EmeraldLightOnSecondary,
-    secondaryContainer = EmeraldLightSecondaryContainer,
-    onSecondaryContainer = EmeraldLightOnSecondaryContainer,
-    tertiary = EmeraldLightTertiary,
-    onTertiary = EmeraldLightOnTertiary,
-    tertiaryContainer = EmeraldLightTertiaryContainer,
-    onTertiaryContainer = EmeraldLightOnTertiaryContainer,
-    background = EmeraldLightBackground,
-    onBackground = EmeraldLightOnBackground,
-    surface = EmeraldLightSurface,
-    onSurface = EmeraldLightOnSurface,
-    surfaceVariant = EmeraldLightSurfaceVariant,
-    onSurfaceVariant = EmeraldLightOnSurfaceVariant,
-    outline = EmeraldLightOutline,
-    outlineVariant = EmeraldLightOutlineVariant,
-    surfaceContainer = EmeraldLightSurfaceContainer,
-    surfaceContainerLow = EmeraldLightSurfaceContainerLow,
-    surfaceContainerHigh = EmeraldLightSurfaceContainerHigh
-)
+// Complete Material 3 Preset Color Schemes (all 32 active roles populated)
+val EmeraldLightColorScheme: ColorScheme = OrbitPresetPalettes.emeraldLight.colorScheme
+val EmeraldDarkColorScheme: ColorScheme = OrbitPresetPalettes.emeraldDark.colorScheme
+val OceanLightColorScheme: ColorScheme = OrbitPresetPalettes.oceanLight.colorScheme
+val OceanDarkColorScheme: ColorScheme = OrbitPresetPalettes.oceanDark.colorScheme
+val TerracottaLightColorScheme: ColorScheme = OrbitPresetPalettes.terracottaLight.colorScheme
+val TerracottaDarkColorScheme: ColorScheme = OrbitPresetPalettes.terracottaDark.colorScheme
+val IndigoLightColorScheme: ColorScheme = OrbitPresetPalettes.indigoLight.colorScheme
+val IndigoDarkColorScheme: ColorScheme = OrbitPresetPalettes.indigoDark.colorScheme
+val MonochromeLightColorScheme: ColorScheme = OrbitPresetPalettes.monochromeLight.colorScheme
+val MonochromeDarkColorScheme: ColorScheme = OrbitPresetPalettes.monochromeDark.colorScheme
+val SpaceshipRedLightColorScheme: ColorScheme = OrbitPresetPalettes.spaceshipRedLight.colorScheme
+val SpaceshipRedDarkColorScheme: ColorScheme = OrbitPresetPalettes.spaceshipRedDark.colorScheme
 
-val EmeraldDarkColorScheme = darkColorScheme(
-    primary = EmeraldDarkPrimary,
-    onPrimary = EmeraldDarkOnPrimary,
-    primaryContainer = EmeraldDarkPrimaryContainer,
-    onPrimaryContainer = EmeraldDarkOnPrimaryContainer,
-    secondary = EmeraldDarkSecondary,
-    onSecondary = EmeraldDarkOnSecondary,
-    secondaryContainer = EmeraldDarkSecondaryContainer,
-    onSecondaryContainer = EmeraldDarkOnSecondaryContainer,
-    tertiary = EmeraldDarkTertiary,
-    onTertiary = EmeraldDarkOnTertiary,
-    tertiaryContainer = EmeraldDarkTertiaryContainer,
-    onTertiaryContainer = EmeraldDarkOnTertiaryContainer,
-    background = EmeraldDarkBackground,
-    onBackground = EmeraldDarkOnBackground,
-    surface = EmeraldDarkSurface,
-    onSurface = EmeraldDarkOnSurface,
-    surfaceVariant = EmeraldDarkSurfaceVariant,
-    onSurfaceVariant = EmeraldDarkOnSurfaceVariant,
-    outline = EmeraldDarkOutline,
-    outlineVariant = EmeraldDarkOutlineVariant,
-    surfaceContainer = EmeraldDarkSurfaceContainer,
-    surfaceContainerLow = EmeraldDarkSurfaceContainerLow,
-    surfaceContainerHigh = EmeraldDarkSurfaceContainerHigh
-)
+fun getPresetPalette(preset: OrbitThemePreset, isDark: Boolean): ResolvedOrbitPalette =
+    OrbitPresetPalettes.get(preset, isDark)
 
-val OceanLightColorScheme = lightColorScheme(
-    primary = OceanLightPrimary,
-    onPrimary = OceanLightOnPrimary,
-    primaryContainer = OceanLightPrimaryContainer,
-    onPrimaryContainer = OceanLightOnPrimaryContainer,
-    background = OceanLightBackground,
-    onBackground = OceanLightOnBackground,
-    surface = OceanLightSurface,
-    onSurface = OceanLightOnSurface,
-    outline = OceanLightOutline,
-    surfaceContainer = OceanLightSurfaceContainer,
-    surfaceContainerLow = OceanLightSurfaceContainerLow,
-    surfaceContainerHigh = OceanLightSurfaceContainerHigh
-)
+fun getPresetColorScheme(preset: OrbitThemePreset, isDark: Boolean): ColorScheme =
+    OrbitPresetPalettes.get(preset, isDark).colorScheme
 
-val OceanDarkColorScheme = darkColorScheme(
-    primary = OceanDarkPrimary,
-    onPrimary = OceanDarkOnPrimary,
-    primaryContainer = OceanDarkPrimaryContainer,
-    onPrimaryContainer = OceanDarkOnPrimaryContainer,
-    background = OceanDarkBackground,
-    onBackground = OceanDarkOnBackground,
-    surface = OceanDarkSurface,
-    onSurface = OceanDarkOnSurface,
-    outline = OceanDarkOutline,
-    surfaceContainer = OceanDarkSurfaceContainer,
-    surfaceContainerLow = OceanDarkSurfaceContainerLow,
-    surfaceContainerHigh = OceanDarkSurfaceContainerHigh
-)
+fun getPresetCustomColors(preset: OrbitThemePreset, isDark: Boolean): CustomThemeColors =
+    OrbitPresetPalettes.get(preset, isDark).customColors
 
-val TerracottaLightColorScheme = lightColorScheme(
-    primary = TerracottaLightPrimary,
-    onPrimary = TerracottaLightOnPrimary,
-    primaryContainer = TerracottaLightPrimaryContainer,
-    onPrimaryContainer = TerracottaLightOnPrimaryContainer,
-    background = TerracottaLightBackground,
-    onBackground = TerracottaLightOnBackground,
-    surface = TerracottaLightSurface,
-    onSurface = TerracottaLightOnSurface,
-    outline = TerracottaLightOutline,
-    surfaceContainer = TerracottaLightSurfaceContainer,
-    surfaceContainerLow = TerracottaLightSurfaceContainerLow,
-    surfaceContainerHigh = TerracottaLightSurfaceContainerHigh
-)
-
-val TerracottaDarkColorScheme = darkColorScheme(
-    primary = TerracottaDarkPrimary,
-    onPrimary = TerracottaDarkOnPrimary,
-    primaryContainer = TerracottaDarkPrimaryContainer,
-    onPrimaryContainer = TerracottaDarkOnPrimaryContainer,
-    background = TerracottaDarkBackground,
-    onBackground = TerracottaDarkOnBackground,
-    surface = TerracottaDarkSurface,
-    onSurface = TerracottaDarkOnSurface,
-    outline = TerracottaDarkOutline,
-    surfaceContainer = TerracottaDarkSurfaceContainer,
-    surfaceContainerLow = TerracottaDarkSurfaceContainerLow,
-    surfaceContainerHigh = TerracottaDarkSurfaceContainerHigh
-)
-
-val IndigoLightColorScheme = lightColorScheme(
-    primary = IndigoLightPrimary,
-    onPrimary = IndigoLightOnPrimary,
-    primaryContainer = IndigoLightPrimaryContainer,
-    onPrimaryContainer = IndigoLightOnPrimaryContainer,
-    background = IndigoLightBackground,
-    onBackground = IndigoLightOnBackground,
-    surface = IndigoLightSurface,
-    onSurface = IndigoLightOnSurface,
-    outline = IndigoLightOutline,
-    surfaceContainer = IndigoLightSurfaceContainer,
-    surfaceContainerLow = IndigoLightSurfaceContainerLow,
-    surfaceContainerHigh = IndigoLightSurfaceContainerHigh
-)
-
-val IndigoDarkColorScheme = darkColorScheme(
-    primary = IndigoDarkPrimary,
-    onPrimary = IndigoDarkOnPrimary,
-    primaryContainer = IndigoDarkPrimaryContainer,
-    onPrimaryContainer = IndigoDarkOnPrimaryContainer,
-    background = IndigoDarkBackground,
-    onBackground = IndigoDarkOnBackground,
-    surface = IndigoDarkSurface,
-    onSurface = IndigoDarkOnSurface,
-    outline = IndigoDarkOutline,
-    surfaceContainer = IndigoDarkSurfaceContainer,
-    surfaceContainerLow = IndigoDarkSurfaceContainerLow,
-    surfaceContainerHigh = IndigoDarkSurfaceContainerHigh
-)
-
-val MonochromeLightColorScheme = lightColorScheme(
-    primary = MonochromeLightPrimary,
-    onPrimary = MonochromeLightOnPrimary,
-    primaryContainer = MonochromeLightPrimaryContainer,
-    onPrimaryContainer = MonochromeLightOnPrimaryContainer,
-    background = MonochromeLightBackground,
-    onBackground = MonochromeLightOnBackground,
-    surface = MonochromeLightSurface,
-    onSurface = MonochromeLightOnSurface,
-    outline = MonochromeLightOutline,
-    surfaceContainer = MonochromeLightSurfaceContainer,
-    surfaceContainerLow = MonochromeLightSurfaceContainerLow,
-    surfaceContainerHigh = MonochromeLightSurfaceContainerHigh
-)
-
-val MonochromeDarkColorScheme = darkColorScheme(
-    primary = MonochromeDarkPrimary,
-    onPrimary = MonochromeDarkOnPrimary,
-    primaryContainer = MonochromeDarkPrimaryContainer,
-    onPrimaryContainer = MonochromeDarkOnPrimaryContainer,
-    background = MonochromeDarkBackground,
-    onBackground = MonochromeDarkOnBackground,
-    surface = MonochromeDarkSurface,
-    onSurface = MonochromeDarkOnSurface,
-    outline = MonochromeDarkOutline,
-    surfaceContainer = MonochromeDarkSurfaceContainer,
-    surfaceContainerLow = MonochromeDarkSurfaceContainerLow,
-    surfaceContainerHigh = MonochromeDarkSurfaceContainerHigh
-)
-
-val SpaceshipRedLightColorScheme = lightColorScheme(
-    primary = SpaceshipRedLightPrimary,
-    onPrimary = SpaceshipRedLightOnPrimary,
-    primaryContainer = SpaceshipRedLightPrimaryContainer,
-    onPrimaryContainer = SpaceshipRedLightOnPrimaryContainer,
-    secondary = SpaceshipRedLightSecondary,
-    onSecondary = SpaceshipRedLightOnSecondary,
-    secondaryContainer = SpaceshipRedLightSecondaryContainer,
-    onSecondaryContainer = SpaceshipRedLightOnSecondaryContainer,
-    tertiary = SpaceshipRedLightTertiary,
-    onTertiary = SpaceshipRedLightOnTertiary,
-    tertiaryContainer = SpaceshipRedLightTertiaryContainer,
-    onTertiaryContainer = SpaceshipRedLightOnTertiaryContainer,
-    background = SpaceshipRedLightBackground,
-    onBackground = SpaceshipRedLightOnBackground,
-    surface = SpaceshipRedLightSurface,
-    onSurface = SpaceshipRedLightOnSurface,
-    surfaceVariant = SpaceshipRedLightSurfaceVariant,
-    onSurfaceVariant = SpaceshipRedLightOnSurfaceVariant,
-    outline = SpaceshipRedLightOutline,
-    outlineVariant = SpaceshipRedLightOutlineVariant,
-    surfaceContainer = SpaceshipRedLightSurfaceContainer,
-    surfaceContainerLow = SpaceshipRedLightSurfaceContainerLow,
-    surfaceContainerHigh = SpaceshipRedLightSurfaceContainerHigh
-)
-
-val SpaceshipRedDarkColorScheme = darkColorScheme(
-    primary = SpaceshipRedDarkPrimary,
-    onPrimary = SpaceshipRedDarkOnPrimary,
-    primaryContainer = SpaceshipRedDarkPrimaryContainer,
-    onPrimaryContainer = SpaceshipRedDarkOnPrimaryContainer,
-    secondary = SpaceshipRedDarkSecondary,
-    onSecondary = SpaceshipRedDarkOnSecondary,
-    secondaryContainer = SpaceshipRedDarkSecondaryContainer,
-    onSecondaryContainer = SpaceshipRedDarkOnSecondaryContainer,
-    tertiary = SpaceshipRedDarkTertiary,
-    onTertiary = SpaceshipRedDarkOnTertiary,
-    tertiaryContainer = SpaceshipRedDarkTertiaryContainer,
-    onTertiaryContainer = SpaceshipRedDarkOnTertiaryContainer,
-    background = SpaceshipRedDarkBackground,
-    onBackground = SpaceshipRedDarkOnBackground,
-    surface = SpaceshipRedDarkSurface,
-    onSurface = SpaceshipRedDarkOnSurface,
-    surfaceVariant = SpaceshipRedDarkSurfaceVariant,
-    onSurfaceVariant = SpaceshipRedDarkOnSurfaceVariant,
-    outline = SpaceshipRedDarkOutline,
-    outlineVariant = SpaceshipRedDarkOutlineVariant,
-    surfaceContainer = SpaceshipRedDarkSurfaceContainer,
-    surfaceContainerLow = SpaceshipRedDarkSurfaceContainerLow,
-    surfaceContainerHigh = SpaceshipRedDarkSurfaceContainerHigh
-)
-
-fun getPresetColorScheme(preset: OrbitThemePreset, isDark: Boolean): ColorScheme = when (preset) {
-    OrbitThemePreset.ORBIT_EMERALD -> if (isDark) EmeraldDarkColorScheme else EmeraldLightColorScheme
-    OrbitThemePreset.OCEAN_SLATE -> if (isDark) OceanDarkColorScheme else OceanLightColorScheme
-    OrbitThemePreset.WARM_TERRACOTTA -> if (isDark) TerracottaDarkColorScheme else TerracottaLightColorScheme
-    OrbitThemePreset.ROYAL_INDIGO -> if (isDark) IndigoDarkColorScheme else IndigoLightColorScheme
-    OrbitThemePreset.MONOCHROME_INK -> if (isDark) MonochromeDarkColorScheme else MonochromeLightColorScheme
-    OrbitThemePreset.SPACESHIP_RED -> if (isDark) SpaceshipRedDarkColorScheme else SpaceshipRedLightColorScheme
-}
-
-fun getPresetCustomColors(preset: OrbitThemePreset, isDark: Boolean): CustomThemeColors = when (preset) {
-    OrbitThemePreset.ORBIT_EMERALD -> emeraldCustomColors(isDark)
-    OrbitThemePreset.OCEAN_SLATE -> oceanSlateCustomColors(isDark)
-    OrbitThemePreset.WARM_TERRACOTTA -> warmTerracottaCustomColors(isDark)
-    OrbitThemePreset.ROYAL_INDIGO -> royalIndigoCustomColors(isDark)
-    OrbitThemePreset.MONOCHROME_INK -> monochromeInkCustomColors(isDark)
-    OrbitThemePreset.SPACESHIP_RED -> spaceshipRedCustomColors(isDark)
+/**
+ * Single canonical theme resolution pipeline shared by [OrbitTheme], live preview cards,
+ * and unit tests:
+ * 1. Android 12+ Material You dynamic scheme (when enabled and supported)
+ * 2. Seed-generated Custom Accent palette (when enabled with a valid hex seed)
+ * 3. Curated built-in preset palette
+ * 4. Pure-black AMOLED surface & border calibration (when dark + AMOLED active)
+ */
+fun resolveOrbitPalette(
+    themePreset: OrbitThemePreset,
+    isDark: Boolean,
+    amoledDark: Boolean = false,
+    useCustomTheme: Boolean = false,
+    customAccentHex: String? = null,
+    dynamicScheme: ColorScheme? = null
+): ResolvedOrbitPalette {
+    val base = when {
+        dynamicScheme != null -> ResolvedOrbitPalette(
+            colorScheme = dynamicScheme,
+            customColors = dynamicCustomColors(dynamicScheme, isDark)
+        )
+        useCustomTheme && normalizeAccentHex(customAccentHex) != null -> {
+            val normalized = normalizeAccentHex(customAccentHex)!!
+            generatePaletteFromSeed(normalized.toComposeColor(EmeraldLightPrimary), isDark)
+        }
+        else -> getPresetPalette(themePreset, isDark)
+    }
+    return if (isDark && amoledDark) applyAmoledOverrides(base) else base
 }
 
 @Composable
@@ -275,7 +84,8 @@ fun OrbitTheme(
     themeMode: OrbitThemeMode = OrbitThemeMode.SYSTEM,
     dynamicColor: Boolean = false,
     amoledDark: Boolean = false,
-    customPreset: CustomThemePreset? = null,
+    useCustomTheme: Boolean = false,
+    customAccentHex: String? = null,
     content: @Composable () -> Unit
 ) {
     val darkTheme = when (themeMode) {
@@ -285,41 +95,24 @@ fun OrbitTheme(
     }
 
     val dynamicScheme = getPlatformColorScheme(darkTheme = darkTheme, dynamicColor = dynamicColor)
-    val baseScheme = if (customPreset != null) {
-        createCustomColorScheme(customPreset, fallbackAccent = EmeraldLightPrimary)
-    } else {
-        getPresetColorScheme(themePreset, darkTheme)
-    }
-
-    val selectedScheme = dynamicScheme ?: baseScheme
-    val finalColorScheme = if (darkTheme && amoledDark) {
-        selectedScheme.copy(
-            background = androidx.compose.ui.graphics.Color.Black,
-            surface = androidx.compose.ui.graphics.Color.Black,
-            surfaceDim = androidx.compose.ui.graphics.Color.Black,
-            surfaceContainerLowest = androidx.compose.ui.graphics.Color.Black,
-            surfaceContainerLow = androidx.compose.ui.graphics.Color(0xFF0A0A0A),
-            surfaceContainer = androidx.compose.ui.graphics.Color(0xFF111111)
+    val palette = remember(themePreset, darkTheme, amoledDark, useCustomTheme, customAccentHex, dynamicScheme) {
+        resolveOrbitPalette(
+            themePreset = themePreset,
+            isDark = darkTheme,
+            amoledDark = amoledDark,
+            useCustomTheme = useCustomTheme,
+            customAccentHex = customAccentHex,
+            dynamicScheme = dynamicScheme
         )
-    } else {
-        selectedScheme
-    }
-
-    val customColors = if (customPreset != null) {
-        createCustomThemeColors(customPreset)
-    } else if (dynamicScheme != null) {
-        dynamicCustomColors(dynamicScheme, darkTheme)
-    } else {
-        getPresetCustomColors(themePreset, darkTheme)
     }
 
     val typography = rememberOrbitTypography()
 
     CompositionLocalProvider(
-        LocalCustomThemeColors provides customColors
+        LocalCustomThemeColors provides palette.customColors
     ) {
         MaterialTheme(
-            colorScheme = finalColorScheme,
+            colorScheme = palette.colorScheme,
             typography = typography,
             shapes = OrbitShapes,
             content = content
@@ -336,14 +129,16 @@ fun OrbitMoneyTheme(
     themeMode: OrbitThemeMode = OrbitThemeMode.SYSTEM,
     dynamicColor: Boolean = false,
     amoledDark: Boolean = false,
-    customPreset: CustomThemePreset? = null,
+    useCustomTheme: Boolean = false,
+    customAccentHex: String? = null,
     content: @Composable () -> Unit
 ) = OrbitTheme(
     themePreset = themePreset,
     themeMode = themeMode,
     dynamicColor = dynamicColor,
     amoledDark = amoledDark,
-    customPreset = customPreset,
+    useCustomTheme = useCustomTheme,
+    customAccentHex = customAccentHex,
     content = content
 )
 

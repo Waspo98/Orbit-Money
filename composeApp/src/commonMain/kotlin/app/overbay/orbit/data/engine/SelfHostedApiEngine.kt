@@ -10,7 +10,10 @@ import app.overbay.orbit.data.model.HouseholdInfo
 import app.overbay.orbit.data.model.MhaTaxProfile
 import app.overbay.orbit.data.model.NotificationPreferencesConfig
 import app.overbay.orbit.data.model.OrbitPreferences
+import app.overbay.orbit.data.model.OrbitThemeMode
+import app.overbay.orbit.data.model.OrbitThemePreset
 import app.overbay.orbit.data.model.OrbitWorkspaceSnapshot
+import app.overbay.orbit.theme.normalizeAccentHex
 import app.overbay.orbit.data.model.StorageMode
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.TransactionRule
@@ -155,7 +158,19 @@ class SelfHostedApiEngine(
         val resolvedPrefs = currentPrefs.copy(
             mhaTrackerEnabled = mhaDto?.enabled ?: currentPrefs.mhaTrackerEnabled,
             cardRewardsToolsEnabled = remotePrefs?.prefOr<Boolean?>("cardRewardsToolsEnabled", currentPrefs.cardRewardsToolsEnabled) ?: currentPrefs.cardRewardsToolsEnabled,
+            themePreset = remotePrefs?.prefOr<String?>("themePreset", null)?.let { name ->
+                OrbitThemePreset.entries.firstOrNull { it.name.equals(name, ignoreCase = true) }
+            } ?: currentPrefs.themePreset,
+            themeMode = remotePrefs?.prefOr<String?>("themeMode", null)?.let { name ->
+                OrbitThemeMode.entries.firstOrNull { it.name.equals(name, ignoreCase = true) }
+            } ?: currentPrefs.themeMode,
             amoledDarkMode = remotePrefs?.prefOr("amoledDarkMode", currentPrefs.amoledDarkMode) ?: currentPrefs.amoledDarkMode,
+            useCustomTheme = remotePrefs?.prefOr("useCustomTheme", currentPrefs.useCustomTheme) ?: currentPrefs.useCustomTheme,
+            customAccentHex = if (remotePrefs != null && "customAccentHex" in remotePrefs) {
+                normalizeAccentHex(remotePrefs.prefOr<String?>("customAccentHex", null))
+            } else {
+                currentPrefs.customAccentHex
+            },
             hiddenRouteNames = remotePrefs?.prefOr("hiddenRouteNames", currentPrefs.hiddenRouteNames) ?: currentPrefs.hiddenRouteNames,
             moreRouteOrder = remotePrefs?.prefOr("moreRouteOrder", currentPrefs.moreRouteOrder) ?: currentPrefs.moreRouteOrder,
             budgetSortOption = remotePrefs?.prefOr<String?>("budgetSortOption", null)?.let { name ->
@@ -434,7 +449,11 @@ class SelfHostedApiEngine(
         runCatching {
             val map = mutableMapOf<String, JsonElement>()
             map["cardRewardsToolsEnabled"] = preferences.cardRewardsToolsEnabled?.let { JsonPrimitive(it) } ?: JsonNull
+            map["themePreset"] = JsonPrimitive(preferences.themePreset.name)
+            map["themeMode"] = JsonPrimitive(preferences.themeMode.name)
             map["amoledDarkMode"] = JsonPrimitive(preferences.amoledDarkMode)
+            map["useCustomTheme"] = JsonPrimitive(preferences.useCustomTheme)
+            map["customAccentHex"] = normalizeAccentHex(preferences.customAccentHex)?.let { JsonPrimitive(it) } ?: JsonNull
             map["dismissedEmptyWorkspaceCard"] = JsonPrimitive(preferences.dismissedEmptyWorkspaceCard)
             map["budgetSortOption"] = JsonPrimitive(preferences.budgetSortOption.name)
             map["dashboardRetirementAge"] = JsonPrimitive(preferences.dashboardRetirementAge)

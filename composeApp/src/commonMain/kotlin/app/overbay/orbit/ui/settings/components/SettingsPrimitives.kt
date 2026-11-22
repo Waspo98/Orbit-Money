@@ -56,7 +56,7 @@ fun SettingsClusterHeader(title: String, modifier: Modifier = Modifier) {
         text = title,
         style = MaterialTheme.typography.labelMedium,
         fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        color = MaterialTheme.colorScheme.primary,
         modifier = modifier.padding(start = 4.dp, top = 6.dp, bottom = 2.dp)
     )
 }
@@ -94,12 +94,12 @@ fun SettingsNavRow(
     val iconContainer = when {
         isDestructive -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.45f)
         isSelected -> MaterialTheme.colorScheme.primaryContainer
-        else -> MaterialTheme.colorScheme.surfaceContainerHigh
+        else -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.42f)
     }
     val iconTint = when {
         isDestructive -> MaterialTheme.colorScheme.error
         isSelected -> MaterialTheme.colorScheme.primary
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
+        else -> MaterialTheme.colorScheme.primary
     }
 
     Row(

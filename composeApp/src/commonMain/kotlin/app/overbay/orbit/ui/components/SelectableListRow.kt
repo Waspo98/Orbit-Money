@@ -91,6 +91,17 @@ fun SelectableListRow(
                 Spacer(modifier = Modifier.width(12.dp))
             }
 
+            val primaryTextColor = if (isSelected) {
+                MaterialTheme.colorScheme.onPrimaryContainer
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            }
+            val secondaryTextColor = if (isSelected) {
+                MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.78f)
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            }
+
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.Center
@@ -99,7 +110,7 @@ fun SelectableListRow(
                     text = title,
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = primaryTextColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -107,7 +118,7 @@ fun SelectableListRow(
                     Text(
                         text = subtitle,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = secondaryTextColor,
                         maxLines = subtitleMaxLines,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -125,7 +136,7 @@ fun SelectableListRow(
                             text = sidePrimary,
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface,
+                            color = primaryTextColor,
                             textAlign = TextAlign.End
                         )
                     }
@@ -133,7 +144,7 @@ fun SelectableListRow(
                         Text(
                             text = sideSecondary,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = secondaryTextColor,
                             textAlign = TextAlign.End
                         )
                     }

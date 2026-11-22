@@ -183,7 +183,9 @@ class OnboardingViewModel(
 
             is OnboardingIntent.SetThemeMode -> updatePrefs { it.copy(themeMode = intent.mode) }
             is OnboardingIntent.SetAmoledDark -> updatePrefs { it.copy(amoledDarkMode = intent.enabled) }
-            is OnboardingIntent.SetThemePreset -> updatePrefs { it.copy(themePreset = intent.preset) }
+            is OnboardingIntent.SetThemePreset -> updatePrefs {
+                it.copy(themePreset = intent.preset, useCustomTheme = false, dynamicColor = false)
+            }
             is OnboardingIntent.SetDynamicColor -> updatePrefs { it.copy(dynamicColor = intent.enabled) }
 
             is OnboardingIntent.SelectStorageMode -> selectStorageMode(intent.mode)

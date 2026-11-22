@@ -27,7 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MoneyUtils
-import app.overbay.orbit.theme.OrbitColorTokens
+import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.ui.components.OrbitScaleBadgeVisibility
 import app.overbay.orbit.ui.components.charts.ChartScrubberHeader
@@ -104,7 +104,7 @@ fun TrendsChartSection(
                 }
 
                 val netCents = state.totalPeriodNetCents
-                val netColor = if (netCents >= 0L) OrbitColorTokens.Green else OrbitColorTokens.Red
+                val netColor = if (netCents >= 0L) OrbitTheme.colors.income else OrbitTheme.colors.danger
                 Text(
                     text = (if (netCents > 0L) "+" else "") + MoneyUtils.formatCents(netCents),
                     style = TabularNumStyle.copy(fontWeight = FontWeight.Bold),
@@ -186,8 +186,8 @@ fun TrendsChartSection(
                     items = barItems,
                     modifier = Modifier.fillMaxWidth(),
                     height = 200.dp,
-                    expenseColor = OrbitColorTokens.Red,
-                    incomeColor = OrbitColorTokens.Green,
+                    expenseColor = OrbitTheme.colors.chartNegative,
+                    incomeColor = OrbitTheme.colors.chartPositive,
                     onItemSelected = onScrubBar
                 )
             } else {

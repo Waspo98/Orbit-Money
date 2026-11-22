@@ -89,7 +89,7 @@ fun <T> OrbitSegmentedTabRow(
                 Surface(
                     shape = RoundedCornerShape(11.dp),
                     color = MaterialTheme.colorScheme.surface,
-                    border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)),
                     shadowElevation = 1.dp,
                     modifier = Modifier
                         .offset { IntOffset(thumbOffsetDp.roundToPx(), 0) }
@@ -105,7 +105,7 @@ fun <T> OrbitSegmentedTabRow(
                 items.forEach { item ->
                     val isSelected = item == selected
                     val textColor by animateColorAsState(
-                        targetValue = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                        targetValue = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                         animationSpec = OrbitSprings.ColorEffectsFast,
                         label = "segTabText"
                     )
@@ -115,7 +115,7 @@ fun <T> OrbitSegmentedTabRow(
                     Surface(
                         shape = RoundedCornerShape(11.dp),
                         color = if (isSelected && trackSize.width == 0) MaterialTheme.colorScheme.surface else Color.Transparent,
-                        border = if (isSelected && trackSize.width == 0) BorderStroke(1.dp, OrbitTheme.colors.cardBorder) else null,
+                        border = if (isSelected && trackSize.width == 0) BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)) else null,
                         shadowElevation = if (isSelected && trackSize.width == 0) 1.dp else 0.dp,
                         modifier = Modifier
                             .weight(1f)

@@ -12,6 +12,8 @@ import app.overbay.orbit.data.refreshSimpleFinStatus
 import app.overbay.orbit.data.sendTestNotification
 import app.overbay.orbit.data.setMhaEnabled
 import app.overbay.orbit.data.updateNotificationPreferences
+import app.overbay.orbit.theme.DEFAULT_CUSTOM_ACCENT_HEX
+import app.overbay.orbit.theme.normalizeAccentHex
 import app.overbay.orbit.ui.settings.controllers.SettingsBackupController
 import app.overbay.orbit.ui.settings.controllers.SettingsSyncSharingController
 import kotlinx.coroutines.CoroutineScope
@@ -137,8 +139,43 @@ class SettingsViewModel(
 
     // Appearance, Workspace & Security Preferences
     fun setThemePreset(preset: OrbitThemePreset) {
-        val updated = _uiState.value.preferences.copy(themePreset = preset)
+        val updated = _uiState.value.preferences.copy(
+            themePreset = preset,
+            useCustomTheme = false,
+            dynamicColor = false
+        )
         _uiState.update { it.copy(preferences = updated) }
+        scope.launch { repository.updatePreferences(updated) }
+    }
+
+    fun openCustomThemePicker() {
+        val initialHex = normalizeAccentHex(_uiState.value.preferences.customAccentHex) ?: DEFAULT_CUSTOM_ACCENT_HEX
+        showDialog(SettingsDialogState.CustomThemePicker(initialHex = initialHex))
+    }
+
+    fun enableSavedCustomTheme() {
+        val savedHex = normalizeAccentHex(_uiState.value.preferences.customAccentHex)
+        if (savedHex == null) {
+            openCustomThemePicker()
+            return
+        }
+        val updated = _uiState.value.preferences.copy(
+            useCustomTheme = true,
+            customAccentHex = savedHex,
+            dynamicColor = false
+        )
+        _uiState.update { it.copy(preferences = updated) }
+        scope.launch { repository.updatePreferences(updated) }
+    }
+
+    fun applyCustomAccentTheme(hex: String) {
+        val normalized = normalizeAccentHex(hex) ?: return
+        val updated = _uiState.value.preferences.copy(
+            useCustomTheme = true,
+            customAccentHex = normalized,
+            dynamicColor = false
+        )
+        _uiState.update { it.copy(preferences = updated, activeDialog = SettingsDialogState.None) }
         scope.launch { repository.updatePreferences(updated) }
     }
 

@@ -54,6 +54,7 @@ sealed interface SettingsDialogState {
     data object SupportDevelopment : SettingsDialogState
     data object TransactionQuickActions : SettingsDialogState
     data class NotificationSchedule(val type: NotificationScheduleType) : SettingsDialogState
+    data class CustomThemePicker(val initialHex: String) : SettingsDialogState
 }
 
 data class SettingsUiState(

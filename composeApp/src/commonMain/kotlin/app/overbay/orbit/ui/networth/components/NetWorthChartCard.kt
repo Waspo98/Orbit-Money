@@ -28,8 +28,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MonthlyNetWorthPoint
-import app.overbay.orbit.theme.OrbitColorTokens
 import app.overbay.orbit.theme.OrbitSprings
+import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.OrbitScaleBadgeVisibility
 import app.overbay.orbit.ui.components.RollingTickerCents
 import app.overbay.orbit.ui.components.charts.NetWorthAreaChart
@@ -73,9 +73,10 @@ fun NetWorthChartCard(
                         color = MaterialTheme.colorScheme.outline
                     )
                     Spacer(modifier = Modifier.height(2.dp))
+                    val themeColors = OrbitTheme.colors
                     val amount = activePoint?.snapshot?.netWorthCents ?: 0L
                     val amountColor by animateColorAsState(
-                        targetValue = if (amount >= 0L) OrbitColorTokens.Green else OrbitColorTokens.Red,
+                        targetValue = if (amount >= 0L) themeColors.income else themeColors.danger,
                         animationSpec = OrbitSprings.ColorEffectsFast,
                         label = "netWorthAmountColor"
                     )
@@ -87,19 +88,20 @@ fun NetWorthChartCard(
                     )
                 }
 
+                val themeColors = OrbitTheme.colors
                 val currentDelta = activePoint?.deltaFromPreviousCents ?: 0L
                 var lastNonZeroDelta by remember { mutableLongStateOf(0L) }
                 if (currentDelta != 0L) lastNonZeroDelta = currentDelta
                 val displayDelta = if (currentDelta != 0L) currentDelta else lastNonZeroDelta
                 val isPositive = displayDelta > 0L
                 val deltaBg by animateColorAsState(
-                    targetValue = if (isPositive) OrbitColorTokens.Green.copy(alpha = 0.15f)
-                    else OrbitColorTokens.Red.copy(alpha = 0.15f),
+                    targetValue = if (isPositive) themeColors.incomeContainer
+                    else themeColors.dangerContainer,
                     animationSpec = OrbitSprings.ColorEffectsFast,
                     label = "netWorthDeltaBg"
                 )
                 val deltaTextColor by animateColorAsState(
-                    targetValue = if (isPositive) OrbitColorTokens.Green else OrbitColorTokens.Red,
+                    targetValue = if (isPositive) themeColors.onIncomeContainer else themeColors.onDangerContainer,
                     animationSpec = OrbitSprings.ColorEffectsFast,
                     label = "netWorthDeltaText"
                 )

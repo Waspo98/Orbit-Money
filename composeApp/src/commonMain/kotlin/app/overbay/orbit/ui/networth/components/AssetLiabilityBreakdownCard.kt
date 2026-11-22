@@ -30,7 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.domain.NetWorthSnapshot
-import app.overbay.orbit.theme.OrbitColorTokens
+import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.OrbitBarSegment
 import app.overbay.orbit.ui.components.OrbitMiniStatRow
 import app.overbay.orbit.ui.components.OrbitSectionCard
@@ -133,8 +133,8 @@ fun AllocationBar(
     val cashColor = MaterialTheme.colorScheme.primary
     val invColor = MaterialTheme.colorScheme.secondary
     val reColor = MaterialTheme.colorScheme.tertiary
-    val creditColor = OrbitColorTokens.Amber
-    val loanColor = OrbitColorTokens.Red
+    val creditColor = OrbitTheme.colors.warning
+    val loanColor = OrbitTheme.colors.danger
     val otherColor = MaterialTheme.colorScheme.outline
 
     Column(modifier = modifier.fillMaxWidth()) {
@@ -215,6 +215,7 @@ private fun AllocationLegendItem(label: String, color: Color) {
 
 @Composable
 private fun AssetsSectionContent(snapshot: NetWorthSnapshot) {
+    val incomeColor = OrbitTheme.colors.income
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -224,13 +225,13 @@ private fun AssetsSectionContent(snapshot: NetWorthSnapshot) {
             text = "Total Assets",
             style = MaterialTheme.typography.bodyLarge,
             fontWeight = FontWeight.Bold,
-            color = OrbitColorTokens.Green
+            color = incomeColor
         )
         Text(
             text = MoneyUtils.formatCents(snapshot.totalAssetsCents),
             style = MaterialTheme.typography.bodyLarge,
             fontWeight = FontWeight.Bold,
-            color = OrbitColorTokens.Green
+            color = incomeColor
         )
     }
 
@@ -246,6 +247,7 @@ private fun AssetsSectionContent(snapshot: NetWorthSnapshot) {
 
 @Composable
 private fun LiabilitiesSectionContent(snapshot: NetWorthSnapshot) {
+    val dangerColor = OrbitTheme.colors.danger
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -255,13 +257,13 @@ private fun LiabilitiesSectionContent(snapshot: NetWorthSnapshot) {
             text = "Total Liabilities",
             style = MaterialTheme.typography.bodyLarge,
             fontWeight = FontWeight.Bold,
-            color = OrbitColorTokens.Red
+            color = dangerColor
         )
         Text(
             text = MoneyUtils.formatCents(snapshot.totalLiabilitiesCents),
             style = MaterialTheme.typography.bodyLarge,
             fontWeight = FontWeight.Bold,
-            color = OrbitColorTokens.Red
+            color = dangerColor
         )
     }
 
@@ -290,7 +292,7 @@ private fun NetWorthSummaryBanner(snapshot: NetWorthSnapshot) {
                 color = MaterialTheme.colorScheme.onSurface
             )
 
-            val netColor = if (snapshot.netWorthCents >= 0L) OrbitColorTokens.Green else OrbitColorTokens.Red
+            val netColor = if (snapshot.netWorthCents >= 0L) OrbitTheme.colors.income else OrbitTheme.colors.danger
             Text(
                 text = MoneyUtils.formatCents(snapshot.netWorthCents),
                 style = MaterialTheme.typography.titleLarge,
@@ -310,6 +312,6 @@ private fun BreakdownRow(
     OrbitMiniStatRow(
         label = label,
         value = MoneyUtils.formatCents(amountCents),
-        valueColor = if (isNegative && amountCents != 0L) OrbitColorTokens.Red else MaterialTheme.colorScheme.onSurface
+        valueColor = if (isNegative && amountCents != 0L) OrbitTheme.colors.danger else MaterialTheme.colorScheme.onSurface
     )
 }

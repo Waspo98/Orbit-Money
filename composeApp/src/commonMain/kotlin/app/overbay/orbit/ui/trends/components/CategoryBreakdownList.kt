@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.labelWithEmoji
 import app.overbay.orbit.domain.CategorySpendingTrend
 import app.overbay.orbit.domain.MoneyUtils
-import app.overbay.orbit.theme.OrbitColorTokens
+import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.toComposeColor
 import app.overbay.orbit.ui.components.EmptyStateCard
 import app.overbay.orbit.ui.components.OrbitBadge
@@ -132,8 +132,8 @@ fun CategoryBreakdownList(
                             Spacer(modifier = Modifier.height(4.dp))
                             OrbitBadge(
                                 text = "${trend.overBudgetMonthCount} mo over budget",
-                                containerColor = OrbitColorTokens.Red.copy(alpha = 0.12f),
-                                contentColor = OrbitColorTokens.Red
+                                containerColor = OrbitTheme.colors.dangerContainer,
+                                contentColor = OrbitTheme.colors.onDangerContainer
                             )
                         }
 

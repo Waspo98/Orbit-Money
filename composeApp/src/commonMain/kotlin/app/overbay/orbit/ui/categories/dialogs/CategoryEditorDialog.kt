@@ -134,8 +134,9 @@ fun CategoryEditorContent(
         bodySpacing = 0.dp
     ) {
 
-        val previewComposeColor = remember(selectedColor) {
-            selectedColor.toComposeColor(Color(0xFF2E7D32))
+        val fallbackColor = MaterialTheme.colorScheme.primary
+        val previewComposeColor = remember(selectedColor, fallbackColor) {
+            selectedColor.toComposeColor(fallbackColor)
         }
         Surface(
             shape = RoundedCornerShape(12.dp),

@@ -1,7 +1,9 @@
 package app.overbay.orbit.ui.settings.components
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import app.overbay.orbit.OrbitNavKey
+import app.overbay.orbit.data.model.OrbitThemeMode
 import app.overbay.orbit.ui.components.OrbitAlertDialog
 import app.overbay.orbit.ui.components.OrbitConfirmationDialog
 import app.overbay.orbit.ui.settings.NotificationScheduleType
@@ -10,6 +12,7 @@ import app.overbay.orbit.ui.settings.SettingsUiState
 import app.overbay.orbit.ui.settings.SettingsViewModel
 import app.overbay.orbit.ui.settings.sheets.BackupExportSheet
 import app.overbay.orbit.ui.settings.sheets.BackupRestorePasteSheet
+import app.overbay.orbit.ui.settings.sheets.CustomThemePickerSheet
 import app.overbay.orbit.ui.settings.sheets.GoogleDriveClientIdDialog
 import app.overbay.orbit.ui.settings.sheets.MigrateWorkspaceSheet
 import app.overbay.orbit.ui.settings.sheets.NotificationScheduleSheet
@@ -188,6 +191,22 @@ fun SettingsDialogsHost(
                     viewModel.updateNotificationPreferences(nextConfig)
                     viewModel.dismissDialog()
                 },
+                onDismiss = viewModel::dismissDialog
+            )
+        }
+
+        is SettingsDialogState.CustomThemePicker -> {
+            val prefs = uiState.preferences
+            val isDarkNow = when (prefs.themeMode) {
+                OrbitThemeMode.DARK -> true
+                OrbitThemeMode.LIGHT -> false
+                OrbitThemeMode.SYSTEM -> isSystemInDarkTheme()
+            }
+            CustomThemePickerSheet(
+                initialHex = dialog.initialHex,
+                initialDarkPreview = isDarkNow,
+                amoledDark = prefs.amoledDarkMode,
+                onApply = viewModel::applyCustomAccentTheme,
                 onDismiss = viewModel::dismissDialog
             )
         }

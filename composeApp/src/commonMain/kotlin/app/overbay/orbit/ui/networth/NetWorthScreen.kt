@@ -35,7 +35,7 @@ import app.overbay.orbit.OrbitNavKey
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MoneyUtils
-import app.overbay.orbit.theme.OrbitColorTokens
+import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.ui.components.CanopySegmentedBar
 import app.overbay.orbit.ui.components.CanopySettingsButton
@@ -233,25 +233,26 @@ private fun NetWorthHeroKpiStrip(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
+            val themeColors = OrbitTheme.colors
             KpiItem(
                 label = "Current",
                 value = MoneyUtils.formatCents(netWorthCents, showCents = false),
-                valueColor = if (netWorthCents >= 0L) OrbitColorTokens.Green else OrbitColorTokens.Red
+                valueColor = if (netWorthCents >= 0L) themeColors.income else themeColors.danger
             )
             KpiItem(
                 label = "This Month",
                 value = (if (thisMonthDeltaCents > 0L) "+" else "") + MoneyUtils.formatCents(thisMonthDeltaCents, showCents = false),
-                valueColor = if (thisMonthDeltaCents >= 0L) OrbitColorTokens.Green else OrbitColorTokens.Red
+                valueColor = if (thisMonthDeltaCents >= 0L) themeColors.income else themeColors.danger
             )
             KpiItem(
                 label = "YTD",
                 value = (if (ytdDeltaCents > 0L) "+" else "") + MoneyUtils.formatCents(ytdDeltaCents, showCents = false),
-                valueColor = if (ytdDeltaCents >= 0L) OrbitColorTokens.Green else OrbitColorTokens.Red
+                valueColor = if (ytdDeltaCents >= 0L) themeColors.income else themeColors.danger
             )
             KpiItem(
                 label = "Debt Share",
                 value = "${debtSharePercent.toInt()}%",
-                valueColor = if (debtSharePercent > 50.0) OrbitColorTokens.Amber else MaterialTheme.colorScheme.onSurface
+                valueColor = if (debtSharePercent > 50.0) themeColors.warning else MaterialTheme.colorScheme.onSurface
             )
         }
     }

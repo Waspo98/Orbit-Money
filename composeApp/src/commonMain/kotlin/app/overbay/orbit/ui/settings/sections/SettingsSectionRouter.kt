@@ -22,6 +22,8 @@ fun LazyListScope.settingsSectionItems(
             onThemeModeChange = viewModel::setThemeMode,
             onAmoledDarkChange = viewModel::setAmoledDark,
             onPresetChange = viewModel::setThemePreset,
+            onEnableSavedCustomTheme = viewModel::enableSavedCustomTheme,
+            onOpenCustomThemePicker = viewModel::openCustomThemePicker,
             onDynamicColorChange = viewModel::setDynamicColor,
             onHapticsChange = viewModel::setHapticsEnabled
         )

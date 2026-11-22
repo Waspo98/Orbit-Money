@@ -36,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.theme.OrbitSprings
+import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 /**
@@ -68,7 +69,7 @@ fun PeriodNavigatorPill(
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(
             width = 1.dp,
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
+            color = OrbitTheme.colors.cardBorder
         )
     ) {
         Row(
@@ -89,7 +90,7 @@ fun PeriodNavigatorPill(
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
                     contentDescription = "Previous Period",
-                    tint = MaterialTheme.colorScheme.onSurface,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -146,7 +147,7 @@ fun PeriodNavigatorPill(
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     contentDescription = "Next Period",
-                    tint = if (canGoNext) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outlineVariant,
+                    tint = if (canGoNext) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
                     modifier = Modifier.size(20.dp)
                 )
             }

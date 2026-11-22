@@ -99,8 +99,14 @@ fun LazyListScope.settingsIndexItems(
 private fun sectionSummary(section: SettingsSection, uiState: SettingsUiState): String {
     val prefs = uiState.preferences
     return when (section) {
-        SettingsSection.APPEARANCE ->
-            "${prefs.themePreset.displayName} · ${prefs.themeMode.shortLabel} · ${if (prefs.hapticsEnabled) "Haptics On" else "Haptics Off"}"
+        SettingsSection.APPEARANCE -> {
+            val paletteLabel = when {
+                !PlatformRuntime.isWeb && prefs.dynamicColor -> "Wallpaper Colors"
+                prefs.useCustomTheme && !prefs.customAccentHex.isNullOrBlank() -> "Custom (${prefs.customAccentHex})"
+                else -> prefs.themePreset.displayName
+            }
+            "$paletteLabel · ${prefs.themeMode.shortLabel} · ${if (prefs.hapticsEnabled) "Haptics On" else "Haptics Off"}"
+        }
         SettingsSection.NOTIFICATIONS -> {
             val notif = prefs.notificationPreferences
             if (!notif.enabled) {

@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.sp
 import app.overbay.orbit.domain.CategorySpendingTrend
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.domain.MoneyUtils
-import app.overbay.orbit.theme.OrbitColorTokens
+import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.TabularNumStyle
 import app.overbay.orbit.ui.components.OrbitSectionCard
 
@@ -78,7 +78,7 @@ fun CategoryTrendStatsCard(
                 StatTile(
                     label = "Highest Month",
                     value = highestLabel,
-                    valueColor = OrbitColorTokens.Red,
+                    valueColor = OrbitTheme.colors.danger,
                     modifier = Modifier.weight(1f)
                 )
 
@@ -91,7 +91,7 @@ fun CategoryTrendStatsCard(
                 StatTile(
                     label = "Months Over Budget",
                     value = overBudgetLabel,
-                    valueColor = if (trend.overBudgetMonthCount > 0) OrbitColorTokens.Amber else OrbitColorTokens.Green,
+                    valueColor = if (trend.overBudgetMonthCount > 0) OrbitTheme.colors.warning else OrbitTheme.colors.income,
                     modifier = Modifier.weight(1f)
                 )
             }

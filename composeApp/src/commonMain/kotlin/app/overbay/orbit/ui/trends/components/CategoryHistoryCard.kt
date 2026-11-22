@@ -30,7 +30,7 @@ import androidx.compose.ui.unit.dp
 import app.overbay.orbit.domain.CategorySpendingTrend
 import app.overbay.orbit.domain.MoneyUtils
 import app.overbay.orbit.domain.UNCATEGORIZED_CATEGORY_ID
-import app.overbay.orbit.theme.OrbitColorTokens
+import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.theme.toComposeColor
 import app.overbay.orbit.ui.components.OrbitDropdownField
 import app.overbay.orbit.ui.components.OrbitScaleBadgeVisibility
@@ -213,7 +213,7 @@ fun CategoryHistoryCard(
                         modifier = Modifier.fillMaxWidth(),
                         height = 200.dp,
                         barColor = selectedTrend.category.color.toComposeColor(),
-                        expenseColor = OrbitColorTokens.Red,
+                        expenseColor = OrbitTheme.colors.chartNegative,
                         onItemSelected = onScrubBar
                     )
                 }

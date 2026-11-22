@@ -109,6 +109,42 @@ class SettingsViewModelTest {
         assertEquals(OrbitThemePreset.ROYAL_INDIGO, prefs.themePreset)
         assertEquals(OrbitThemeMode.DARK, prefs.themeMode)
         assertFalse(prefs.dynamicColor)
+        assertFalse(prefs.useCustomTheme)
+    }
+
+    @Test
+    fun testCustomAccentTheme_appliesPersistsAndPreservesSavedHexAcrossPresetSwitch() = runTest(testDispatcher) {
+        testScheduler.advanceUntilIdle()
+        viewModel.setDynamicColor(true)
+        viewModel.openCustomThemePicker()
+        assertTrue(viewModel.uiState.value.activeDialog is SettingsDialogState.CustomThemePicker)
+
+        viewModel.applyCustomAccentTheme("7c3aed")
+        testScheduler.advanceUntilIdle()
+
+        var prefs = viewModel.uiState.value.preferences
+        assertTrue(prefs.useCustomTheme)
+        assertEquals("#7C3AED", prefs.customAccentHex)
+        assertFalse(prefs.dynamicColor)
+        assertEquals(SettingsDialogState.None, viewModel.uiState.value.activeDialog)
+        assertEquals("#7C3AED", repository.preferences.value.customAccentHex)
+
+        // Switching back to a preset preserves saved customAccentHex for 1-tap re-activation
+        viewModel.setThemePreset(OrbitThemePreset.OCEAN_SLATE)
+        testScheduler.advanceUntilIdle()
+
+        prefs = viewModel.uiState.value.preferences
+        assertEquals(OrbitThemePreset.OCEAN_SLATE, prefs.themePreset)
+        assertFalse(prefs.useCustomTheme)
+        assertEquals("#7C3AED", prefs.customAccentHex)
+
+        // Re-enabling saved custom theme restores it cleanly
+        viewModel.enableSavedCustomTheme()
+        testScheduler.advanceUntilIdle()
+
+        prefs = viewModel.uiState.value.preferences
+        assertTrue(prefs.useCustomTheme)
+        assertEquals("#7C3AED", prefs.customAccentHex)
     }
 
     @Test

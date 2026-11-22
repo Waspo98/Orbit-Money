@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.theme.OrbitSprings
+import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.util.LocalOrbitHaptics
 
 /**
@@ -68,7 +69,7 @@ fun CanopySurfacePill(
     Surface(
         shape = CircleShape,
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
+        border = BorderStroke(1.dp, OrbitTheme.colors.cardBorder),
         modifier = modifier
             .clip(CircleShape)
             .then(
@@ -88,7 +89,7 @@ fun CanopySurfacePill(
                     Icon(
                         imageVector = leadingIcon,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(iconSize)
                     )
                     Spacer(modifier = Modifier.width(if (isCompact) 6.dp else 8.dp))
@@ -152,7 +153,7 @@ fun CanopyIconButton(
         targetValue = if (isActive) {
             MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
         } else {
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
+            OrbitTheme.colors.cardBorder
         },
         animationSpec = OrbitSprings.ColorEffectsFast,
         label = "canopyIconBorder"
@@ -225,7 +226,7 @@ fun CanopyActionPillButton(
         targetValue = if (isActive) {
             MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
         } else {
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
+            OrbitTheme.colors.cardBorder
         },
         animationSpec = OrbitSprings.ColorEffectsFast,
         label = "canopyActionPillBorder"

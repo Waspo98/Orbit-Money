@@ -36,7 +36,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.AccountType
-import app.overbay.orbit.theme.OrbitColorTokens
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.CurrencyTextField
 import app.overbay.orbit.ui.components.LocalOrbitSheetDismiss
@@ -156,7 +155,7 @@ fun AccountEditorContent(
                             Icon(
                                 imageVector = Icons.Default.CheckCircle,
                                 contentDescription = null,
-                                tint = OrbitColorTokens.Green,
+                                tint = OrbitTheme.colors.income,
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))

@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -48,7 +47,7 @@ import app.overbay.orbit.util.LocalOrbitHaptics
 
 @Composable
 fun ThemeSwatchGrid(
-    selectedPreset: OrbitThemePreset,
+    selectedPreset: OrbitThemePreset?,
     isDarkPreview: Boolean,
     isOverriddenByDynamicColor: Boolean,
     onPresetSelected: (OrbitThemePreset) -> Unit,
@@ -65,7 +64,7 @@ fun ThemeSwatchGrid(
         if (isOverriddenByDynamicColor) {
             SettingsCalloutBanner(
                 icon = OrbitIcons.InfoCircle,
-                text = "Wallpaper colors are active and currently override preset palettes."
+                text = "Wallpaper colors are active. Tap any palette below to switch."
             )
         }
 
@@ -75,7 +74,7 @@ fun ThemeSwatchGrid(
                     rowPresets.forEach { preset ->
                         ThemeSwatchCard(
                             preset = preset,
-                            isSelected = preset == selectedPreset,
+                            isSelected = !isOverriddenByDynamicColor && preset == selectedPreset,
                             isDarkPreview = isDarkPreview,
                             onClick = { onPresetSelected(preset) },
                             modifier = Modifier.weight(1f)
@@ -111,43 +110,92 @@ private fun ThemeSwatchCard(
             },
         shape = RoundedCornerShape(14.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
-        border = BorderStroke(if (isSelected) 2.dp else 1.dp, if (isSelected) MaterialTheme.colorScheme.primary else OrbitTheme.colors.cardBorder)
+        border = BorderStroke(
+            width = if (isSelected) 2.dp else 1.dp,
+            color = if (isSelected) MaterialTheme.colorScheme.primary else OrbitTheme.colors.cardBorder
+        )
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(
+            // Mini app preview: canopy strip + tinted canvas/surface/ink/accent bars
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(36.dp)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(Brush.horizontalGradient(listOf(custom.canopyStart, custom.canopyMid, custom.canopyEnd)))
-                    .padding(horizontal = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                    .border(1.dp, custom.cardBorder, RoundedCornerShape(10.dp))
             ) {
-                Box(modifier = Modifier.width(30.dp).height(18.dp)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(22.dp)
+                        .background(Brush.horizontalGradient(listOf(custom.canopyStart, custom.canopyMid, custom.canopyEnd)))
+                        .padding(horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
                     Box(
                         modifier = Modifier
-                            .size(18.dp)
+                            .width(26.dp)
+                            .height(5.dp)
                             .clip(CircleShape)
-                            .background(scheme.primary)
-                            .border(1.dp, scheme.surface.copy(alpha = 0.7f), CircleShape)
+                            .background(custom.onCanopy.copy(alpha = 0.9f))
                     )
                     Box(
                         modifier = Modifier
-                            .offset(x = 11.dp)
-                            .size(18.dp)
+                            .size(8.dp)
                             .clip(CircleShape)
-                            .background(scheme.primaryContainer)
-                            .border(1.dp, scheme.surface.copy(alpha = 0.7f), CircleShape)
+                            .background(custom.canopyKicker)
                     )
                 }
-                Box(
+
+                Row(
                     modifier = Modifier
-                        .width(24.dp)
-                        .height(10.dp)
-                        .clip(CircleShape)
+                        .fillMaxWidth()
                         .background(scheme.background)
-                )
+                        .padding(horizontal = 7.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .width(34.dp)
+                                .height(4.dp)
+                                .clip(CircleShape)
+                                .background(scheme.onSurface)
+                        )
+                        Box(
+                            modifier = Modifier
+                                .width(22.dp)
+                                .height(3.5.dp)
+                                .clip(CircleShape)
+                                .background(scheme.onSurfaceVariant)
+                        )
+                    }
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(11.dp)
+                                .clip(CircleShape)
+                                .background(scheme.primary)
+                        )
+                        Box(
+                            modifier = Modifier
+                                .size(11.dp)
+                                .clip(CircleShape)
+                                .background(scheme.secondaryContainer)
+                                .border(0.5.dp, custom.cardBorder, CircleShape)
+                        )
+                        Box(
+                            modifier = Modifier
+                                .size(11.dp)
+                                .clip(CircleShape)
+                                .background(custom.income)
+                        )
+                    }
+                }
             }
 
             Row(
