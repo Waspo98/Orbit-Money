@@ -77,7 +77,7 @@ class OnboardingViewModel(
                 } else {
                     _uiState.update { cur ->
                         cur.copy(
-                            isSubmittingAuth = exchanging || cur.isSubmittingAuth,
+                            isSubmittingAuth = exchanging || (cur.isSubmittingAuth && err == null),
                             authError = err ?: cur.authError
                         )
                     }
@@ -388,8 +388,14 @@ class OnboardingViewModel(
     private fun prepareOidcLogin() {
         val url = ServerUrlNormalizer.normalize(_uiState.value.serverUrl)
         awaitingSelfHostedAuth = true
-        storage.saveString(OidcCallbackBridge.PENDING_SERVER_URL_KEY, url.ifEmpty { "/" })
-        scope.launch { repository.prepareForOidcLogin(url) }
+        OidcCallbackBridge.setExchangeError(null)
+        _uiState.update { it.copy(authError = null) }
+        runCatching {
+            storage.saveString(OidcCallbackBridge.PENDING_SERVER_URL_KEY, url.ifEmpty { "/" })
+        }
+        scope.launch {
+            runCatching { repository.prepareForOidcLogin(url) }
+        }
     }
 
     private fun submitServerSampleData() {

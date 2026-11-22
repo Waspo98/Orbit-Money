@@ -95,7 +95,9 @@ fun App(
             if (!code.isNullOrBlank()) {
                 OidcCallbackBridge.consumeExchangeCode(code)
                 OidcCallbackBridge.setExchanging(true)
-                val result = repo.completeOidcNativeExchange(code)
+                val result = withContext(Dispatchers.Default) {
+                    repo.completeOidcNativeExchange(code)
+                }
                 OidcCallbackBridge.setExchanging(false)
                 result.exceptionOrNull()?.let { err ->
                     OidcCallbackBridge.setExchangeError(err.message ?: "SSO Login failed")

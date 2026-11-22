@@ -26,7 +26,9 @@ actual fun rememberOidcAuthLauncher(): OidcAuthLauncher {
                 val base = ServerUrlNormalizer.normalize(serverUrl)
                 if (base.isEmpty() && !loginPath.startsWith("http")) return
                 if (base.isNotEmpty()) {
-                    PlatformStorage().saveString(OidcCallbackBridge.PENDING_SERVER_URL_KEY, base)
+                    runCatching {
+                        PlatformStorage().saveString(OidcCallbackBridge.PENDING_SERVER_URL_KEY, base)
+                    }
                 }
                 val resolvedPath = if (loginPath.startsWith("http")) {
                     loginPath
@@ -52,13 +54,13 @@ actual fun rememberOidcAuthLauncher(): OidcAuthLauncher {
                         customTabsIntent.intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         customTabsIntent.launchUrl(context, uri)
                     }
-                } catch (_: Exception) {
+                } catch (_: Throwable) {
                     try {
                         val fallback = Intent(Intent.ACTION_VIEW, uri).apply {
                             if (activity == null) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         }
                         (activity ?: context).startActivity(fallback)
-                    } catch (_: Exception) {}
+                    } catch (_: Throwable) {}
                 }
             }
         }

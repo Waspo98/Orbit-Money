@@ -7,11 +7,35 @@ import app.overbay.orbit.data.model.OrbitThemePreset
 import app.overbay.orbit.data.model.RetirementScenarioPreset
 import app.overbay.orbit.data.model.StorageMode
 import app.overbay.orbit.data.model.TaxTrackingMode
+import app.overbay.orbit.data.network.OrbitApiClient
+import app.overbay.orbit.util.OidcCallbackBridge
 import app.overbay.orbit.util.PlatformStorage
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.HttpClientEngineBase
+import io.ktor.client.engine.HttpClientEngineConfig
+import io.ktor.client.engine.callContext
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.request.HttpRequestData
+import io.ktor.client.request.HttpResponseData
+import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpProtocolVersion
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.headersOf
+import io.ktor.serialization.kotlinx.json.json
+import io.ktor.util.date.GMTDate
+import io.ktor.utils.io.ByteReadChannel
+import io.ktor.utils.io.InternalAPI
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -169,4 +193,90 @@ class OnboardingViewModelTest {
         assertFalse("housing_calculator" in vm.uiState.value.enabledFeatures)
         assertTrue(repo.preferences.value.onboardingCompleted)
     }
+
+    @Test
+    fun concurrentPlatformStorageWritesDuringOidcLaunchDoNotThrow() = runTest {
+        withContext(Dispatchers.Default) {
+            val jobs = (1..4).map { worker ->
+                async {
+                    val s = PlatformStorage()
+                    repeat(100) { iter ->
+                        s.saveString(OidcCallbackBridge.PENDING_SERVER_URL_KEY, "https://orbit-$worker-$iter.example.com")
+                    }
+                }
+            }
+            jobs.awaitAll()
+        }
+        val finalValue = PlatformStorage().loadString(OidcCallbackBridge.PENDING_SERVER_URL_KEY)
+        assertTrue(finalValue?.startsWith("https://orbit-") == true)
+        PlatformStorage().delete(OidcCallbackBridge.PENDING_SERVER_URL_KEY)
+    }
+
+    @OptIn(InternalAPI::class)
+    @Test
+    fun prepareOidcLoginFromFreshLocalInstallStaysOnServerAuthAndDetectsExistingServerOnCallback() =
+        runTest(UnconfinedTestDispatcher()) {
+            val dispatcher = UnconfinedTestDispatcher(testScheduler)
+            val storage = PlatformStorage().apply { clear() }
+            val wireJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+            val engine = object : HttpClientEngineBase("onboarding-oidc-mock") {
+                override val dispatcher: CoroutineDispatcher = dispatcher
+                override val config: HttpClientEngineConfig = HttpClientEngineConfig()
+                override suspend fun execute(data: HttpRequestData): HttpResponseData {
+                    val body = when (data.url.encodedPath) {
+                        "/api/auth/config" -> """{"authProvider":"both","localEnabled":true,"oidcEnabled":true,"oidcLoginUrl":"/api/auth/oidc/login","oidcLoginLabel":"Sign in with Authentik"}"""
+                        "/api/auth/oidc/native-exchange" -> """{"authenticated":true,"username":"neal","displayName":"Neal","authProvider":"both","authMethod":"oidc"}"""
+                        "/api/auth/me" -> """{"authenticated":true,"username":"neal","displayName":"Neal","authProvider":"both","authMethod":"oidc","household":{"id":1,"name":"Home","role":"owner"}}"""
+                        "/api/accounts" -> """{"items":[{"id":10,"name":"Main Checking","type":"checking","current_balance":1500.0}]}"""
+                        "/api/transactions" -> """{"items":[],"total":0,"page":1,"totalPages":1}"""
+                        "/api/categories" -> """{"items":[]}"""
+                        "/api/simplefin/status" -> """{"connected":true,"syncEnabled":true}"""
+                        else -> """{"items":[]}"""
+                    }
+                    return HttpResponseData(
+                        statusCode = HttpStatusCode.OK,
+                        requestTime = GMTDate(),
+                        headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+                        version = HttpProtocolVersion.HTTP_1_1,
+                        body = ByteReadChannel(body),
+                        callContext = callContext()
+                    )
+                }
+            }
+            val apiClient = OrbitApiClient(
+                baseUrlProvider = { "https://orbit.example.com" },
+                storage = storage,
+                customHttpClient = HttpClient(engine) { install(ContentNegotiation) { json(wireJson) } }
+            )
+            val repo = OrbitRepository(storage = storage, customApiClient = apiClient, scope = backgroundScope)
+            repo.initialize() // Fresh local install: storageMode=LOCAL, isAuthenticated=true
+            val vm = OnboardingViewModel(
+                repository = repo,
+                customApiClient = apiClient,
+                storage = storage,
+                isWebPlatform = false,
+                scope = backgroundScope
+            )
+            vm.beginSession(isReplay = false)
+            vm.processIntent(OnboardingIntent.Next) // -> APPEARANCE
+            vm.processIntent(OnboardingIntent.Next) // -> STORAGE_MODE
+            vm.processIntent(OnboardingIntent.SelectStorageMode(StorageMode.SELF_HOSTED))
+            vm.processIntent(OnboardingIntent.Next) // -> SERVER_URL
+            vm.processIntent(OnboardingIntent.UpdateServerInput("https://orbit.example.com"))
+            vm.processIntent(OnboardingIntent.TestAndConnectServer)
+            assertEquals(OnboardingStep.SERVER_AUTH, vm.uiState.value.currentStep)
+
+            // Pressing OIDC login must keep us on SERVER_AUTH while awaiting callback (never false-auth!)
+            vm.processIntent(OnboardingIntent.PrepareOidcLogin)
+            assertEquals(OnboardingStep.SERVER_AUTH, vm.uiState.value.currentStep)
+            assertFalse(repo.isAuthenticated.value)
+
+            // OIDC callback completes -> existing accounts are loaded before onboarding advances to ALL_SET
+            val res = repo.completeOidcNativeExchange("test-exchange-code")
+            assertTrue(res.isSuccess)
+            assertTrue(vm.uiState.value.existingServerDetected)
+            assertEquals(OnboardingStep.ALL_SET, vm.uiState.value.currentStep)
+            assertFalse(repo.preferences.value.onboardingCompleted)
+            storage.clear()
+        }
 }

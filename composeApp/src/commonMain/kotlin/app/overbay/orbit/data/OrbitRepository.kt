@@ -208,9 +208,11 @@ class OrbitRepository(
         val normalizedUrl = ServerUrlNormalizer.normalize(serverUrl)
         storage.saveString(OidcCallbackBridge.PENDING_SERVER_URL_KEY, normalizedUrl.ifEmpty { "/" })
         val updatedPref = _preferences.value.copy(storageMode = StorageMode.SELF_HOSTED, selfHostedServerUrl = normalizedUrl)
+        // Clear authentication BEFORE switching storageMode so observers combining (isAuthenticated, storageMode)
+        // never witness a transient (true, SELF_HOSTED) state when transitioning from LOCAL mode.
+        _isAuthenticated.value = false
         _preferences.value = updatedPref
         _storageMode.value = StorageMode.SELF_HOSTED
-        _isAuthenticated.value = false
         persistAuthMethod(null)
         localEngine.saveStartupPreferences(updatedPref)
     }

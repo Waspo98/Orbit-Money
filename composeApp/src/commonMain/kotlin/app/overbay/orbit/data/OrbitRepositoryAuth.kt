@@ -91,8 +91,6 @@ internal suspend fun OrbitRepository.markAuthenticatedImpl(
         onboardingCompleted = resolvedOnboarding
     )
     _preferences.value = updatedPref
-    _storageMode.value = StorageMode.SELF_HOSTED
-    _isAuthenticated.value = true
     _currentUser.value = userLabel
     if (!authMethod.isNullOrBlank()) {
         persistAuthMethod(authMethod)
@@ -104,6 +102,8 @@ internal suspend fun OrbitRepository.markAuthenticatedImpl(
         preferences = fresh.preferences.copy(onboardingCompleted = resolvedOnboarding)
     )
     commitSnapshot(finalSnap, immediate = true)
+    _storageMode.value = StorageMode.SELF_HOSTED
+    _isAuthenticated.value = true
     refreshSimpleFinStatus()
     _syncStatus.value = SyncResult.Success("Signed in as $userLabel (${fresh.transactions.size} transactions)")
 }
