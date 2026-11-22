@@ -178,9 +178,6 @@ fun TransactionsScreen(
             accounts = state.accounts,
             categories = state.categories,
             existingTransactions = state.transactions,
-            onImportConfirmed = { txns, rules ->
-                viewModel.importCsvTransactions(txns, rules)
-            },
             onImportPreview = { fileName, preview, fallbackAcctId, includeRules ->
                 viewModel.importCsvPreview(fileName, preview, fallbackAcctId, includeRules)
             },

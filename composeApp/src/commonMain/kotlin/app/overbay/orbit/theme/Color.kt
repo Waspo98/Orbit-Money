@@ -228,11 +228,6 @@ val FinanceIncomeDark = Color(0xFF34D399)
 val FinanceIncomeContainerLight = Color(0xFFD1FAE5)
 val FinanceIncomeContainerDark = Color(0xFF064E3B)
 
-val FinanceExpenseLight = Color(0xFF1A1F1B)
-val FinanceExpenseDark = Color(0xFFE8ECE6)
-val FinanceExpenseContainerLight = Color(0xFFFEE2E2)
-val FinanceExpenseContainerDark = Color(0xFF3F1212)
-
 val FinanceDangerLight = Color(0xFFB91C1C)
 val FinanceDangerDark = Color(0xFFF87171)
 val FinanceDangerContainerLight = Color(0xFFFEE2E2)
@@ -242,9 +237,6 @@ val FinanceWarningLight = Color(0xFFA16207)
 val FinanceWarningDark = Color(0xFFFBBF24)
 val FinanceWarningContainerLight = Color(0xFFFEF3C7)
 val FinanceWarningContainerDark = Color(0xFF3F2A08)
-
-val FinanceTransferLight = Color(0xFF6B7268)
-val FinanceTransferDark = Color(0xFF8A948C)
 
 /**
  * Safely parses a hex color string (e.g. "#RRGGBB", "RRGGBB", "#AARRGGBB", or "AARRGGBB")

@@ -8,7 +8,6 @@ import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
-import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -139,15 +138,17 @@ class ThemeAndColorsTest {
 
     @Test
     fun testDynamicCustomColorsHarmonizesBordersAndCanopyContrast() {
-        val dynamicLight = dynamicCustomColors(TerracottaLightColorScheme, isDark = false)
-        val dynamicDark = dynamicCustomColors(TerracottaDarkColorScheme, isDark = true)
+        val terracottaLight = getPresetColorScheme(OrbitThemePreset.WARM_TERRACOTTA, isDark = false)
+        val terracottaDark = getPresetColorScheme(OrbitThemePreset.WARM_TERRACOTTA, isDark = true)
+        val dynamicLight = dynamicCustomColors(terracottaLight, isDark = false)
+        val dynamicDark = dynamicCustomColors(terracottaDark, isDark = true)
         val emeraldLight = emeraldCustomColors(isDark = false)
         val emeraldDark = emeraldCustomColors(isDark = true)
 
-        assertEquals(TerracottaLightColorScheme.outlineVariant, dynamicLight.cardBorder)
-        assertEquals(TerracottaDarkColorScheme.outlineVariant, dynamicDark.cardBorder)
-        assertEquals(TerracottaLightColorScheme.onSurface, dynamicLight.expense)
-        assertEquals(TerracottaDarkColorScheme.onSurface, dynamicDark.expense)
+        assertEquals(terracottaLight.outlineVariant, dynamicLight.cardBorder)
+        assertEquals(terracottaDark.outlineVariant, dynamicDark.cardBorder)
+        assertEquals(terracottaLight.onSurface, dynamicLight.expense)
+        assertEquals(terracottaDark.onSurface, dynamicDark.expense)
         assertNotEquals(emeraldLight.canopyMid, dynamicLight.canopyMid)
         assertNotEquals(emeraldDark.canopyMid, dynamicDark.canopyMid)
         assertTrue(contrastRatio(dynamicLight.onCanopy, dynamicLight.canopyStart) >= 7.0)
@@ -180,12 +181,13 @@ class ThemeAndColorsTest {
         )
         assertEquals(IndigoLightPrimary, invalidCustomFallsBack.colorScheme.primary)
 
+        val terracottaLight = getPresetColorScheme(OrbitThemePreset.WARM_TERRACOTTA, isDark = false)
         val dynamicWins = resolveOrbitPalette(
             themePreset = OrbitThemePreset.ROYAL_INDIGO,
             isDark = false,
             useCustomTheme = true,
             customAccentHex = "#0D9488",
-            dynamicScheme = TerracottaLightColorScheme
+            dynamicScheme = terracottaLight
         )
         assertEquals(TerracottaLightPrimary, dynamicWins.colorScheme.primary)
     }

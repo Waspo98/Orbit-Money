@@ -7,6 +7,7 @@ import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.EditSource
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.merchantLogoKey
+import app.overbay.orbit.domain.CsvImportPreview
 import app.overbay.orbit.domain.LocalDateUtils
 import app.overbay.orbit.ui.components.TransactionFilterDraft
 import app.overbay.orbit.util.PlatformStorage
@@ -477,10 +478,21 @@ class TransactionsViewModelTest {
         testScheduler.advanceUntilIdle()
 
         val imported = listOf(
-            Transaction(id = 0L, accountId = 1L, originalDate = "2026-05-01", originalMerchant = "Shop 1", originalAmountCents = -1500L),
-            Transaction(id = 0L, accountId = 1L, originalDate = "2026-05-02", originalMerchant = "Shop 2", originalAmountCents = -2500L)
+            Transaction(id = 1L, accountId = 1L, originalDate = "2026-05-01", originalMerchant = "Shop 1", originalAmountCents = -1500L),
+            Transaction(id = 2L, accountId = 1L, originalDate = "2026-05-02", originalMerchant = "Shop 2", originalAmountCents = -2500L)
         )
-        viewModel.importCsvTransactions(imported)
+        viewModel.importCsvPreview(
+            fileName = "test.csv",
+            preview = CsvImportPreview(
+                accounts = emptyList(),
+                rules = emptyList(),
+                transactions = imported,
+                totalRowCount = 2,
+                invalidRowCount = 0,
+                duplicateRowCount = 0
+            ),
+            fallbackAccountId = 1L
+        )
         testScheduler.advanceUntilIdle()
 
         assertEquals(2, repository.transactions.value.size)

@@ -486,16 +486,6 @@ class TransactionsViewModel(
     fun getImportBatches(): List<app.overbay.orbit.data.model.ImportBatchRecord> =
         repository.snapshot.value.importBatches
 
-    fun importCsvTransactions(
-        transactions: List<Transaction>,
-        rules: List<TransactionRule> = emptyList()
-    ) {
-        viewModelScope.launch(computeDispatcher) {
-            repository.importTransactions(transactions, rules)
-            closeCsvImportSheet()
-        }
-    }
-
     fun importCsvPreview(
         fileName: String,
         preview: app.overbay.orbit.domain.CsvImportPreview,

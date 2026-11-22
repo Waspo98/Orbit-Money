@@ -2,14 +2,10 @@ package app.overbay.orbit.data.network
 
 import app.overbay.orbit.data.model.ImportBatchRecord
 import io.ktor.client.call.body
-import io.ktor.client.request.forms.formData
-import io.ktor.client.request.forms.submitFormWithBinaryData
 import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
-import io.ktor.http.Headers
-import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import kotlinx.serialization.Serializable
@@ -65,26 +61,6 @@ suspend fun OrbitApiClient.importNormalizedCsvRemote(
     ensureSuccess(res)
     val dto = res.body<ImportRocketMoneyResponseDto>()
     dto.toDomain(request.fileName).copy(source = request.source)
-}
-
-suspend fun OrbitApiClient.uploadRocketMoneyCsvRemote(
-    rawCsvContent: String,
-    fileName: String = "rocket_money.csv"
-): Result<ImportBatchRecord> = runCatching {
-    val res = client.submitFormWithBinaryData(
-        url = url("/api/import/rocket-money"),
-        formData = formData {
-            append("file", rawCsvContent.encodeToByteArray(), Headers.build {
-                append(HttpHeaders.ContentDisposition, "filename=\"$fileName\"")
-                append(HttpHeaders.ContentType, "text/csv")
-            })
-        }
-    ) {
-        sessionCookie?.let { header("Cookie", it) }
-    }
-    extractSessionCookie(res)
-    ensureSuccess(res)
-    res.body<ImportRocketMoneyResponseDto>().toDomain(fileName)
 }
 
 suspend fun OrbitApiClient.undoImportBatchRemote(batchId: Long): Result<Boolean> = runCatching {

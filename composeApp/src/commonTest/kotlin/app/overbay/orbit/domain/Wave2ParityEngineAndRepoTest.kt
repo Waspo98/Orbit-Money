@@ -2,7 +2,7 @@ package app.overbay.orbit.domain
 
 import app.overbay.orbit.data.OrbitRepository
 import app.overbay.orbit.data.addBalanceRecord
-import app.overbay.orbit.data.importTransactionsWithBatch
+import app.overbay.orbit.data.importCsvPreview
 import app.overbay.orbit.data.muteSimpleFinAccountWarnings
 import app.overbay.orbit.data.unmuteSimpleFinAccountWarning
 import app.overbay.orbit.data.model.Account
@@ -299,13 +299,20 @@ class Wave2ParityEngineAndRepoTest {
             stealFromOthers = false
         )
 
-        val importedBatch = repository.importTransactionsWithBatch(
+        val importedBatch = repository.importCsvPreview(
             fileName = "april_export.csv",
-            rawCsvContent = null,
-            newTransactions = listOf(
-                Transaction(accountId = 1L, originalDate = "2026-04-01", originalMerchant = "Trader Joes", originalAmountCents = -8_400L),
-                Transaction(accountId = 1L, originalDate = "2026-04-02", originalMerchant = "Target", originalAmountCents = -4_200L)
-            )
+            preview = CsvImportPreview(
+                accounts = emptyList(),
+                rules = emptyList(),
+                transactions = listOf(
+                    Transaction(id = 1L, accountId = 1L, originalDate = "2026-04-01", originalMerchant = "Trader Joes", originalAmountCents = -8_400L),
+                    Transaction(id = 2L, accountId = 1L, originalDate = "2026-04-02", originalMerchant = "Target", originalAmountCents = -4_200L)
+                ),
+                totalRowCount = 2,
+                invalidRowCount = 0,
+                duplicateRowCount = 0
+            ),
+            fallbackAccountId = 1L
         ).getOrThrow()
 
         assertEquals(2, repository.transactions.value.size)

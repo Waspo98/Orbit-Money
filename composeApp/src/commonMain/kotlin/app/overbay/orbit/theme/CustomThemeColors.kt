@@ -50,18 +50,3 @@ val LocalCustomThemeColors = staticCompositionLocalOf {
 
 fun emeraldCustomColors(isDark: Boolean): CustomThemeColors =
     if (isDark) OrbitPresetPalettes.emeraldDark.customColors else OrbitPresetPalettes.emeraldLight.customColors
-
-fun oceanSlateCustomColors(isDark: Boolean): CustomThemeColors =
-    if (isDark) OrbitPresetPalettes.oceanDark.customColors else OrbitPresetPalettes.oceanLight.customColors
-
-fun warmTerracottaCustomColors(isDark: Boolean): CustomThemeColors =
-    if (isDark) OrbitPresetPalettes.terracottaDark.customColors else OrbitPresetPalettes.terracottaLight.customColors
-
-fun royalIndigoCustomColors(isDark: Boolean): CustomThemeColors =
-    if (isDark) OrbitPresetPalettes.indigoDark.customColors else OrbitPresetPalettes.indigoLight.customColors
-
-fun monochromeInkCustomColors(isDark: Boolean): CustomThemeColors =
-    if (isDark) OrbitPresetPalettes.monochromeDark.customColors else OrbitPresetPalettes.monochromeLight.customColors
-
-fun spaceshipRedCustomColors(isDark: Boolean): CustomThemeColors =
-    if (isDark) OrbitPresetPalettes.spaceshipRedDark.customColors else OrbitPresetPalettes.spaceshipRedLight.customColors

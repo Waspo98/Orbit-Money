@@ -22,20 +22,6 @@ val OrbitShapes = Shapes(
     extraLarge = RoundedCornerShape(24.dp)
 )
 
-// Complete Material 3 Preset Color Schemes (all 32 active roles populated)
-val EmeraldLightColorScheme: ColorScheme = OrbitPresetPalettes.emeraldLight.colorScheme
-val EmeraldDarkColorScheme: ColorScheme = OrbitPresetPalettes.emeraldDark.colorScheme
-val OceanLightColorScheme: ColorScheme = OrbitPresetPalettes.oceanLight.colorScheme
-val OceanDarkColorScheme: ColorScheme = OrbitPresetPalettes.oceanDark.colorScheme
-val TerracottaLightColorScheme: ColorScheme = OrbitPresetPalettes.terracottaLight.colorScheme
-val TerracottaDarkColorScheme: ColorScheme = OrbitPresetPalettes.terracottaDark.colorScheme
-val IndigoLightColorScheme: ColorScheme = OrbitPresetPalettes.indigoLight.colorScheme
-val IndigoDarkColorScheme: ColorScheme = OrbitPresetPalettes.indigoDark.colorScheme
-val MonochromeLightColorScheme: ColorScheme = OrbitPresetPalettes.monochromeLight.colorScheme
-val MonochromeDarkColorScheme: ColorScheme = OrbitPresetPalettes.monochromeDark.colorScheme
-val SpaceshipRedLightColorScheme: ColorScheme = OrbitPresetPalettes.spaceshipRedLight.colorScheme
-val SpaceshipRedDarkColorScheme: ColorScheme = OrbitPresetPalettes.spaceshipRedDark.colorScheme
-
 fun getPresetPalette(preset: OrbitThemePreset, isDark: Boolean): ResolvedOrbitPalette =
     OrbitPresetPalettes.get(preset, isDark)
 

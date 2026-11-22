@@ -22,7 +22,6 @@ import app.overbay.orbit.data.model.SimpleFinStatusInfo
 import app.overbay.orbit.data.model.SimpleFinSyncLogEntry
 import app.overbay.orbit.data.model.StorageMode
 import app.overbay.orbit.data.model.Transaction
-import app.overbay.orbit.data.model.TransactionRule
 import app.overbay.orbit.data.network.AccountDto
 import app.overbay.orbit.data.network.CategoryDto
 import app.overbay.orbit.data.network.GoalDto
@@ -471,58 +470,6 @@ suspend fun OrbitRepository.exportBudgetingJson(): Result<String> = runCatching 
         if (!remote.isNullOrBlank()) return@runCatching remote
     }
     exportBackupJson()
-}
-
-suspend fun OrbitRepository.importTransactionsWithBatch(
-    fileName: String,
-    rawCsvContent: String?,
-    newTransactions: List<Transaction>,
-    newAccounts: List<Account> = emptyList(),
-    newCategories: List<Category> = emptyList(),
-    newRules: List<TransactionRule> = emptyList()
-): Result<ImportBatchRecord> = runCatching {
-    if (storageMode.value == StorageMode.SELF_HOSTED && !rawCsvContent.isNullOrBlank()) {
-        val remoteBatch = createApiClient().uploadRocketMoneyCsvRemote(rawCsvContent, fileName).getOrThrow()
-        sync(force = true)
-        return@runCatching remoteBatch
-    }
-    val curAccounts = accounts.value
-    var nextAcctId = (curAccounts.maxOfOrNull { it.id } ?: 0L) + 1L
-    val assignedAccounts = newAccounts.map { if (it.id <= 0L) it.copy(id = nextAcctId++) else it }
-
-    val curCategories = categories.value
-    var nextCatId = (curCategories.maxOfOrNull { it.id } ?: 0L) + 1L
-    val assignedCategories = newCategories.map { if (it.id <= 0L) it.copy(id = nextCatId++) else it }
-
-    val curRules = rules.value
-    var nextRuleId = (curRules.maxOfOrNull { it.id } ?: 0L) + 1L
-    val assignedRules = newRules.map { if (it.id <= 0L) it.copy(id = nextRuleId++) else it }
-
-    val curTxns = transactions.value
-    var nextTxId = (curTxns.maxOfOrNull { it.id } ?: 0L) + 1L
-    val assignedTxns = newTransactions.map { if (it.id <= 0L || curTxns.any { c -> c.id == it.id }) it.copy(id = nextTxId++) else it }
-
-    val nextBatchId = (snapshot.value.importBatches.maxOfOrNull { it.id } ?: 0L) + 1L
-    val batch = ImportBatchRecord(
-        id = nextBatchId,
-        fileName = fileName,
-        importedAt = Clock.System.now().toString(),
-        totalRows = newTransactions.size,
-        importedCount = assignedTxns.size,
-        transactionIds = assignedTxns.map { it.id },
-        createdAccountIds = assignedAccounts.map { it.id },
-        createdCategoryIds = assignedCategories.map { it.id },
-        createdRuleIds = assignedRules.map { it.id }
-    )
-
-    commitSnapshot(snapshot.value.copy(
-        accounts = curAccounts + assignedAccounts,
-        categories = curCategories + assignedCategories,
-        rules = curRules + assignedRules,
-        transactions = curTxns + assignedTxns,
-        importBatches = snapshot.value.importBatches + batch
-    ))
-    batch
 }
 
 suspend fun OrbitRepository.undoImportBatch(batchId: Long): Result<Boolean> = runCatching {

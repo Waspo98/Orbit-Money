@@ -46,10 +46,6 @@ data class CsvImportPreview(
 
 object CsvImportEngine {
 
-    val REQUIRED_HEADERS = listOf(
-        "Date", "Account Type", "Account Name", "Institution Name", "Name", "Amount", "Description", "Category"
-    )
-
     fun parseCsvHeaders(csvContent: String): List<String> {
         val firstLine = csvContent.lines().firstOrNull { it.isNotBlank() } ?: return emptyList()
         return parseCsvLine(firstLine)

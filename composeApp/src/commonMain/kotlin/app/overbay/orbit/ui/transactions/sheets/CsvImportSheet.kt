@@ -35,10 +35,9 @@ fun CsvImportSheet(
     accounts: List<Account>,
     categories: List<Category>,
     existingTransactions: List<Transaction>,
-    onImportConfirmed: (transactions: List<Transaction>, rules: List<TransactionRule>) -> Unit,
+    onImportPreview: (fileName: String, preview: CsvImportPreview, fallbackAccountId: Long?, includeRules: Boolean) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
-    onImportPreview: ((fileName: String, preview: CsvImportPreview, fallbackAccountId: Long?, includeRules: Boolean) -> Unit)? = null,
     isImporting: Boolean = false,
     externalError: String? = null,
     importBatches: List<ImportBatchRecord> = emptyList(),
@@ -107,38 +106,8 @@ fun CsvImportSheet(
                 onConfirm = {
                     if (preview == null) {
                         parseCsv(activeMapping)
-                    } else if (onImportPreview != null) {
-                        onImportPreview(fileName, preview, selectedAccountId, includeRules)
                     } else {
-                        val fallbackId = selectedAccountId ?: 1L
-                        val accountName = accounts.find { it.id == fallbackId }?.name ?: ""
-                        val assignedTxns = preview.transactions.map {
-                            it.copy(accountId = fallbackId, accountName = it.accountName.ifBlank { accountName })
-                        }
-                        val generatedRules = if (includeRules) {
-                            preview.rules.map { candidate ->
-                                TransactionRule(
-                                    name = candidate.friendlyRuleName,
-                                    conditions = listOf(
-                                        RuleCondition(
-                                            field = RuleConditionField.MERCHANT,
-                                            operator = RuleOperator.CONTAINS,
-                                            value = candidate.originalName
-                                        )
-                                    ),
-                                    actions = listOf(
-                                        RuleAction(
-                                            type = RuleActionType.RENAME,
-                                            value = candidate.customName,
-                                            textValue = candidate.customName
-                                        )
-                                    ),
-                                    enabled = true
-                                )
-                            }
-                        } else emptyList()
-
-                        onImportConfirmed(assignedTxns, generatedRules)
+                        onImportPreview(fileName, preview, selectedAccountId, includeRules)
                     }
                 },
                 confirmEnabled = !isImporting && if (preview == null) csvText.isNotBlank() else preview.transactions.isNotEmpty()
