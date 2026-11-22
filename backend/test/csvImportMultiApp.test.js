@@ -89,3 +89,25 @@ test('importNormalizedCsvTransactions auto-creates Imported Checking when worksp
   assert.equal(acct.name, 'Imported Checking');
   assert.equal(acct.type, 'checking');
 });
+
+test('importNormalizedCsvTransactions ignores non-existent or foreign categoryId and falls back safely', () => {
+  const db = createTestDb();
+  const result = importNormalizedCsvTransactions(db, 1, {
+    fileName: 'foreign_cat.csv',
+    source: 'csv',
+    accounts: [],
+    transactions: [
+      {
+        date: '2026-11-02',
+        amountCents: -2500,
+        merchant: 'Corner Deli',
+        description: 'CORNER DELI',
+        categoryId: 999999
+      }
+    ]
+  });
+
+  assert.equal(result.inserted, 1);
+  const tx = db.prepare('SELECT category_id FROM transactions WHERE household_id = 1').get();
+  assert.notEqual(tx.category_id, 999999);
+});

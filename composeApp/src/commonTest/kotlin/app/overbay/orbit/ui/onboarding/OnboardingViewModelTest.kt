@@ -3,11 +3,15 @@ package app.overbay.orbit.ui.onboarding
 import app.overbay.orbit.data.OrbitRepository
 import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.data.model.FilingStatus
+import app.overbay.orbit.data.model.OrbitPreferences
 import app.overbay.orbit.data.model.OrbitThemePreset
+import app.overbay.orbit.data.model.OrbitWorkspaceSnapshot
 import app.overbay.orbit.data.model.RetirementScenarioPreset
 import app.overbay.orbit.data.model.StorageMode
 import app.overbay.orbit.data.model.TaxTrackingMode
 import app.overbay.orbit.data.network.OrbitApiClient
+import app.overbay.orbit.data.network.SimpleFinDirectClient
+import app.overbay.orbit.ui.login.LocalSeedChoice
 import app.overbay.orbit.util.OidcCallbackBridge
 import app.overbay.orbit.util.PlatformStorage
 import io.ktor.client.HttpClient
@@ -21,11 +25,14 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpProtocolVersion
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.content.OutgoingContent
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.util.date.GMTDate
 import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.InternalAPI
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -43,6 +50,8 @@ import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class OnboardingViewModelTest {
+
+    private val testJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
     private fun createVm(scope: TestScope): Pair<OrbitRepository, OnboardingViewModel> {
         val storage = PlatformStorage()
@@ -277,6 +286,220 @@ class OnboardingViewModelTest {
             assertTrue(vm.uiState.value.existingServerDetected)
             assertEquals(OnboardingStep.ALL_SET, vm.uiState.value.currentStep)
             assertFalse(repo.preferences.value.onboardingCompleted)
+            storage.clear()
+        }
+
+    @OptIn(InternalAPI::class)
+    @Test
+    fun selfHostedSimpleFinDefaultsCutoverDateAndMhaTogglePersistsToServer() =
+        runTest(UnconfinedTestDispatcher()) {
+            val dispatcher = UnconfinedTestDispatcher(testScheduler)
+            val storage = PlatformStorage().apply { clear() }
+            val wireJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+            var capturedSimpleFinSetupBody = ""
+            var capturedMhaSettingsBody = ""
+            val engine = object : HttpClientEngineBase("onboarding-selfhosted-mock") {
+                override val dispatcher: CoroutineDispatcher = dispatcher
+                override val config: HttpClientEngineConfig = HttpClientEngineConfig()
+                override suspend fun execute(data: HttpRequestData): HttpResponseData {
+                    val reqBody = when (val c = data.body) {
+                        is OutgoingContent.ByteArrayContent -> c.bytes().decodeToString()
+                        else -> ""
+                    }
+                    when (data.url.encodedPath) {
+                        "/api/simplefin/setup" -> capturedSimpleFinSetupBody = reqBody
+                        "/api/mha/settings" -> capturedMhaSettingsBody = reqBody
+                    }
+                    val body = when (data.url.encodedPath) {
+                        "/api/auth/config" -> """{"authProvider":"local","localEnabled":true,"oidcEnabled":false}"""
+                        "/api/auth/login" -> """{"authenticated":true,"username":"neal"}"""
+                        "/api/auth/me" -> """{"authenticated":true,"username":"neal","authProvider":"local","household":{"id":1,"name":"Home","role":"owner"}}"""
+                        "/api/simplefin/setup" -> """{"connected":true,"syncEnabled":true,"cutoverDate":"2026-11-21"}"""
+                        "/api/simplefin/status" -> """{"connected":true,"syncEnabled":true,"cutoverDate":"2026-11-21"}"""
+                        "/api/simplefin/sync" -> """{"status":"ok"}"""
+                        "/api/mha/settings" -> """{"enabled":true}"""
+                        "/api/mha" -> """{"enabled":true}"""
+                        "/api/transactions" -> """{"items":[],"total":0,"page":1,"totalPages":1}"""
+                        else -> """{"items":[]}"""
+                    }
+                    return HttpResponseData(
+                        statusCode = HttpStatusCode.OK,
+                        requestTime = GMTDate(),
+                        headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+                        version = HttpProtocolVersion.HTTP_1_1,
+                        body = ByteReadChannel(body),
+                        callContext = callContext()
+                    )
+                }
+            }
+            val apiClient = OrbitApiClient(
+                baseUrlProvider = { "https://orbit.example.com" },
+                storage = storage,
+                customHttpClient = HttpClient(engine) { install(ContentNegotiation) { json(wireJson) } }
+            )
+            val repo = OrbitRepository(storage = storage, customApiClient = apiClient, scope = backgroundScope)
+            repo.initialize()
+            val vm = OnboardingViewModel(repo, customApiClient = apiClient, storage = storage, isWebPlatform = false, scope = backgroundScope)
+            vm.beginSession(isReplay = false)
+            vm.processIntent(OnboardingIntent.Next) // APPEARANCE
+            vm.processIntent(OnboardingIntent.Next) // STORAGE_MODE
+            vm.processIntent(OnboardingIntent.SelectStorageMode(StorageMode.SELF_HOSTED))
+            vm.processIntent(OnboardingIntent.Next) // SERVER_URL
+            vm.processIntent(OnboardingIntent.UpdateServerInput("https://orbit.example.com"))
+            vm.processIntent(OnboardingIntent.TestAndConnectServer)
+            vm.processIntent(OnboardingIntent.UpdateUsername("neal"))
+            vm.processIntent(OnboardingIntent.UpdatePassword("secret"))
+            vm.processIntent(OnboardingIntent.SubmitPasswordLogin)
+            assertEquals(OnboardingStep.DATA_CONNECT, vm.uiState.value.currentStep)
+
+            vm.processIntent(OnboardingIntent.UpdateSimpleFinToken("SAMPLE_TOKEN"))
+            vm.processIntent(OnboardingIntent.ConnectSimpleFin)
+            assertTrue(capturedSimpleFinSetupBody.contains("\"cutoverDate\":\""))
+            assertTrue(vm.uiState.value.simpleFinConnected)
+
+            vm.processIntent(OnboardingIntent.Next) // PERSONALIZE_FORK
+            vm.processIntent(OnboardingIntent.EnterAct2Personalize) // FEATURES
+            vm.processIntent(OnboardingIntent.ToggleFeature("mha"))
+            vm.processIntent(OnboardingIntent.Next) // ADDITIONAL_ACCOUNTS
+            assertTrue(capturedMhaSettingsBody.contains("\"enabled\":true"))
+            storage.clear()
+        }
+
+    @Test
+    fun localLiabilityAccountsStoreNegativeBalancesAndRestoreForcesLocalMode() =
+        runTest(UnconfinedTestDispatcher()) {
+            val (repo, vm) = createVm(this)
+            vm.beginSession(isReplay = false)
+            vm.processIntent(OnboardingIntent.Next) // APPEARANCE
+            vm.processIntent(OnboardingIntent.Next) // STORAGE_MODE
+            vm.processIntent(OnboardingIntent.SelectStorageMode(StorageMode.LOCAL))
+            vm.processIntent(OnboardingIntent.Next) // LOCAL_WORKSPACE
+            vm.processIntent(OnboardingIntent.SelectLocalSeed(LocalSeedChoice.FRESH))
+            vm.processIntent(OnboardingIntent.ConfirmLocalWorkspace)
+            vm.processIntent(OnboardingIntent.Next) // PERSONALIZE_FORK
+            vm.processIntent(OnboardingIntent.EnterAct2Personalize) // FEATURES
+            vm.processIntent(OnboardingIntent.Next) // ADDITIONAL_ACCOUNTS
+
+            vm.processIntent(OnboardingIntent.UpdateManualAccountName("Home Mortgage"))
+            vm.processIntent(OnboardingIntent.UpdateManualAccountType(AccountType.MORTGAGE))
+            vm.processIntent(OnboardingIntent.UpdateManualAccountBalance(320_000_00L))
+            vm.processIntent(OnboardingIntent.UpdateManualAccountEstValue(450_000_00L))
+            vm.processIntent(OnboardingIntent.SaveManualAccount)
+
+            val mortgage = repo.accounts.value.single { it.name == "Home Mortgage" }
+            assertEquals(-320_000_00L, mortgage.currentBalanceCents)
+            assertEquals(450_000_00L, mortgage.estimatedValueCents)
+
+            // Restoring a backup exported from Self-Hosted under Local workspace must keep LOCAL mode
+            val selfHostedSnapshotJson = testJson.encodeToString(
+                OrbitWorkspaceSnapshot.serializer(),
+                OrbitWorkspaceSnapshot.empty().copy(
+                    preferences = OrbitPreferences(
+                        storageMode = StorageMode.SELF_HOSTED,
+                        selfHostedServerUrl = "https://remote.example.com",
+                        onboardingCompleted = true
+                    )
+                )
+            )
+            vm.beginSession(isReplay = false)
+            vm.processIntent(OnboardingIntent.Next) // APPEARANCE
+            vm.processIntent(OnboardingIntent.Next) // STORAGE_MODE
+            vm.processIntent(OnboardingIntent.SelectStorageMode(StorageMode.LOCAL))
+            vm.processIntent(OnboardingIntent.Next) // LOCAL_WORKSPACE
+            vm.processIntent(OnboardingIntent.SelectLocalSeed(LocalSeedChoice.RESTORE_FILE))
+            vm.processIntent(OnboardingIntent.SetBackupFile("backup.json", selfHostedSnapshotJson))
+            vm.processIntent(OnboardingIntent.ConfirmLocalWorkspace)
+
+            assertEquals(StorageMode.LOCAL, repo.storageMode.value)
+            assertEquals(StorageMode.LOCAL, repo.preferences.value.storageMode)
+            assertEquals(OnboardingStep.ALL_SET, vm.uiState.value.currentStep)
+        }
+
+    @OptIn(InternalAPI::class)
+    @Test
+    fun webOidcRedirectDuringOnboardingResumesAtAllSetInsteadOfWelcome() =
+        runTest(UnconfinedTestDispatcher()) {
+            val dispatcher = UnconfinedTestDispatcher(testScheduler)
+            val storage = PlatformStorage().apply { clear() }
+            storage.saveString(OidcCallbackBridge.PENDING_SERVER_URL_KEY, "/")
+            storage.saveString(OidcCallbackBridge.PENDING_ONBOARDING_OIDC_KEY, "1")
+            val wireJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+            val engine = object : HttpClientEngineBase("onboarding-web-oidc-mock") {
+                override val dispatcher: CoroutineDispatcher = dispatcher
+                override val config: HttpClientEngineConfig = HttpClientEngineConfig()
+                override suspend fun execute(data: HttpRequestData): HttpResponseData {
+                    val body = when (data.url.encodedPath) {
+                        "/api/auth/me" -> """{"authenticated":true,"username":"neal","displayName":"Neal","authProvider":"oidc","authMethod":"oidc","household":{"id":1,"name":"Home","role":"owner"}}"""
+                        "/api/accounts" -> """{"items":[{"id":1,"name":"Checking","type":"checking","current_balance":1000.0}]}"""
+                        "/api/transactions" -> """{"items":[],"total":0,"page":1,"totalPages":1}"""
+                        "/api/simplefin/status" -> """{"connected":false,"syncEnabled":false}"""
+                        else -> """{"items":[]}"""
+                    }
+                    return HttpResponseData(
+                        statusCode = HttpStatusCode.OK,
+                        requestTime = GMTDate(),
+                        headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+                        version = HttpProtocolVersion.HTTP_1_1,
+                        body = ByteReadChannel(body),
+                        callContext = callContext()
+                    )
+                }
+            }
+            val apiClient = OrbitApiClient(
+                baseUrlProvider = { "" },
+                storage = storage,
+                customHttpClient = HttpClient(engine) { install(ContentNegotiation) { json(wireJson) } }
+            )
+            val repo = OrbitRepository(storage = storage, customApiClient = apiClient, scope = backgroundScope)
+            repo.initialize()
+            val vm = OnboardingViewModel(repo, customApiClient = apiClient, storage = storage, isWebPlatform = true, scope = backgroundScope)
+            vm.beginSession(isReplay = false)
+
+            assertEquals(OnboardingStep.ALL_SET, vm.uiState.value.currentStep)
+            assertTrue(vm.uiState.value.existingServerDetected)
+            storage.clear()
+        }
+
+    @OptIn(InternalAPI::class, ExperimentalEncodingApi::class)
+    @Test
+    fun failedLocalSimpleFinSyncDoesNotMaskErrorAsConnected() =
+        runTest(UnconfinedTestDispatcher()) {
+            val dispatcher = UnconfinedTestDispatcher(testScheduler)
+            val storage = PlatformStorage().apply { clear() }
+            val engine = object : HttpClientEngineBase("simplefin-fail-mock") {
+                override val dispatcher: CoroutineDispatcher = dispatcher
+                override val config: HttpClientEngineConfig = HttpClientEngineConfig()
+                override suspend fun execute(data: HttpRequestData): HttpResponseData {
+                    val isClaim = data.url.encodedPath.endsWith("/claim")
+                    val body = if (isClaim) "https://u:p@bridge.example.com/simplefin" else "Internal Error"
+                    val status = if (isClaim) HttpStatusCode.OK else HttpStatusCode.InternalServerError
+                    return HttpResponseData(
+                        statusCode = status,
+                        requestTime = GMTDate(),
+                        headers = headersOf(HttpHeaders.ContentType, ContentType.Text.Plain.toString()),
+                        version = HttpProtocolVersion.HTTP_1_1,
+                        body = ByteReadChannel(body),
+                        callContext = callContext()
+                    )
+                }
+            }
+            val sfClient = SimpleFinDirectClient(HttpClient(engine))
+            val repo = OrbitRepository(storage = storage, customSimpleFinClient = sfClient, scope = backgroundScope)
+            repo.initialize()
+            val vm = OnboardingViewModel(repo, storage = storage, isWebPlatform = false, scope = backgroundScope)
+            vm.beginSession(isReplay = false)
+            vm.processIntent(OnboardingIntent.Next) // APPEARANCE
+            vm.processIntent(OnboardingIntent.Next) // STORAGE_MODE
+            vm.processIntent(OnboardingIntent.SelectStorageMode(StorageMode.LOCAL))
+            vm.processIntent(OnboardingIntent.Next) // LOCAL_WORKSPACE
+            vm.processIntent(OnboardingIntent.ConfirmLocalWorkspace) // -> DATA_CONNECT
+
+            val token = Base64.encode("https://bridge.example.com/claim".encodeToByteArray())
+            vm.processIntent(OnboardingIntent.UpdateSimpleFinToken(token))
+            vm.processIntent(OnboardingIntent.ConnectSimpleFin)
+
+            assertFalse(vm.uiState.value.simpleFinConnected)
+            assertTrue(!vm.uiState.value.simpleFinError.isNullOrBlank())
             storage.clear()
         }
 }

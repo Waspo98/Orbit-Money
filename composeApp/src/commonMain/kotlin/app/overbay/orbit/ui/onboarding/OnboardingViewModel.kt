@@ -24,6 +24,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.random.Random
 
 class OnboardingViewModel(
@@ -39,7 +41,10 @@ class OnboardingViewModel(
     internal val _uiState = MutableStateFlow(OnboardingUiState())
     val uiState: StateFlow<OnboardingUiState> = _uiState.asStateFlow()
 
+    private val persistMutex = Mutex()
     private var awaitingSelfHostedAuth = false
+    private var wasExchangingOidc = false
+    internal var lastFailedLocalSimpleFinInput: String? = null
 
     init {
         this.scope.launch {
@@ -55,8 +60,7 @@ class OnboardingViewModel(
                         preferences = prefs,
                         existingAccounts = snap.accounts.filter { !it.isArchived },
                         householdMembers = snap.members,
-                        simpleFinConnected = cur.simpleFinConnected || sfStatus.connected ||
-                            (prefs.storageMode == StorageMode.LOCAL && !prefs.simpleFinToken.isNullOrBlank())
+                        simpleFinConnected = cur.simpleFinConnected || sfStatus.connected
                     )
                 }
             }
@@ -73,14 +77,19 @@ class OnboardingViewModel(
             }.collect { (authed, mode, exchanging, err) ->
                 if (awaitingSelfHostedAuth && authed && mode == StorageMode.SELF_HOSTED) {
                     awaitingSelfHostedAuth = false
+                    wasExchangingOidc = false
                     handleSelfHostedAuthComplete()
-                } else {
+                } else if (err != null) {
+                    wasExchangingOidc = false
                     _uiState.update { cur ->
-                        cur.copy(
-                            isSubmittingAuth = exchanging || (cur.isSubmittingAuth && err == null),
-                            authError = err ?: cur.authError
-                        )
+                        cur.copy(isSubmittingAuth = exchanging, authError = err)
                     }
+                } else if (exchanging) {
+                    wasExchangingOidc = true
+                    _uiState.update { cur -> cur.copy(isSubmittingAuth = true) }
+                } else if (wasExchangingOidc) {
+                    wasExchangingOidc = false
+                    _uiState.update { cur -> cur.copy(isSubmittingAuth = false) }
                 }
             }
         }
@@ -88,6 +97,14 @@ class OnboardingViewModel(
 
     fun beginSession(isReplay: Boolean) {
         awaitingSelfHostedAuth = false
+        wasExchangingOidc = false
+        lastFailedLocalSimpleFinInput = null
+        OidcCallbackBridge.setExchangeError(null)
+        val resumingOidc = !isReplay && storage.loadString(OidcCallbackBridge.PENDING_ONBOARDING_OIDC_KEY) == "1"
+        if (resumingOidc || isReplay) {
+            storage.delete(OidcCallbackBridge.PENDING_ONBOARDING_OIDC_KEY)
+        }
+
         val prefs = repository.preferences.value
         val snap = repository.snapshot.value
         val profile = snap.mhaTaxProfile
@@ -108,16 +125,35 @@ class OnboardingViewModel(
 
         val normalizedUrl = ServerUrlNormalizer.normalize(prefs.selfHostedServerUrl)
         val initialTaxMode = if (isReplay && prefs.mhaTrackerEnabled) profile.trackingMode else TaxTrackingMode.GENERAL
+        val alreadyAuthedSelfHosted = repository.isAuthenticated.value && repository.storageMode.value == StorageMode.SELF_HOSTED
+        val hasExistingWorkspace = snap.accounts.any { !it.isArchived }
+        val initialStep = when {
+            isReplay -> OnboardingStep.APPEARANCE
+            resumingOidc && alreadyAuthedSelfHosted ->
+                if (hasExistingWorkspace) OnboardingStep.ALL_SET else OnboardingStep.DATA_CONNECT
+            resumingOidc -> OnboardingStep.SERVER_AUTH
+            else -> OnboardingStep.WELCOME
+        }
+        if (resumingOidc && !alreadyAuthedSelfHosted) {
+            awaitingSelfHostedAuth = true
+        }
 
         _uiState.value = OnboardingUiState(
-            currentStep = if (isReplay) OnboardingStep.APPEARANCE else OnboardingStep.WELCOME,
+            currentStep = initialStep,
             isReplay = isReplay,
             transitionDirection = 1,
             isCompleted = false,
             preferences = prefs,
-            selectedStorageMode = if (isReplay) prefs.storageMode else if (isWebPlatform) StorageMode.SELF_HOSTED else StorageMode.LOCAL,
+            selectedStorageMode = when {
+                isReplay -> prefs.storageMode
+                resumingOidc -> StorageMode.SELF_HOSTED
+                isWebPlatform -> StorageMode.SELF_HOSTED
+                else -> StorageMode.LOCAL
+            },
             serverUrl = normalizedUrl,
             serverInput = normalizedUrl.ifBlank { LoginUiState.DEFAULT_SERVER_PREFIX },
+            existingServerDetected = resumingOidc && alreadyAuthedSelfHosted && hasExistingWorkspace,
+            isSubmittingAuth = resumingOidc && !alreadyAuthedSelfHosted && OidcCallbackBridge.isExchanging.value,
             enteredAct2 = isReplay,
             enabledFeatures = initialFeatures,
             existingAccounts = snap.accounts.filter { !it.isArchived },
@@ -132,6 +168,10 @@ class OnboardingViewModel(
             taxCapCents = profile.designatedCapCents,
             taxFmrvCents = profile.fairMarketRentalValueCents
         )
+
+        if (resumingOidc && !alreadyAuthedSelfHosted) {
+            loadServerAuthConfigForResume(normalizedUrl)
+        }
     }
 
     fun processIntent(intent: OnboardingIntent) {
@@ -232,9 +272,11 @@ class OnboardingViewModel(
         val steps = cur.resolvedSteps
         val idx = steps.indexOf(cur.currentStep)
         scope.launch {
-            if (cur.currentStep == OnboardingStep.FEATURES) persistFeatureChoicesImpl(cur)
-            if (cur.currentStep == OnboardingStep.RETIREMENT) persistRetirementChoicesImpl(cur)
-            if (cur.currentStep == OnboardingStep.TAX_DEDUCTIONS) persistTaxChoicesImpl(cur)
+            persistMutex.withLock {
+                if (cur.currentStep == OnboardingStep.FEATURES) persistFeatureChoicesImpl(cur)
+                if (cur.currentStep == OnboardingStep.RETIREMENT) persistRetirementChoicesImpl(cur)
+                if (cur.currentStep == OnboardingStep.TAX_DEDUCTIONS) persistTaxChoicesImpl(cur)
+            }
         }
         val nextStep = steps.getOrNull(idx + 1) ?: return
         _uiState.update { it.copy(currentStep = nextStep, transitionDirection = 1) }
@@ -256,10 +298,18 @@ class OnboardingViewModel(
     }
 
     private fun updatePrefs(transform: (OrbitPreferences) -> OrbitPreferences) {
-        scope.launch { repository.updatePreferences(transform(repository.preferences.value)) }
+        scope.launch {
+            persistMutex.withLock {
+                repository.updatePreferences(transform(repository.preferences.value))
+            }
+        }
     }
 
     private fun selectStorageMode(mode: StorageMode) {
+        OidcCallbackBridge.setExchangeError(null)
+        if (mode == StorageMode.LOCAL) {
+            storage.delete(OidcCallbackBridge.PENDING_ONBOARDING_OIDC_KEY)
+        }
         _uiState.update {
             it.copy(
                 selectedStorageMode = mode,
@@ -270,13 +320,16 @@ class OnboardingViewModel(
     }
 
     private fun startLocalSampleQuickly() {
+        storage.delete(OidcCallbackBridge.PENDING_ONBOARDING_OIDC_KEY)
         _uiState.update { it.copy(isSubmittingAuth = true, authError = null) }
         scope.launch {
-            repository.setStorageMode(StorageMode.LOCAL)
-            repository.loadDemoData(DemoSeedGenerator.generateDemoSnapshot())
-            repository.updatePreferences(
-                repository.preferences.value.copy(storageMode = StorageMode.LOCAL, onboardingCompleted = true)
-            )
+            persistMutex.withLock {
+                repository.setStorageMode(StorageMode.LOCAL)
+                repository.loadDemoData(DemoSeedGenerator.generateDemoSnapshot())
+                repository.updatePreferences(
+                    repository.preferences.value.copy(storageMode = StorageMode.LOCAL, onboardingCompleted = true)
+                )
+            }
             _uiState.update { it.copy(isSubmittingAuth = false, isCompleted = true) }
         }
     }
@@ -287,21 +340,30 @@ class OnboardingViewModel(
             _uiState.update { it.copy(authError = "Please select or paste a backup JSON file first.") }
             return
         }
+        storage.delete(OidcCallbackBridge.PENDING_ONBOARDING_OIDC_KEY)
         _uiState.update { it.copy(isSubmittingAuth = true, authError = null) }
         scope.launch {
-            repository.setStorageMode(StorageMode.LOCAL)
-            when (state.selectedLocalSeed) {
-                LocalSeedChoice.DEMO -> repository.loadDemoData(DemoSeedGenerator.generateDemoSnapshot())
-                LocalSeedChoice.RESTORE_FILE -> {
-                    val res = repository.restoreBackupJson(state.backupJsonContent.orEmpty())
-                    if (res.isFailure) {
-                        _uiState.update {
-                            it.copy(isSubmittingAuth = false, authError = res.exceptionOrNull()?.message ?: "Could not restore backup.")
+            persistMutex.withLock {
+                repository.setStorageMode(StorageMode.LOCAL)
+                when (state.selectedLocalSeed) {
+                    LocalSeedChoice.DEMO -> repository.loadDemoData(DemoSeedGenerator.generateDemoSnapshot())
+                    LocalSeedChoice.RESTORE_FILE -> {
+                        val res = repository.restoreBackupJson(state.backupJsonContent.orEmpty())
+                        if (res.isFailure) {
+                            _uiState.update {
+                                it.copy(isSubmittingAuth = false, authError = res.exceptionOrNull()?.message ?: "Could not restore backup.")
+                            }
+                            return@launch
                         }
-                        return@launch
+                        repository.updatePreferences(
+                            repository.preferences.value.copy(
+                                storageMode = StorageMode.LOCAL,
+                                onboardingCompleted = false
+                            )
+                        )
                     }
+                    LocalSeedChoice.FRESH -> Unit
                 }
-                LocalSeedChoice.FRESH -> Unit
             }
             val nextStep = if (state.selectedLocalSeed == LocalSeedChoice.FRESH) {
                 OnboardingStep.DATA_CONNECT
@@ -361,6 +423,24 @@ class OnboardingViewModel(
         }
     }
 
+    private fun loadServerAuthConfigForResume(serverUrl: String) {
+        scope.launch {
+            val client = customApiClient ?: repository.createApiClient(serverUrl)
+            val cfg = client.getAuthConfig().getOrNull() ?: return@launch
+            val localEnabled = cfg.localEnabled || (cfg.authProvider == "local" && !cfg.oidcEnabled)
+            val oidcEnabled = cfg.oidcEnabled || cfg.authProvider == "oidc" || cfg.authProvider == "both"
+            _uiState.update { cur ->
+                cur.copy(
+                    localAuthEnabled = localEnabled,
+                    oidcEnabled = oidcEnabled,
+                    oidcLoginUrl = cfg.oidcLoginUrl?.ifBlank { "/api/auth/oidc/login" } ?: "/api/auth/oidc/login",
+                    oidcLoginLabel = cfg.oidcLoginLabel?.ifBlank { "Log in with OIDC" } ?: "Log in with OIDC",
+                    sampleDataEnabled = cfg.sampleDataEnabled
+                )
+            }
+        }
+    }
+
     private fun submitPasswordLogin() {
         val state = _uiState.value
         val url = ServerUrlNormalizer.normalize(state.serverUrl)
@@ -368,6 +448,7 @@ class OnboardingViewModel(
             _uiState.update { it.copy(authError = "Username and password are required.") }
             return
         }
+        OidcCallbackBridge.setExchangeError(null)
         _uiState.update { it.copy(isSubmittingAuth = true, authError = null) }
         scope.launch {
             val client = customApiClient ?: repository.createApiClient(url)
@@ -392,6 +473,7 @@ class OnboardingViewModel(
         _uiState.update { it.copy(authError = null) }
         runCatching {
             storage.saveString(OidcCallbackBridge.PENDING_SERVER_URL_KEY, url.ifEmpty { "/" })
+            storage.saveString(OidcCallbackBridge.PENDING_ONBOARDING_OIDC_KEY, "1")
         }
         scope.launch {
             runCatching { repository.prepareForOidcLogin(url) }
@@ -400,6 +482,7 @@ class OnboardingViewModel(
 
     private fun submitServerSampleData() {
         val url = ServerUrlNormalizer.normalize(_uiState.value.serverUrl)
+        OidcCallbackBridge.setExchangeError(null)
         _uiState.update { it.copy(isSampleLoading = true, authError = null) }
         scope.launch {
             val deviceId = getOrCreateSampleDeviceId()
@@ -438,14 +521,17 @@ class OnboardingViewModel(
 
     private fun finishSetup(commitAct2: Boolean) {
         val state = _uiState.value
+        storage.delete(OidcCallbackBridge.PENDING_ONBOARDING_OIDC_KEY)
         scope.launch {
-            if (commitAct2 && state.enteredAct2) {
-                persistFeatureChoicesImpl(state)
-                if ("retirement_calculator" in state.enabledFeatures) persistRetirementChoicesImpl(state)
-                if ("mha" in state.enabledFeatures) persistTaxChoicesImpl(state)
-            }
-            if (!state.isReplay) {
-                repository.updatePreferences(repository.preferences.value.copy(onboardingCompleted = true))
+            persistMutex.withLock {
+                if (commitAct2 && state.enteredAct2) {
+                    persistFeatureChoicesImpl(state)
+                    if ("retirement_calculator" in state.enabledFeatures) persistRetirementChoicesImpl(state)
+                    if ("mha" in state.enabledFeatures) persistTaxChoicesImpl(state)
+                }
+                if (!state.isReplay) {
+                    repository.updatePreferences(repository.preferences.value.copy(onboardingCompleted = true))
+                }
             }
             _uiState.update { it.copy(isCompleted = true) }
         }

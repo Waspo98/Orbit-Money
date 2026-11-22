@@ -38,8 +38,9 @@ fun CsvImportSheet(
     onImportConfirmed: (transactions: List<Transaction>, rules: List<TransactionRule>) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
-    onImportBatch: ((fileName: String, rawCsv: String, transactions: List<Transaction>, rules: List<TransactionRule>) -> Unit)? = null,
     onImportPreview: ((fileName: String, preview: CsvImportPreview, fallbackAccountId: Long?, includeRules: Boolean) -> Unit)? = null,
+    isImporting: Boolean = false,
+    externalError: String? = null,
     importBatches: List<ImportBatchRecord> = emptyList(),
     onUndoBatch: ((Long) -> Unit)? = null
 ) {
@@ -97,7 +98,11 @@ fun CsvImportSheet(
         footer = {
             val preview = previewResult
             OrbitModalFooter(
-                confirmText = if (preview == null) "Preview Import" else "Import (${preview.transactions.size})",
+                confirmText = when {
+                    isImporting -> "Importing..."
+                    preview == null -> "Preview Import"
+                    else -> "Import (${preview.transactions.size})"
+                },
                 onDismiss = onDismiss,
                 onConfirm = {
                     if (preview == null) {
@@ -133,14 +138,10 @@ fun CsvImportSheet(
                             }
                         } else emptyList()
 
-                        if (onImportBatch != null) {
-                            onImportBatch(fileName, csvText, assignedTxns, generatedRules)
-                        } else {
-                            onImportConfirmed(assignedTxns, generatedRules)
-                        }
+                        onImportConfirmed(assignedTxns, generatedRules)
                     }
                 },
-                confirmEnabled = if (preview == null) csvText.isNotBlank() else preview.transactions.isNotEmpty()
+                confirmEnabled = !isImporting && if (preview == null) csvText.isNotBlank() else preview.transactions.isNotEmpty()
             )
         }
     ) {
@@ -255,9 +256,10 @@ fun CsvImportSheet(
                 }
             }
 
+            val displayError = errorMessage ?: externalError
             var lastError by remember { mutableStateOf<String?>(null) }
-            if (errorMessage != null) lastError = errorMessage
-            OrbitAccordionVisibility(visible = errorMessage != null) {
+            if (displayError != null) lastError = displayError
+            OrbitAccordionVisibility(visible = displayError != null) {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     Spacer(modifier = Modifier.height(10.dp))
                     Surface(
@@ -276,7 +278,7 @@ fun CsvImportSheet(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = errorMessage ?: lastError.orEmpty(),
+                                text = displayError ?: lastError.orEmpty(),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onErrorContainer
                             )

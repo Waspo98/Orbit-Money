@@ -10,7 +10,6 @@ import app.overbay.orbit.data.model.HouseholdIncomeRecord
 import app.overbay.orbit.data.model.HouseholdMember
 import app.overbay.orbit.data.model.HouseholdShare
 import app.overbay.orbit.data.model.HouseholdSharingState
-import app.overbay.orbit.data.model.ImportBatchRecord
 import app.overbay.orbit.data.model.MerchantLogo
 import app.overbay.orbit.data.model.MhaTaxProfile
 import app.overbay.orbit.data.model.OccurrenceStatus
@@ -27,8 +26,6 @@ import app.overbay.orbit.domain.MoneyUtils
 import io.ktor.client.call.body
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.delete
-import io.ktor.client.request.forms.formData
-import io.ktor.client.request.forms.submitFormWithBinaryData
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
@@ -38,8 +35,6 @@ import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
-import io.ktor.http.Headers
-import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import kotlinx.serialization.json.JsonElement
@@ -578,30 +573,6 @@ suspend fun OrbitApiClient.restoreOrbitBackupRemote(backupJson: String): Result<
         contentType(ContentType.Application.Json); auth(sessionCookie)
         setBody(RestoreOrbitBackupRequestDto(backupJson = backupJson))
     }
-    extractSessionCookie(res); ensureSuccess(res)
-    res.status.isSuccess()
-}
-
-suspend fun OrbitApiClient.uploadRocketMoneyCsvRemote(
-    rawCsvContent: String, fileName: String = "rocket_money.csv"
-): Result<ImportBatchRecord> = runCatching {
-    val res = client.submitFormWithBinaryData(
-        url = url("/api/import/rocket-money"),
-        formData = formData {
-            append("file", rawCsvContent.encodeToByteArray(), Headers.build {
-                append(HttpHeaders.ContentDisposition, "filename=\"$fileName\"")
-                append(HttpHeaders.ContentType, "text/csv")
-            })
-        }
-    ) {
-        auth(sessionCookie)
-    }
-    extractSessionCookie(res); ensureSuccess(res)
-    res.body<ImportRocketMoneyResponseDto>().toDomain(fileName)
-}
-
-suspend fun OrbitApiClient.undoImportBatchRemote(batchId: Long): Result<Boolean> = runCatching {
-    val res = client.post(url("/api/import/batches/$batchId/undo")) { auth(sessionCookie) }
     extractSessionCookie(res); ensureSuccess(res)
     res.status.isSuccess()
 }

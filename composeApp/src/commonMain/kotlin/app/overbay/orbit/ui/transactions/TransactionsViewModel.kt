@@ -107,6 +107,8 @@ class TransactionsViewModel(
             showEditorSheet = overlays.showEditorSheet,
             showSplitSheet = overlays.showSplitSheet,
             showCsvImportSheet = overlays.showCsvImportSheet,
+            isImportingCsv = overlays.isImportingCsv,
+            csvImportError = overlays.csvImportError,
             showFilterSheet = overlays.showFilterSheet,
             showBatchDeleteConfirm = overlays.showBatchDeleteConfirm,
             singleDeleteConfirmId = overlays.singleDeleteConfirmId,
@@ -254,8 +256,12 @@ class TransactionsViewModel(
         _overlays.update { it.copy(inspectingId = id, showSplitSheet = true) }
     }
     fun closeSplitSheet() { _overlays.update { it.copy(showSplitSheet = false) } }
-    fun openCsvImportSheet() { _overlays.update { it.copy(showCsvImportSheet = true) } }
-    fun closeCsvImportSheet() { _overlays.update { it.copy(showCsvImportSheet = false) } }
+    fun openCsvImportSheet() {
+        _overlays.update { it.copy(showCsvImportSheet = true, isImportingCsv = false, csvImportError = null) }
+    }
+    fun closeCsvImportSheet() {
+        _overlays.update { it.copy(showCsvImportSheet = false, isImportingCsv = false, csvImportError = null) }
+    }
     fun openFilterSheet() { _overlays.update { it.copy(showFilterSheet = true) } }
     fun closeFilterSheet() { _overlays.update { it.copy(showFilterSheet = false) } }
     fun openLogoFinder(transactionId: Long) { _overlays.update { it.copy(logoFinderTransactionId = transactionId) } }
@@ -490,39 +496,31 @@ class TransactionsViewModel(
         }
     }
 
-    fun importCsvBatch(
-        fileName: String,
-        rawCsvContent: String,
-        transactions: List<Transaction>,
-        rules: List<TransactionRule> = emptyList()
-    ) {
-        viewModelScope.launch(computeDispatcher) {
-            repository.importTransactionsWithBatch(
-                fileName = fileName,
-                rawCsvContent = rawCsvContent,
-                newTransactions = transactions,
-                newAccounts = emptyList(),
-                newCategories = emptyList(),
-                newRules = rules
-            )
-            closeCsvImportSheet()
-        }
-    }
-
     fun importCsvPreview(
         fileName: String,
         preview: app.overbay.orbit.domain.CsvImportPreview,
         fallbackAccountId: Long?,
         includeRules: Boolean = true
     ) {
+        if (_overlays.value.isImportingCsv) return
+        _overlays.update { it.copy(isImportingCsv = true, csvImportError = null) }
         viewModelScope.launch(computeDispatcher) {
-            repository.importCsvPreview(
+            val res = repository.importCsvPreview(
                 fileName = fileName,
                 preview = preview,
                 fallbackAccountId = fallbackAccountId,
                 includeRules = includeRules
             )
-            closeCsvImportSheet()
+            if (res.isSuccess) {
+                closeCsvImportSheet()
+            } else {
+                _overlays.update {
+                    it.copy(
+                        isImportingCsv = false,
+                        csvImportError = res.exceptionOrNull()?.message ?: "CSV import failed."
+                    )
+                }
+            }
         }
     }
 
@@ -532,52 +530,27 @@ class TransactionsViewModel(
         }
     }
 
-    fun batchCategorize(categoryId: Long) {
+    private inline fun runBatchAction(crossinline block: suspend (Set<Long>) -> Unit) {
         val selected = _overlays.value.selectedIds
         if (selected.isEmpty()) return
         viewModelScope.launch(computeDispatcher) {
-            repository.batchEditCategory(selected, categoryId)
+            block(selected)
             clearSelection()
         }
     }
 
-    fun batchMarkTransfer(isTransfer: Boolean) {
-        val selected = _overlays.value.selectedIds
-        if (selected.isEmpty()) return
-        viewModelScope.launch(computeDispatcher) {
-            repository.batchMarkTransfer(selected, isTransfer)
-            clearSelection()
-        }
+    fun batchCategorize(categoryId: Long) = runBatchAction { repository.batchEditCategory(it, categoryId) }
+
+    fun batchMarkTransfer(isTransfer: Boolean) = runBatchAction { repository.batchMarkTransfer(it, isTransfer) }
+
+    fun batchToggleMha() = runBatchAction { selected ->
+        val allEligible = uiState.value.transactions.filter { it.id in selected }.all { it.effectiveMhaEligible == true }
+        repository.batchSetMhaEligible(selected, !allEligible)
     }
 
-    fun batchToggleMha() {
-        val selected = _overlays.value.selectedIds
-        if (selected.isEmpty()) return
-        viewModelScope.launch(computeDispatcher) {
-            val txns = uiState.value.transactions.filter { it.id in selected }
-            val allEligible = txns.all { it.effectiveMhaEligible == true }
-            repository.batchSetMhaEligible(selected, !allEligible)
-            clearSelection()
-        }
-    }
+    fun batchMarkIgnored(isIgnored: Boolean) = runBatchAction { repository.batchSetIgnored(it, isIgnored) }
 
-    fun batchMarkIgnored(isIgnored: Boolean) {
-        val selected = _overlays.value.selectedIds
-        if (selected.isEmpty()) return
-        viewModelScope.launch(computeDispatcher) {
-            repository.batchSetIgnored(selected, isIgnored)
-            clearSelection()
-        }
-    }
-
-    fun batchDelete() {
-        val selected = _overlays.value.selectedIds
-        if (selected.isEmpty()) return
-        viewModelScope.launch(computeDispatcher) {
-            repository.batchDeleteTransactions(selected)
-            clearSelection()
-        }
-    }
+    fun batchDelete() = runBatchAction { repository.batchDeleteTransactions(it) }
 
     fun openCreateRuleModal(transactionId: Long) {
         _overlays.update { it.copy(showEditorSheet = false, ruleDraftTransactionId = transactionId) }

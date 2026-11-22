@@ -5,15 +5,18 @@ import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.HouseholdMember
 import app.overbay.orbit.data.model.StorageMode
 import app.overbay.orbit.data.model.TaxTrackingMode
+import app.overbay.orbit.data.network.putMhaSettings
 import app.overbay.orbit.data.setupSimpleFinBridge
 import app.overbay.orbit.domain.CsvColumnMapping
 import app.overbay.orbit.domain.CsvImportEngine
 import app.overbay.orbit.domain.CsvImportFormat
+import app.overbay.orbit.domain.LocalDateUtils
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.plus
+import kotlin.math.abs
 
 internal fun OnboardingViewModel.inspectAndPreviewCsvImpl(
     fileName: String,
@@ -97,9 +100,20 @@ internal fun OnboardingViewModel.connectSimpleFinImpl() {
     _uiState.update { it.copy(isConnectingSimpleFin = true, simpleFinError = null) }
     scope.launch {
         val beforeTxCount = repository.transactions.value.size
-        val cutover = state.simpleFinCutoverDate?.takeIf { it.isNotBlank() }
-        val res = repository.setupSimpleFinBridge(token, cutover)
+        val cutover = state.simpleFinCutoverDate?.takeIf { it.isNotBlank() } ?: LocalDateUtils.todayIsoDate()
+        val storedLocalToken = repository.preferences.value.simpleFinToken
+        val effectiveToken = if (
+            repository.storageMode.value == StorageMode.LOCAL &&
+            token == lastFailedLocalSimpleFinInput &&
+            !storedLocalToken.isNullOrBlank()
+        ) {
+            storedLocalToken
+        } else {
+            token
+        }
+        val res = repository.setupSimpleFinBridge(effectiveToken, cutover)
         if (res.isSuccess) {
+            lastFailedLocalSimpleFinInput = null
             if (repository.storageMode.value == StorageMode.SELF_HOSTED) {
                 repository.sync(force = true)
             }
@@ -122,6 +136,9 @@ internal fun OnboardingViewModel.connectSimpleFinImpl() {
                 )
             }
         } else {
+            if (repository.storageMode.value == StorageMode.LOCAL && !repository.preferences.value.simpleFinToken.isNullOrBlank()) {
+                lastFailedLocalSimpleFinInput = token
+            }
             _uiState.update {
                 it.copy(
                     isConnectingSimpleFin = false,
@@ -140,13 +157,14 @@ internal fun OnboardingViewModel.saveManualAccountImpl() {
         return
     }
     _uiState.update { it.copy(manualAccountDraft = draft.copy(isSubmitting = true, error = null)) }
+    val signedBalanceCents = if (draft.type.isLiability) -abs(draft.balanceCents) else draft.balanceCents
     scope.launch {
         repository.saveAccount(
             Account(
                 id = 0L,
                 name = trimmedName,
                 type = draft.type,
-                currentBalanceCents = draft.balanceCents,
+                currentBalanceCents = signedBalanceCents,
                 estimatedValueCents = draft.estimatedValueCents.takeIf { it > 0L },
                 isManual = true
             )
@@ -203,6 +221,9 @@ internal suspend fun OnboardingViewModel.persistFeatureChoicesImpl(state: Onboar
             dashboardWidgets = widgets
         )
     )
+    if (repository.storageMode.value == StorageMode.SELF_HOSTED) {
+        repository.createApiClient().putMhaSettings(mhaOn)
+    }
 }
 
 internal suspend fun OnboardingViewModel.persistRetirementChoicesImpl(state: OnboardingUiState) {

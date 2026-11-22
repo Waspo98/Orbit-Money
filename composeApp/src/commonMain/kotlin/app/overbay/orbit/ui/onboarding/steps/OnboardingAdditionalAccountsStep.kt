@@ -142,8 +142,8 @@ fun OnboardingAdditionalAccountsStep(
             CurrencyTextField(
                 cents = draft.balanceCents,
                 onCentsChange = { onIntent(OnboardingIntent.UpdateManualAccountBalance(it)) },
-                label = if (draft.type == AccountType.MORTGAGE || draft.type == AccountType.LOAN) {
-                    "Remaining Balance Owed ($)"
+                label = if (draft.type.isLiability) {
+                    "Balance Owed ($)"
                 } else {
                     "Current Balance ($)"
                 },

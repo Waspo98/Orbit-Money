@@ -33,9 +33,9 @@ enum class SettingsSection(
     WORKSPACE_NAVIGATION(
         title = "Turn On/Off App Features",
         shortTitle = "App Features",
-        subtitle = "More menu destinations, MHA tracker & transaction quick actions",
+        subtitle = "More menu destinations, tax tracking & transaction quick actions",
         cluster = SettingsCluster.PERSONALIZE,
-        searchKeywords = listOf("features", "navigation", "more", "menu", "reorder", "hide", "quick actions", "buttons", "mha", "ministerial", "housing", "clergy", "credit card", "goals", "upcoming", "household")
+        searchKeywords = listOf("features", "navigation", "more", "menu", "reorder", "hide", "quick actions", "buttons", "tax", "deductions", "mha", "ministerial", "housing", "clergy", "credit card", "goals", "upcoming", "household")
     ),
     SYNC_AND_SHARING(
         title = "Storage, Sync & Sharing",

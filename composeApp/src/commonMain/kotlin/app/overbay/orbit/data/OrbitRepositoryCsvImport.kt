@@ -154,8 +154,15 @@ suspend fun OrbitRepository.importCsvPreview(
     } else emptyList()
 
     val curTxns = transactions.value
+    val existingExtIds = curTxns.mapNotNull { it.externalId }.toHashSet()
+    val dedupedPreviewTxns = preview.transactions.filter { txn ->
+        val extId = txn.externalId
+        extId == null || existingExtIds.add(extId)
+    }
+    require(dedupedPreviewTxns.isNotEmpty()) { "All transactions in this import were already imported." }
+
     var nextTxId = (curTxns.maxOfOrNull { it.id } ?: 0L) + 1L
-    val assignedTxns = preview.transactions.map { txn ->
+    val assignedTxns = dedupedPreviewTxns.map { txn ->
         val key = preview.transactionAccountKeys[txn.id]
         val acctId = (key?.let { accountIdByKey[it] }) ?: ensureFallbackAccount()
         txn.copy(
@@ -173,7 +180,7 @@ suspend fun OrbitRepository.importCsvPreview(
         importedAt = Clock.System.now().toString(),
         totalRows = preview.totalRowCount,
         importedCount = assignedTxns.size,
-        duplicateCount = preview.duplicateRowCount,
+        duplicateCount = preview.duplicateRowCount + (preview.transactions.size - dedupedPreviewTxns.size),
         transactionIds = assignedTxns.map { it.id },
         createdAccountIds = createdAccounts.map { it.id },
         createdRuleIds = createdRules.map { it.id }

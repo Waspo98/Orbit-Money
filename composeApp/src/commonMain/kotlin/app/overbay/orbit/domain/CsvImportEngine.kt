@@ -52,14 +52,19 @@ object CsvImportEngine {
 
     fun parseCsvHeaders(csvContent: String): List<String> {
         val firstLine = csvContent.lines().firstOrNull { it.isNotBlank() } ?: return emptyList()
-        return parseCsvLine(firstLine).map { it.trim().removePrefix("\uFEFF") }.filter { it.isNotEmpty() }
+        return parseCsvLine(firstLine)
+            .map { it.trim().removePrefix("\uFEFF") }
+            .dropLastWhile { it.isEmpty() }
+            .filter { it.isNotEmpty() }
     }
 
     fun parseCsvRows(csvContent: String): List<Map<String, String>> {
         val lines = csvContent.lines().filter { it.isNotBlank() }
         if (lines.isEmpty()) return emptyList()
 
-        val headers = parseCsvLine(lines.first()).map { it.trim().removePrefix("\uFEFF") }
+        val headers = parseCsvLine(lines.first())
+            .map { it.trim().removePrefix("\uFEFF") }
+            .dropLastWhile { it.isEmpty() }
         val rows = mutableListOf<Map<String, String>>()
 
         for (i in 1 until lines.size) {
@@ -257,10 +262,16 @@ object CsvImportEngine {
 
     private fun resolveRowAmountCents(row: Map<String, String>, mapping: CsvColumnMapping): Cents? {
         val rawCents = if (!mapping.inflowColumn.isNullOrBlank() && !mapping.outflowColumn.isNullOrBlank()) {
-            val inflow = CsvFormatDetector.parseSignedMoneyToCents(row[mapping.inflowColumn].orEmpty()) ?: 0L
-            val outflow = CsvFormatDetector.parseSignedMoneyToCents(row[mapping.outflowColumn].orEmpty()) ?: 0L
-            if (row[mapping.inflowColumn].isNullOrBlank() && row[mapping.outflowColumn].isNullOrBlank()) {
+            val inflowRaw = row[mapping.inflowColumn].orEmpty().trim()
+            val outflowRaw = row[mapping.outflowColumn].orEmpty().trim()
+            if (inflowRaw.isBlank() && outflowRaw.isBlank()) {
                 return null
+            }
+            val inflow = if (inflowRaw.isBlank()) 0L else {
+                CsvFormatDetector.parseSignedMoneyToCents(inflowRaw) ?: return null
+            }
+            val outflow = if (outflowRaw.isBlank()) 0L else {
+                CsvFormatDetector.parseSignedMoneyToCents(outflowRaw) ?: return null
             }
             abs(inflow) - abs(outflow)
         } else {

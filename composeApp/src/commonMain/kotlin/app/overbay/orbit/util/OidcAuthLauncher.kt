@@ -18,6 +18,7 @@ val LocalOidcAuthLauncher = staticCompositionLocalOf<OidcAuthLauncher> {
 
 object OidcCallbackBridge {
     const val PENDING_SERVER_URL_KEY = "orbit_pending_oidc_server_url"
+    const val PENDING_ONBOARDING_OIDC_KEY = "orbit_pending_onboarding_oidc"
 
     private val _pendingCode = MutableStateFlow<String?>(null)
     val pendingCode: StateFlow<String?> = _pendingCode.asStateFlow()

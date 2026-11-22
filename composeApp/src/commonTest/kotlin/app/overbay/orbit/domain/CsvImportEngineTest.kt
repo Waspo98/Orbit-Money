@@ -91,4 +91,19 @@ class CsvImportEngineTest {
         assertNotNull(preview.latestTransactionDateIso)
         assertTrue(preview.accounts.isEmpty())
     }
+
+    @Test
+    fun trailingCommaHeadersAndInvalidInflowOutflowCellsHandledSafely() {
+        val csv = """
+            Account,Date,Payee,Outflow,Inflow,
+            Checking,11/02/2026,Valid Row,25.00,,
+            Checking,11/03/2026,Bad Row,N/A,,
+        """.trimIndent()
+
+        val preview = CsvImportEngine.buildPreview(csv)
+        assertEquals(CsvImportFormat.YNAB, preview.detectedFormat)
+        assertEquals(1, preview.transactions.size)
+        assertEquals(-2500L, preview.transactions.single().originalAmountCents)
+        assertEquals(1, preview.invalidRowCount)
+    }
 }

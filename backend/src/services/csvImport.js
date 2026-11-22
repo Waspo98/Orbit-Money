@@ -72,13 +72,14 @@ function readCategories(db, householdId) {
     .prepare('SELECT id, name FROM categories WHERE household_id = ?')
     .all(householdId);
   const categoryIdByName = new Map(categories.map((c) => [c.name.toLowerCase(), c.id]));
+  const validCategoryIds = new Set(categories.map((c) => c.id));
   const uncategorizedId = categoryIdByName.get('uncategorized') ?? categories[0]?.id ?? null;
-  return { categoryIdByName, uncategorizedId };
+  return { categoryIdByName, validCategoryIds, uncategorizedId };
 }
 
 export function buildRocketMoneyImportPreview(db, csvBuffer, householdId = 1, filename = null) {
   const { rows, parseWarnings } = parseRocketMoneyRows(csvBuffer);
-  const { categoryIdByName, uncategorizedId } = readCategories(db, householdId);
+  const { categoryIdByName, validCategoryIds, uncategorizedId } = readCategories(db, householdId);
 
   const accountsMap = new Map();
   for (const row of rows) {
@@ -508,7 +509,7 @@ export function importNormalizedCsvTransactions(db, householdId = 1, payload = {
     throw new Error('No valid transactions to import.');
   }
 
-  const { categoryIdByName, uncategorizedId } = readCategories(db, householdId);
+  const { categoryIdByName, validCategoryIds, uncategorizedId } = readCategories(db, householdId);
   const findAccountByKey = db.prepare(`
     SELECT id FROM accounts
      WHERE household_id = ?
@@ -617,8 +618,11 @@ export function importNormalizedCsvTransactions(db, householdId = 1, payload = {
       const accountId = (acctKey && accountIdByKey.get(acctKey)) || ensureDefaultAccount();
       const merchant = String(txn.merchant || txn.description || 'Imported Transaction').trim().slice(0, 200);
       const description = String(txn.description || merchant).trim().slice(0, 400);
-      const categoryId = Number.isInteger(txn.categoryId) && txn.categoryId > 0
+      const requestedCategoryId = Number.isInteger(txn.categoryId) && txn.categoryId > 0
         ? txn.categoryId
+        : null;
+      const categoryId = (requestedCategoryId && validCategoryIds.has(requestedCategoryId))
+        ? requestedCategoryId
         : (txn.categoryName ? categoryIdByName.get(String(txn.categoryName).trim().toLowerCase()) : null) || uncategorizedId;
       const externalId = String(txn.externalId || '').trim() || computeContentHash({
         date,

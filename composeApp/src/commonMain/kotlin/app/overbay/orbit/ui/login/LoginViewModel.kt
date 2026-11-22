@@ -94,17 +94,6 @@ class LoginViewModel(
         }
     }
 
-    fun resetToModeSelect() {
-        modifyState {
-            it.copy(
-                step = LoginStep.MODE_SELECT,
-                customServerInput = it.serverUrl.ifBlank { LoginUiState.DEFAULT_SERVER_PREFIX },
-                serverError = null,
-                errorMessage = null
-            )
-        }
-    }
-
     fun processIntent(intent: LoginIntent) {
         when (intent) {
             LoginIntent.SelectLocalMode -> modifyState {
