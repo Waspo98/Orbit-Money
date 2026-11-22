@@ -7,6 +7,7 @@ import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SimpleFinDirectClientTest {
@@ -81,5 +82,34 @@ class SimpleFinDirectClientTest {
         assertEquals(0, secondRun.accountsCreatedCount)
         assertEquals(1, secondRun.accountsSyncedCount)
         assertEquals(0, secondRun.newTransactionCount)
+    }
+
+    @Test
+    fun parsesExactDecimalCentsDeduplicatesIntraPayloadIdsAndInfersCdSavings() {
+        val sfClient = SimpleFinDirectClient()
+        assertEquals(-125050L, sfClient.parseDecimalStringToCents("-1250.50"))
+        assertEquals(12345678999L, sfClient.parseDecimalStringToCents("123456789.99"))
+        assertEquals(123456L, sfClient.parseDecimalStringToCents("  \$1,234.56  "))
+        assertNull(sfClient.parseDecimalStringToCents(""))
+        assertEquals(AccountType.SAVINGS, sfClient.inferAccountType("12-Month CD", "Ally Bank", 5000_00L))
+
+        val dupPayload = SimpleFinDataResponse(
+            accounts = listOf(
+                SimpleFinAccount(
+                    id = "sf_cd",
+                    name = "12-Month CD",
+                    balance = "123456789.99",
+                    balanceDate = 1794960000L,
+                    transactions = listOf(
+                        SimpleFinTransaction(id = "dup_tx", posted = 1794960000L, amount = "10.25", description = "INTEREST"),
+                        SimpleFinTransaction(id = "dup_tx", posted = 1794960000L, amount = "10.25", description = "INTEREST")
+                    )
+                )
+            )
+        )
+        val outcome = sfClient.mergeBridgeData(dupPayload, OrbitWorkspaceSnapshot.empty())
+        assertEquals(AccountType.SAVINGS, outcome.updatedSnapshot.accounts.single().type)
+        assertEquals(12345678999L, outcome.updatedSnapshot.accounts.single().currentBalanceCents)
+        assertEquals(1, outcome.newTransactionCount)
     }
 }

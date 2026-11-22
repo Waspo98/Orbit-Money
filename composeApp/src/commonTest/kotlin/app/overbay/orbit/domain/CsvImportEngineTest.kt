@@ -5,6 +5,7 @@ import app.overbay.orbit.data.model.Category
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class CsvImportEngineTest {
@@ -105,5 +106,12 @@ class CsvImportEngineTest {
         assertEquals(1, preview.transactions.size)
         assertEquals(-2500L, preview.transactions.single().originalAmountCents)
         assertEquals(1, preview.invalidRowCount)
+    }
+
+    @Test
+    fun rejectsImpossibleCalendarDates() {
+        assertNull(CsvFormatDetector.normalizeDateToIso("2026-02-31"))
+        assertNull(CsvFormatDetector.normalizeDateToIso("04/31/2026"))
+        assertEquals("2024-02-29", CsvFormatDetector.normalizeDateToIso("2024-02-29"))
     }
 }

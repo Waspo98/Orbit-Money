@@ -245,4 +245,15 @@ class ThemeAndColorsTest {
         assertTrue(OrbitTypography.bodyMedium.letterSpacing.value <= 0f)
         assertTrue(OrbitTypography.titleMedium.letterSpacing.value <= 0f)
     }
+
+    @Test
+    fun testCuratedSeedSwatchesAreWithinSliderBoundsAndRoundTripExactHex() {
+        for ((name, hex) in CuratedSeedSwatches) {
+            val hsl = hex.toComposeColor().toHsl()
+            assertTrue(hsl.saturation in 0.05f..1.0f, "$name ($hex) saturation=${hsl.saturation}")
+            assertTrue(hsl.lightness in 0.24f..0.62f, "$name ($hex) lightness=${hsl.lightness}")
+            val roundTripHex = hslToColor(hsl.hue, hsl.saturation, hsl.lightness).toHexString()
+            assertEquals(hex.uppercase(), roundTripHex, "$name round-trip mismatch")
+        }
+    }
 }

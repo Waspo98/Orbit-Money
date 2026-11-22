@@ -11,6 +11,7 @@ import app.overbay.orbit.data.model.StorageMode
 import app.overbay.orbit.data.model.TaxTrackingMode
 import app.overbay.orbit.data.network.OrbitApiClient
 import app.overbay.orbit.data.network.SimpleFinDirectClient
+import app.overbay.orbit.domain.CsvColumnMapping
 import app.overbay.orbit.ui.login.LocalSeedChoice
 import app.overbay.orbit.util.OidcCallbackBridge
 import app.overbay.orbit.util.PlatformStorage
@@ -46,6 +47,8 @@ import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -502,4 +505,79 @@ class OnboardingViewModelTest {
             assertTrue(!vm.uiState.value.simpleFinError.isNullOrBlank())
             storage.clear()
         }
+
+    @Test
+    fun unmappedCsvHeadersKeepInspectionAndExpandColumnMapperForRecovery() = runTest(UnconfinedTestDispatcher()) {
+        val (_, vm) = createVm(this)
+        vm.beginSession(isReplay = false)
+
+        val csv = "ColA,ColB,ColC\n2026-10-01,Cafe,-4.50"
+        vm.processIntent(OnboardingIntent.LoadCsvText("custom.csv", csv))
+
+        val failedState = vm.uiState.value
+        assertNotNull(failedState.csvInspection)
+        assertNotNull(failedState.csvMapping)
+        assertTrue(failedState.csvMapperExpanded)
+        assertNotNull(failedState.csvError)
+        assertNull(failedState.csvPreview)
+
+        vm.processIntent(
+            OnboardingIntent.UpdateCsvMapping(
+                CsvColumnMapping(dateColumn = "ColA", merchantColumn = "ColB", amountColumn = "ColC")
+            )
+        )
+        val recovered = vm.uiState.value
+        assertEquals(1, recovered.csvPreview?.transactions?.size)
+        assertNull(recovered.csvError)
+    }
+
+    @OptIn(InternalAPI::class)
+    @Test
+    fun cancellingOidcAndFallingBackToPasswordLoginAdvancesCleanlyOnce() = runTest(UnconfinedTestDispatcher()) {
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val storage = PlatformStorage().apply { clear() }
+        val wireJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+        val engine = object : HttpClientEngineBase("onboarding-oidc-fallback-mock") {
+            override val dispatcher: CoroutineDispatcher = dispatcher
+            override val config: HttpClientEngineConfig = HttpClientEngineConfig()
+            override suspend fun execute(data: HttpRequestData): HttpResponseData {
+                val body = when (data.url.encodedPath) {
+                    "/api/auth/config" -> """{"authProvider":"both","localEnabled":true,"oidcEnabled":true}"""
+                    "/api/auth/login" -> """{"authenticated":true,"username":"neal"}"""
+                    "/api/auth/me" -> """{"authenticated":true,"username":"neal","authProvider":"local","household":{"id":1,"name":"Home","role":"owner"}}"""
+                    "/api/transactions" -> """{"items":[],"total":0,"page":1,"totalPages":1}"""
+                    else -> """{"items":[]}"""
+                }
+                return HttpResponseData(
+                    statusCode = HttpStatusCode.OK,
+                    requestTime = GMTDate(),
+                    headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+                    version = HttpProtocolVersion.HTTP_1_1,
+                    body = ByteReadChannel(body),
+                    callContext = callContext()
+                )
+            }
+        }
+        val apiClient = OrbitApiClient({ "https://orbit.example.com" }, storage, HttpClient(engine) { install(ContentNegotiation) { json(wireJson) } })
+        val repo = OrbitRepository(storage = storage, customApiClient = apiClient, scope = backgroundScope)
+        repo.initialize()
+        val vm = OnboardingViewModel(repo, customApiClient = apiClient, storage = storage, isWebPlatform = false, scope = backgroundScope)
+        vm.beginSession(isReplay = false)
+        vm.processIntent(OnboardingIntent.Next) // APPEARANCE
+        vm.processIntent(OnboardingIntent.Next) // STORAGE_MODE
+        vm.processIntent(OnboardingIntent.SelectStorageMode(StorageMode.SELF_HOSTED))
+        vm.processIntent(OnboardingIntent.Next) // SERVER_URL
+        vm.processIntent(OnboardingIntent.UpdateServerInput("https://orbit.example.com"))
+        vm.processIntent(OnboardingIntent.TestAndConnectServer)
+        vm.processIntent(OnboardingIntent.PrepareOidcLogin)
+        assertEquals("1", storage.loadString(OidcCallbackBridge.PENDING_ONBOARDING_OIDC_KEY))
+
+        vm.processIntent(OnboardingIntent.UpdateUsername("neal"))
+        vm.processIntent(OnboardingIntent.UpdatePassword("secret"))
+        vm.processIntent(OnboardingIntent.SubmitPasswordLogin)
+
+        assertEquals(OnboardingStep.DATA_CONNECT, vm.uiState.value.currentStep)
+        assertNull(storage.loadString(OidcCallbackBridge.PENDING_ONBOARDING_OIDC_KEY))
+        storage.clear()
+    }
 }
