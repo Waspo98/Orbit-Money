@@ -84,6 +84,7 @@ data class OrbitPreferences(
     val cardPerksWidgets: List<DashboardWidgetConfig> = defaultCardPerksWidgets(),
     val handledReviewTransactionIds: List<Long> = emptyList(),
     val onboardingCompleted: Boolean = false,
+    val dismissedEmptyWorkspaceCard: Boolean = false,
     val amoledDarkMode: Boolean = false,
     val hiddenRouteNames: List<String> = emptyList(),
     val moreRouteOrder: List<String> = emptyList(),

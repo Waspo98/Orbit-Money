@@ -912,4 +912,23 @@ class DashboardViewModelTest {
 
         collectJob.cancel()
     }
+
+    @Test
+    fun testDismissEmptyWorkspaceCard_hidesCardAndPersistsPreference() = runTest(testDispatcher) {
+        val collectJob = launch(testDispatcher) {
+            viewModel.uiState.collect {}
+        }
+        testScheduler.advanceUntilIdle()
+
+        assertTrue(viewModel.uiState.value.isEmptyWorkspace)
+        assertFalse(repository.preferences.value.dismissedEmptyWorkspaceCard)
+
+        viewModel.onAction(DashboardAction.DismissEmptyWorkspaceCard)
+        testScheduler.advanceUntilIdle()
+
+        assertFalse(viewModel.uiState.value.isEmptyWorkspace)
+        assertTrue(repository.preferences.value.dismissedEmptyWorkspaceCard)
+
+        collectJob.cancel()
+    }
 }

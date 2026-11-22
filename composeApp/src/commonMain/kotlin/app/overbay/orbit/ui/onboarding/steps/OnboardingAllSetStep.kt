@@ -19,7 +19,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.overbay.orbit.data.model.StorageMode
-import app.overbay.orbit.data.model.TaxTrackingLabels
 import app.overbay.orbit.ui.components.OrbitMiniStatRow
 import app.overbay.orbit.ui.components.OrbitSwitchRow
 import app.overbay.orbit.ui.onboarding.OnboardingIntent
@@ -54,7 +53,7 @@ fun OnboardingAllSetStep(
         val subtitle = when {
             state.isReplay -> "Your preferences and workspace settings are saved."
             state.existingServerDetected -> "We loaded your existing household from your server—everything is right where you left it."
-            else -> "Your Orbit Money workspace is ready. Everything here can be adjusted anytime in Settings."
+            else -> "Orbit Money is ready. Every feature can be adjusted anytime in Settings."
         }
 
         OnboardingHeroHeader(
@@ -67,51 +66,20 @@ fun OnboardingAllSetStep(
 
         OnboardingCardContainer {
             OrbitMiniStatRow(
-                label = "Storage",
+                label = "Storage Mode",
                 value = if (prefs.storageMode == StorageMode.SELF_HOSTED) "Self-Hosted Server" else "On This Device",
                 valueColor = MaterialTheme.colorScheme.primary
             )
             OrbitMiniStatRow(
-                label = "Theme",
-                value = "${prefs.themePreset.displayName} · ${prefs.themeMode.shortLabel}",
+                label = "SimpleFIN Connection",
+                value = if (state.simpleFinConnected) "Yes" else "No",
+                valueColor = if (state.simpleFinConnected) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
                 showTopDivider = true
             )
-            if (state.existingAccounts.isNotEmpty()) {
-                OrbitMiniStatRow(
-                    label = "Accounts",
-                    value = "${state.existingAccounts.size} connected",
-                    showTopDivider = true
-                )
-            }
-            if (state.simpleFinConnected) {
-                OrbitMiniStatRow(
-                    label = "Bank Sync",
-                    value = "SimpleFIN Bridge",
-                    valueColor = MaterialTheme.colorScheme.primary,
-                    showTopDivider = true
-                )
-            }
-            if (state.householdMembers.isNotEmpty()) {
-                OrbitMiniStatRow(
-                    label = "Household",
-                    value = "${state.householdMembers.size} member${if (state.householdMembers.size == 1) "" else "s"}",
-                    showTopDivider = true
-                )
-            }
-            if (state.enteredAct2 && "retirement_calculator" in state.enabledFeatures) {
-                OrbitMiniStatRow(
-                    label = "Retirement Goal",
-                    value = "Age ${state.retirementAge} (${state.retirementPreset.label})",
-                    showTopDivider = true
-                )
-            }
-            if (state.enteredAct2 && "mha" in state.enabledFeatures) {
-                OrbitMiniStatRow(
-                    label = "Tax Tracking",
-                    value = TaxTrackingLabels.forMode(state.taxTrackingMode).navTitle,
-                    showTopDivider = true
-                )
-            }
         }
 
         if (!PlatformRuntime.isWeb) {

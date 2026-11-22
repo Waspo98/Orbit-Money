@@ -164,6 +164,7 @@ class SelfHostedApiEngine(
             dashboardWidgets = remotePrefs?.prefOr("dashboardWidgets", currentPrefs.dashboardWidgets) ?: currentPrefs.dashboardWidgets,
             cardPerksWidgets = remotePrefs?.prefOr("cardPerksWidgets", currentPrefs.cardPerksWidgets) ?: currentPrefs.cardPerksWidgets,
             handledReviewTransactionIds = mergedHandledIds,
+            dismissedEmptyWorkspaceCard = remotePrefs?.prefOr("dismissedEmptyWorkspaceCard", currentPrefs.dismissedEmptyWorkspaceCard) ?: currentPrefs.dismissedEmptyWorkspaceCard,
             dashboardHiddenBiggestIds = remotePrefs?.prefOr("dashboardHiddenBiggestIds", currentPrefs.dashboardHiddenBiggestIds) ?: currentPrefs.dashboardHiddenBiggestIds,
             dashboardFocusedGoalId = remotePrefs?.prefOr("dashboardFocusedGoalId", currentPrefs.dashboardFocusedGoalId),
             dashboardRetirementAge = remotePrefs?.prefOr("dashboardRetirementAge", currentPrefs.dashboardRetirementAge) ?: currentPrefs.dashboardRetirementAge,
@@ -434,6 +435,7 @@ class SelfHostedApiEngine(
             val map = mutableMapOf<String, JsonElement>()
             map["cardRewardsToolsEnabled"] = preferences.cardRewardsToolsEnabled?.let { JsonPrimitive(it) } ?: JsonNull
             map["amoledDarkMode"] = JsonPrimitive(preferences.amoledDarkMode)
+            map["dismissedEmptyWorkspaceCard"] = JsonPrimitive(preferences.dismissedEmptyWorkspaceCard)
             map["budgetSortOption"] = JsonPrimitive(preferences.budgetSortOption.name)
             map["dashboardRetirementAge"] = JsonPrimitive(preferences.dashboardRetirementAge)
             map["dashboardRetirementPreset"] = JsonPrimitive(preferences.dashboardRetirementPreset)

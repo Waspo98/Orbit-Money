@@ -43,8 +43,14 @@ class OnboardingViewModelTest {
         vm.processIntent(OnboardingIntent.SetThemePreset(OrbitThemePreset.OCEAN_SLATE))
         assertEquals(OrbitThemePreset.OCEAN_SLATE, repo.preferences.value.themePreset)
 
-        // Local fresh path
+        // Local fresh path — selecting storage mode must not auto-advance until Next is tapped
+        vm.processIntent(OnboardingIntent.Next) // -> APPEARANCE
+        vm.processIntent(OnboardingIntent.Next) // -> STORAGE_MODE
+        assertEquals(OnboardingStep.STORAGE_MODE, vm.uiState.value.currentStep)
         vm.processIntent(OnboardingIntent.SelectStorageMode(StorageMode.LOCAL))
+        assertEquals(OnboardingStep.STORAGE_MODE, vm.uiState.value.currentStep)
+        vm.processIntent(OnboardingIntent.Next) // -> LOCAL_WORKSPACE
+        assertEquals(OnboardingStep.LOCAL_WORKSPACE, vm.uiState.value.currentStep)
         vm.processIntent(OnboardingIntent.ConfirmLocalWorkspace)
         assertEquals(OnboardingStep.DATA_CONNECT, vm.uiState.value.currentStep)
 
@@ -108,6 +114,40 @@ class OnboardingViewModelTest {
         assertEquals(TaxTrackingMode.GENERAL, repo.snapshot.value.mhaTaxProfile.trackingMode)
         assertEquals("CO", repo.snapshot.value.mhaTaxProfile.state)
         assertEquals("household", repo.snapshot.value.mhaTaxProfile.mode)
+
+        // Only the top 5 default dashboard cards remain visible even when Goals, MHA, and Housing are enabled
+        val visibleWidgetIds = repo.preferences.value.dashboardWidgets
+            .filter { it.isVisible }
+            .sortedBy { it.sortOrder }
+            .map { it.widgetId }
+        assertEquals(
+            listOf("accounts", "recent_transactions", "categorize_recent", "subscriptions", "retirement"),
+            visibleWidgetIds
+        )
+        assertFalse(repo.preferences.value.dashboardWidgets.first { it.widgetId == "goals_progress" }.isVisible)
+        assertFalse(repo.preferences.value.dashboardWidgets.first { it.widgetId == "mha" }.isVisible)
+        assertFalse(repo.preferences.value.dashboardWidgets.first { it.widgetId == "mortgage" }.isVisible)
+    }
+
+    @Test
+    fun selectingStorageModeDoesNotAutoAdvanceUntilNextIsPressed() = runTest(UnconfinedTestDispatcher()) {
+        val (_, vm) = createVm(this)
+        vm.beginSession(isReplay = false)
+        vm.processIntent(OnboardingIntent.Next) // -> APPEARANCE
+        vm.processIntent(OnboardingIntent.Next) // -> STORAGE_MODE
+        assertEquals(OnboardingStep.STORAGE_MODE, vm.uiState.value.currentStep)
+
+        vm.processIntent(OnboardingIntent.SelectStorageMode(StorageMode.SELF_HOSTED))
+        assertEquals(StorageMode.SELF_HOSTED, vm.uiState.value.selectedStorageMode)
+        assertEquals(OnboardingStep.STORAGE_MODE, vm.uiState.value.currentStep)
+
+        vm.processIntent(OnboardingIntent.SelectStorageMode(StorageMode.LOCAL))
+        assertEquals(StorageMode.LOCAL, vm.uiState.value.selectedStorageMode)
+        assertEquals(OnboardingStep.STORAGE_MODE, vm.uiState.value.currentStep)
+
+        vm.processIntent(OnboardingIntent.SelectStorageMode(StorageMode.SELF_HOSTED))
+        vm.processIntent(OnboardingIntent.Next)
+        assertEquals(OnboardingStep.SERVER_URL, vm.uiState.value.currentStep)
     }
 
     @Test

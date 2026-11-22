@@ -238,6 +238,13 @@ class OnboardingViewModel(
         }
         val nextStep = steps.getOrNull(idx + 1) ?: return
         _uiState.update { it.copy(currentStep = nextStep, transitionDirection = 1) }
+        if (cur.currentStep == OnboardingStep.STORAGE_MODE &&
+            nextStep == OnboardingStep.SERVER_URL &&
+            isWebPlatform &&
+            cur.serverUrl.isBlank()
+        ) {
+            testAndConnectServer()
+        }
     }
 
     private fun goBackStep() {
@@ -253,18 +260,12 @@ class OnboardingViewModel(
     }
 
     private fun selectStorageMode(mode: StorageMode) {
-        val nextStep = if (mode == StorageMode.LOCAL) OnboardingStep.LOCAL_WORKSPACE else OnboardingStep.SERVER_URL
         _uiState.update {
             it.copy(
                 selectedStorageMode = mode,
-                currentStep = nextStep,
-                transitionDirection = 1,
                 authError = null,
                 serverError = null
             )
-        }
-        if (mode == StorageMode.SELF_HOSTED && isWebPlatform && _uiState.value.serverUrl.isBlank()) {
-            testAndConnectServer()
         }
     }
 

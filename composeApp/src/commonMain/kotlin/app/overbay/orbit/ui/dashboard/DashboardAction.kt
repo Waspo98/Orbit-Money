@@ -13,6 +13,7 @@ sealed interface DashboardAction {
     data class MoveCard(val fromIndex: Int, val toIndex: Int) : DashboardAction
     data class ReorderCards(val orderedTypes: List<DashboardCardType>) : DashboardAction
     data object ResetCardsToDefault : DashboardAction
+    data object DismissEmptyWorkspaceCard : DashboardAction
     data class MarkBillPaid(val upcomingItemId: Long, val dueDateIso: String) : DashboardAction
     data class HideBiggestTransaction(val transactionId: Long) : DashboardAction
     data object ResetHiddenBiggestTransactions : DashboardAction

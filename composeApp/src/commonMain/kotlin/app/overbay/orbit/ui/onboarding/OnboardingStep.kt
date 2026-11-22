@@ -151,7 +151,6 @@ object OnboardingStepResolver {
     }
 
     fun isGateStep(step: OnboardingStep): Boolean = step in setOf(
-        OnboardingStep.STORAGE_MODE,
         OnboardingStep.LOCAL_WORKSPACE,
         OnboardingStep.SERVER_URL,
         OnboardingStep.SERVER_AUTH,

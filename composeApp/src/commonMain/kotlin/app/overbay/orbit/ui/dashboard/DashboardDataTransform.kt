@@ -535,7 +535,9 @@ object DashboardDataTransform {
             daysRemaining = daysRemaining,
             selectedMonth = selectedMonth,
             mhaEnabled = snapshot.preferences.mhaTrackerEnabled,
-            isEmptyWorkspace = snapshot.accounts.isEmpty() && snapshot.transactions.isEmpty(),
+            isEmptyWorkspace = snapshot.accounts.isEmpty() &&
+                snapshot.transactions.isEmpty() &&
+                !snapshot.preferences.dismissedEmptyWorkspaceCard,
             availableCategories = snapshot.categories,
             isReviewModalOpen = categorizeReview.isOpen,
             categorizeReview = if (categorizeReview.isOpen) {

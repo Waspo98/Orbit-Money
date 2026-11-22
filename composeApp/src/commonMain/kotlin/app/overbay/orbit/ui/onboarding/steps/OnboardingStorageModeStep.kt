@@ -15,10 +15,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -73,7 +72,7 @@ fun OnboardingStorageModeStep(
             ),
             highlighted = state.selectedStorageMode == StorageMode.LOCAL,
             onClick = {
-                haptics.confirm()
+                haptics.tick()
                 onIntent(OnboardingIntent.SelectStorageMode(StorageMode.LOCAL))
             }
         )
@@ -93,7 +92,7 @@ fun OnboardingStorageModeStep(
             ),
             highlighted = state.selectedStorageMode == StorageMode.SELF_HOSTED,
             onClick = {
-                haptics.confirm()
+                haptics.tick()
                 onIntent(OnboardingIntent.SelectStorageMode(StorageMode.SELF_HOSTED))
             }
         )
@@ -145,36 +144,33 @@ private fun StorageChoiceCard(
                         )
                     }
                 }
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = title,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        OrbitBadge(
-                            text = badgeText,
-                            containerColor = if (badgeText == "Advanced") {
-                                MaterialTheme.colorScheme.secondaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.primaryContainer
-                            },
-                            contentColor = if (badgeText == "Advanced") {
-                                MaterialTheme.colorScheme.onSecondaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.onPrimaryContainer
-                            }
-                        )
-                    }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    OrbitBadge(
+                        text = badgeText,
+                        containerColor = if (badgeText == "Advanced") {
+                            MaterialTheme.colorScheme.secondaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.primaryContainer
+                        },
+                        contentColor = if (badgeText == "Advanced") {
+                            MaterialTheme.colorScheme.onSecondaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        }
+                    )
                 }
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                RadioButton(
+                    selected = highlighted,
+                    onClick = null
                 )
             }
 

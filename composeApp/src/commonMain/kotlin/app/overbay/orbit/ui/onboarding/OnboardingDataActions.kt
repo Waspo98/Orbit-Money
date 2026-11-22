@@ -191,9 +191,6 @@ internal suspend fun OnboardingViewModel.persistFeatureChoicesImpl(state: Onboar
             when (w.widgetId) {
                 "subscriptions" -> w.copy(isVisible = "upcoming" in state.enabledFeatures)
                 "retirement" -> w.copy(isVisible = "retirement_calculator" in state.enabledFeatures)
-                "goals_progress" -> w.copy(isVisible = "goals" in state.enabledFeatures)
-                "mha" -> w.copy(isVisible = mhaOn)
-                "mortgage" -> w.copy(isVisible = "housing_calculator" in state.enabledFeatures)
                 else -> w
             }
         }

@@ -206,6 +206,9 @@ fun DashboardScreen(
                                     onAddManualAccount = {
                                         onNavigate(OrbitNavKey.Accounts())
                                     },
+                                    onDismiss = {
+                                        onAction(DashboardAction.DismissEmptyWorkspaceCard)
+                                    },
                                     modifier = Modifier.animateItem(
                                         fadeInSpec = OrbitSprings.FloatEffectsDefault,
                                         placementSpec = OrbitSprings.IntOffsetSpatialDefault,

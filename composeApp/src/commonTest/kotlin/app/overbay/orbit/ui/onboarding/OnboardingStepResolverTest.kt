@@ -97,4 +97,11 @@ class OnboardingStepResolverTest {
         assertTrue(OnboardingStepResolver.canShowTopSkip(OnboardingUiState(currentStep = OnboardingStep.FEATURES)))
         assertFalse(OnboardingStepResolver.canShowTopSkip(OnboardingUiState(currentStep = OnboardingStep.ALL_SET)))
     }
+
+    @Test
+    fun storageModeShowsNextButtonInsteadOfGatingAutoAdvance() {
+        assertFalse(OnboardingStepResolver.isGateStep(OnboardingStep.STORAGE_MODE))
+        assertTrue(OnboardingStepResolver.isGateStep(OnboardingStep.LOCAL_WORKSPACE))
+        assertTrue(OnboardingStepResolver.isGateStep(OnboardingStep.ALL_SET))
+    }
 }

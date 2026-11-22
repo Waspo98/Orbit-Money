@@ -488,6 +488,9 @@ class DashboardViewModel(
             is DashboardAction.MoveCard -> moveCard(action.fromIndex, action.toIndex)
             is DashboardAction.ReorderCards -> reorderCards(action.orderedTypes)
             DashboardAction.ResetCardsToDefault -> resetCardsToDefault()
+            DashboardAction.DismissEmptyWorkspaceCard -> viewModelScope.launch(computeDispatcher) {
+                repository.updatePreferences(repository.preferences.value.copy(dismissedEmptyWorkspaceCard = true))
+            }
             is DashboardAction.MarkBillPaid -> markUpcomingPaid(action.upcomingItemId, action.dueDateIso)
             is DashboardAction.HideBiggestTransaction -> hideBiggestTransaction(action.transactionId)
             DashboardAction.ResetHiddenBiggestTransactions -> resetHiddenBiggestTransactions()
