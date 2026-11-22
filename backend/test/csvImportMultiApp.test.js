@@ -111,3 +111,29 @@ test('importNormalizedCsvTransactions ignores non-existent or foreign categoryId
   const tx = db.prepare('SELECT category_id FROM transactions WHERE household_id = 1').get();
   assert.notEqual(tx.category_id, 999999);
 });
+
+test('importNormalizedCsvTransactions skips blank/null amounts and non-object entries instead of inserting $0.00 rows', () => {
+  const db = createTestDb();
+  const result = importNormalizedCsvTransactions(db, 1, {
+    fileName: 'malformed.csv',
+    source: 'csv',
+    accounts: [null, 'invalid'],
+    rules: [null, 'invalid'],
+    transactions: [
+      null,
+      'invalid',
+      { date: '2026-11-05', amount: '', merchant: 'Blank String' },
+      { date: '2026-11-05', amount: '   ', merchant: 'Whitespace String' },
+      { date: '2026-11-05', amount: null, merchant: 'Null Amount' },
+      { date: '2026-11-05', merchant: 'Missing Amount' },
+      { date: '2026-11-05', amount: 12.34, merchant: 'Valid Dollar Row' }
+    ]
+  });
+
+  assert.equal(result.inserted, 1);
+  assert.equal(result.skipped, 6);
+  const rows = db.prepare('SELECT amount, original_merchant FROM transactions WHERE household_id = 1').all();
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].amount, 1234);
+  assert.equal(rows[0].original_merchant, 'Valid Dollar Row');
+});
