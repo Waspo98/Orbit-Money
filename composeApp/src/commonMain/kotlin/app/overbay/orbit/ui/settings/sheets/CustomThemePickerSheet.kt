@@ -29,9 +29,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -85,11 +85,11 @@ fun CustomThemePickerSheet(
         safeInitialHex.toComposeColor().toHsl()
     }
 
-    var hue by remember(safeInitialHex) { mutableFloatStateOf(initialHsl.hue) }
-    var saturation by remember(safeInitialHex) { mutableFloatStateOf(initialHsl.saturation.coerceIn(0.05f, 0.95f)) }
-    var lightness by remember(safeInitialHex) { mutableFloatStateOf(initialHsl.lightness.coerceIn(0.24f, 0.62f)) }
-    var hexInput by remember(safeInitialHex) { mutableStateOf(safeInitialHex) }
-    var previewDark by remember { mutableStateOf(initialDarkPreview) }
+    var hue by rememberSaveable(safeInitialHex) { mutableStateOf(initialHsl.hue) }
+    var saturation by rememberSaveable(safeInitialHex) { mutableStateOf(initialHsl.saturation.coerceIn(0.05f, 1.0f)) }
+    var lightness by rememberSaveable(safeInitialHex) { mutableStateOf(initialHsl.lightness.coerceIn(0.24f, 0.62f)) }
+    var hexInput by rememberSaveable(safeInitialHex) { mutableStateOf(safeInitialHex) }
+    var previewDark by rememberSaveable { mutableStateOf(initialDarkPreview) }
 
     val draftColor = remember(hue, saturation, lightness) {
         hslToColor(hue, saturation, lightness)
@@ -97,14 +97,15 @@ fun CustomThemePickerSheet(
     val draftHex = remember(draftColor) { draftColor.toHexString() }
     val normalizedInput = remember(hexInput) { normalizeAccentHex(hexInput) }
     val hexError = hexInput.isNotBlank() && normalizedInput == null
+    val activeHex = normalizedInput ?: draftHex
 
-    val previewPalette = remember(draftHex, previewDark, amoledDark) {
+    val previewPalette = remember(activeHex, previewDark, amoledDark) {
         resolveOrbitPalette(
             themePreset = OrbitThemePreset.ORBIT_EMERALD,
             isDark = previewDark,
             amoledDark = amoledDark,
             useCustomTheme = true,
-            customAccentHex = draftHex
+            customAccentHex = activeHex
         )
     }
 
@@ -112,7 +113,7 @@ fun CustomThemePickerSheet(
         val norm = normalizeAccentHex(hex) ?: return
         val hsl = norm.toComposeColor().toHsl()
         hue = hsl.hue
-        saturation = hsl.saturation.coerceIn(0.05f, 0.95f)
+        saturation = hsl.saturation.coerceIn(0.05f, 1.0f)
         lightness = hsl.lightness.coerceIn(0.24f, 0.62f)
         hexInput = norm
     }
@@ -122,7 +123,7 @@ fun CustomThemePickerSheet(
         confirmText = "Apply Theme",
         onConfirm = {
             haptics.confirm()
-            onApply(normalizedInput ?: draftHex)
+            onApply(activeHex)
         },
         confirmEnabled = !hexError,
         title = "Custom Accent",
@@ -155,7 +156,7 @@ fun CustomThemePickerSheet(
                 ) {
                     row.forEach { (name, swatchHex) ->
                         val swatchColor = swatchHex.toComposeColor()
-                        val isSelected = draftHex.equals(swatchHex, ignoreCase = true)
+                        val isSelected = activeHex.equals(swatchHex, ignoreCase = true)
                         SeedSwatchDot(
                             name = name,
                             color = swatchColor,
@@ -196,11 +197,11 @@ fun CustomThemePickerSheet(
             label = "Vibrancy",
             valueLabel = "${(saturation * 100f).roundToInt()}%",
             value = saturation,
-            valueRange = 0.05f..0.95f,
+            valueRange = 0.05f..1.0f,
             gradientColors = listOf(
                 hslToColor(hue, 0.05f, lightness),
                 hslToColor(hue, 0.50f, lightness),
-                hslToColor(hue, 0.95f, lightness)
+                hslToColor(hue, 1.0f, lightness)
             ),
             thumbColor = draftColor,
             onValueChange = {
@@ -235,7 +236,7 @@ fun CustomThemePickerSheet(
                 normalizeAccentHex(filtered)?.let { valid ->
                     val parsedHsl = valid.toComposeColor().toHsl()
                     hue = parsedHsl.hue
-                    saturation = parsedHsl.saturation.coerceIn(0.05f, 0.95f)
+                    saturation = parsedHsl.saturation.coerceIn(0.05f, 1.0f)
                     lightness = parsedHsl.lightness.coerceIn(0.24f, 0.62f)
                 }
             },

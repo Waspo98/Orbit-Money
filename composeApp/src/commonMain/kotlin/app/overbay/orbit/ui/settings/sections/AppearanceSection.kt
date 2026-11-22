@@ -155,7 +155,9 @@ fun LazyListScope.appearanceSectionItems(
                 savedHex = normalizeAccentHex(preferences.customAccentHex),
                 isSelected = !isOverriddenByDynamic && preferences.useCustomTheme && normalizeAccentHex(preferences.customAccentHex) != null,
                 onSelectCard = {
-                    if (normalizeAccentHex(preferences.customAccentHex) != null && !preferences.useCustomTheme) {
+                    val hasSavedCustom = normalizeAccentHex(preferences.customAccentHex) != null
+                    val isCurrentlyActive = !isOverriddenByDynamic && preferences.useCustomTheme && hasSavedCustom
+                    if (hasSavedCustom && !isCurrentlyActive) {
                         onEnableSavedCustomTheme()
                     } else {
                         onOpenCustomThemePicker()
