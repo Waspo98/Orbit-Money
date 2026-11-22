@@ -310,6 +310,7 @@ class OnboardingViewModel(
     private fun selectStorageMode(mode: StorageMode) {
         OidcCallbackBridge.setExchangeError(null)
         if (mode == StorageMode.LOCAL) {
+            awaitingSelfHostedAuth = false
             storage.delete(OidcCallbackBridge.PENDING_ONBOARDING_OIDC_KEY)
         }
         _uiState.update {
@@ -450,6 +451,8 @@ class OnboardingViewModel(
             _uiState.update { it.copy(authError = "Username and password are required.") }
             return
         }
+        awaitingSelfHostedAuth = false
+        storage.delete(OidcCallbackBridge.PENDING_ONBOARDING_OIDC_KEY)
         OidcCallbackBridge.setExchangeError(null)
         _uiState.update { it.copy(isSubmittingAuth = true, authError = null) }
         scope.launch {
@@ -484,6 +487,8 @@ class OnboardingViewModel(
 
     private fun submitServerSampleData() {
         val url = ServerUrlNormalizer.normalize(_uiState.value.serverUrl)
+        awaitingSelfHostedAuth = false
+        storage.delete(OidcCallbackBridge.PENDING_ONBOARDING_OIDC_KEY)
         OidcCallbackBridge.setExchangeError(null)
         _uiState.update { it.copy(isSampleLoading = true, authError = null) }
         scope.launch {

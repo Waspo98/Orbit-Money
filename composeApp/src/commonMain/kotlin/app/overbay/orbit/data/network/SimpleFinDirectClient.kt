@@ -8,7 +8,6 @@ import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.domain.BalanceHistoryEngine
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.LocalDateUtils
-import app.overbay.orbit.domain.MoneyUtils
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.HttpTimeout
@@ -174,7 +173,7 @@ class SimpleFinDirectClient(
         cutoverDateIso: String? = null
     ): DirectSyncOutcome {
         val normalizedCutover = cutoverDateIso?.trim()?.takeIf { it.length == 10 }
-        val existingTxIds = snapshot.transactions.mapNotNull { it.externalId }.toSet()
+        val existingTxIds = snapshot.transactions.mapNotNull { it.externalId }.toMutableSet()
         val accountBySimpleFinId = snapshot.accounts
             .filter { !it.simplefinAccountId.isNullOrBlank() }
             .associateBy { it.simplefinAccountId!! }
@@ -191,8 +190,8 @@ class SimpleFinDirectClient(
         var syncedCount = 0
 
         for (sfAccount in bridgeData.accounts) {
-            val parsedBalance = sfAccount.balance.toDoubleOrNull()
-            val balanceCents = parsedBalance?.let { MoneyUtils.dollarsToCents(it) } ?: 0L
+            val balanceCentsParsed = parseDecimalStringToCents(sfAccount.balance)
+            val balanceCents = balanceCentsParsed ?: 0L
             val recordDate = if (sfAccount.balanceDate > 0L) formatEpochDate(sfAccount.balanceDate) else todayIso
 
             val existing = accountBySimpleFinId[sfAccount.id]
@@ -217,7 +216,7 @@ class SimpleFinDirectClient(
 
             syncedCount += 1
 
-            if (parsedBalance != null) {
+            if (balanceCentsParsed != null) {
                 updatedBalancesByAccountId[localAccount.id] = balanceCents
                 updatedRecords = BalanceHistoryEngine.upsertAutoCheckpoint(
                     records = updatedRecords,
@@ -229,12 +228,11 @@ class SimpleFinDirectClient(
             }
 
             for (sfTx in sfAccount.transactions) {
-                if (existingTxIds.contains(sfTx.id)) continue
+                if (!existingTxIds.add(sfTx.id)) continue
                 val dateIso = formatEpochDate(sfTx.posted)
                 if (normalizedCutover != null && dateIso < normalizedCutover) continue
 
-                val amountDouble = sfTx.amount.toDoubleOrNull() ?: 0.0
-                val amountCents = MoneyUtils.dollarsToCents(amountDouble)
+                val amountCents = parseDecimalStringToCents(sfTx.amount) ?: 0L
                 val merchantName = sfTx.payee?.takeIf { it.isNotBlank() } ?: sfTx.description
 
                 newTransactions.add(
@@ -277,11 +275,29 @@ class SimpleFinDirectClient(
             Regex("credit|card|sapphire|amex|visa|mastercard|discover|venture|freedom|cash back").containsMatchIn(text) -> AccountType.CREDIT
             Regex("auto loan|student loan|loan|line of credit|heloc").containsMatchIn(text) -> AccountType.LOAN
             Regex("401\\(?k\\)?|ira|roth|vanguard|fidelity|schwab|betterment|brokerage|hsa|403b|tsp|investment").containsMatchIn(text) -> AccountType.INVESTMENT
-            Regex("saving|money market|reserve|cd ").containsMatchIn(text) -> AccountType.SAVINGS
+            Regex("saving|money market|reserve|\\bcd\\b").containsMatchIn(text) -> AccountType.SAVINGS
             Regex("checking|debit|everyday").containsMatchIn(text) -> AccountType.CHECKING
             balanceCents < 0L -> AccountType.CREDIT
             else -> AccountType.CHECKING
         }
+    }
+
+    internal fun parseDecimalStringToCents(raw: String): Cents? {
+        val s = raw.trim().replace("$", "").replace(",", "")
+        if (s.isEmpty()) return null
+        val negative = s.startsWith("-")
+        val unsigned = if (negative || s.startsWith("+")) s.substring(1) else s
+        if (unsigned.isEmpty() || unsigned.count { it == '.' } > 1) return null
+        val parts = unsigned.split('.')
+        val wholeStr = parts[0].ifEmpty { "0" }
+        val fracRaw = parts.getOrElse(1) { "" }
+        if (!wholeStr.all(Char::isDigit) || !fracRaw.all(Char::isDigit)) return null
+        val whole = wholeStr.toLongOrNull() ?: return null
+        val paddedFrac = fracRaw.padEnd(3, '0')
+        val twoDigits = paddedFrac.substring(0, 2).toLong()
+        val roundUp = if (paddedFrac[2] >= '5') 1L else 0L
+        val total = whole * 100L + twoDigits + roundUp
+        return if (negative) -total else total
     }
 
     private fun resolveStartDateEpochSeconds(cutoverDateIso: String?): Long {

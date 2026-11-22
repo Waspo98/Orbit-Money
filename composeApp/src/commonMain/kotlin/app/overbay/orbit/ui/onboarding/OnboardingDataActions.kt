@@ -10,6 +10,7 @@ import app.overbay.orbit.data.setupSimpleFinBridge
 import app.overbay.orbit.domain.CsvColumnMapping
 import app.overbay.orbit.domain.CsvImportEngine
 import app.overbay.orbit.domain.CsvImportFormat
+import app.overbay.orbit.domain.CsvInspectionResult
 import app.overbay.orbit.domain.LocalDateUtils
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -24,31 +25,51 @@ internal fun OnboardingViewModel.inspectAndPreviewCsvImpl(
     overrideMap: CsvColumnMapping?
 ) {
     if (rawCsv.isBlank()) {
-        _uiState.update { it.copy(csvRawText = "", csvInspection = null, csvPreview = null, csvError = null) }
+        _uiState.update {
+            it.copy(
+                csvRawText = "",
+                csvInspection = null,
+                csvMapping = null,
+                csvPreview = null,
+                csvError = null
+            )
+        }
         return
     }
+    var inspected: CsvInspectionResult? = null
+    var mapping: CsvColumnMapping? = overrideMap
     try {
-        val inspected = CsvImportEngine.inspectCsv(rawCsv)
-        val mapping = overrideMap ?: inspected.suggestedMapping
-        val existingIds = repository.transactions.value.mapNotNull { it.externalId }.toSet()
-        val catMap = repository.categories.value.associateBy { it.name.lowercase() }
-        val preview = CsvImportEngine.buildPreview(rawCsv, existingIds, catMap, mapping)
+        val parsedInspection = CsvImportEngine.inspectCsv(rawCsv)
+        inspected = parsedInspection
+        val chosenMapping = overrideMap ?: parsedInspection.suggestedMapping
+        mapping = chosenMapping
+        val shouldExpandMapper = if (overrideMap == null) {
+            parsedInspection.detectedFormat == CsvImportFormat.GENERIC || !chosenMapping.isValid
+        } else {
+            _uiState.value.csvMapperExpanded
+        }
         _uiState.update {
             it.copy(
                 csvFileName = fileName,
                 csvRawText = rawCsv,
-                csvInspection = inspected,
-                csvMapping = mapping,
-                csvMapperExpanded = if (overrideMap == null) inspected.detectedFormat == CsvImportFormat.GENERIC else it.csvMapperExpanded,
-                csvPreview = preview,
+                csvInspection = parsedInspection,
+                csvMapping = chosenMapping,
+                csvMapperExpanded = shouldExpandMapper,
                 csvError = null
             )
         }
+        val existingIds = repository.transactions.value.mapNotNull { it.externalId }.toSet()
+        val catMap = repository.categories.value.associateBy { it.name.lowercase() }
+        val preview = CsvImportEngine.buildPreview(rawCsv, existingIds, catMap, chosenMapping)
+        _uiState.update { it.copy(csvPreview = preview, csvError = null) }
     } catch (e: Throwable) {
         _uiState.update {
             it.copy(
                 csvFileName = fileName,
                 csvRawText = rawCsv,
+                csvInspection = inspected ?: it.csvInspection,
+                csvMapping = mapping ?: it.csvMapping,
+                csvMapperExpanded = if (inspected != null) true else it.csvMapperExpanded,
                 csvPreview = null,
                 csvError = e.message ?: "Could not parse that CSV file."
             )
@@ -71,7 +92,7 @@ internal fun OnboardingViewModel.commitCsvImportImpl() {
             _uiState.update {
                 it.copy(
                     isImportingCsv = false,
-                    csvImportedCount = batch.importedCount.coerceAtLeast(preview.transactions.size),
+                    csvImportedCount = batch.importedCount,
                     csvImportedFormatName = preview.detectedFormat.displayName,
                     csvLatestDateIso = latest,
                     csvSuggestedCutoverDate = suggestedCutover,
@@ -180,7 +201,8 @@ internal fun OnboardingViewModel.saveHouseholdMemberImpl() {
         _uiState.update { it.copy(memberDraft = draft.copy(error = "Enter a name to add.")) }
         return
     }
-    val birthDate = draft.birthYearText.toIntOrNull()?.takeIf { it in 1920..2026 }?.let { "$it-01-01" }
+    val currentYear = LocalDateUtils.todayLocalDate().year
+    val birthDate = draft.birthYearText.toIntOrNull()?.takeIf { it in 1920..currentYear }?.let { "$it-01-01" }
     val isAdult = draft.role == "adult"
     val contribPct = if (isAdult) draft.retirementContribPercentText.toDoubleOrNull()?.coerceIn(0.0, 100.0) ?: 0.0 else 0.0
     _uiState.update { it.copy(memberDraft = draft.copy(isSubmitting = true, error = null)) }

@@ -1,6 +1,7 @@
 package app.overbay.orbit.domain
 
 import app.overbay.orbit.data.model.AccountType
+import kotlinx.datetime.LocalDate
 
 enum class CsvImportFormat(val id: String, val displayName: String) {
     ROCKET_MONEY("rocket_money", "Rocket Money"),
@@ -221,8 +222,6 @@ object CsvFormatDetector {
 
     private fun formatValidatedIso(y: Int, m: Int, d: Int): String? {
         if (y !in 1970..2100 || m !in 1..12 || d !in 1..31) return null
-        val mm = m.toString().padStart(2, '0')
-        val dd = d.toString().padStart(2, '0')
-        return "$y-$mm-$dd"
+        return runCatching { LocalDate(y, m, d).toString() }.getOrNull()
     }
 }

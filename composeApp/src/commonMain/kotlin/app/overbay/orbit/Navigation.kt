@@ -136,6 +136,14 @@ fun OrbitNavigation(
     }
 
     val isAuthRoute = currentKey == OrbitNavKey.Login || currentKey is OrbitNavKey.Onboarding
+    var lastAuthKey by remember(initialKey) {
+        mutableStateOf<OrbitNavKey>(
+            if (initialKey == OrbitNavKey.Login || initialKey is OrbitNavKey.Onboarding) initialKey else OrbitNavKey.Login
+        )
+    }
+    if (isAuthRoute) {
+        lastAuthKey = currentKey
+    }
     var lastShellEntry by remember(initialKey) {
         mutableStateOf(
             if (initialKey == OrbitNavKey.Login || initialKey is OrbitNavKey.Onboarding) {
@@ -167,7 +175,8 @@ fun OrbitNavigation(
         label = "authShellTransition"
     ) { showAuth ->
         if (showAuth) {
-            val onboardingKey = currentKey as? OrbitNavKey.Onboarding
+            val activeAuthKey = if (isAuthRoute) currentKey else lastAuthKey
+            val onboardingKey = activeAuthKey as? OrbitNavKey.Onboarding
             if (onboardingKey != null) {
                 LaunchedEffect(onboardingKey) {
                     viewModels.onboardingViewModel.beginSession(isReplay = onboardingKey.isReplay)
