@@ -2,6 +2,23 @@ package app.overbay.orbit.data.network
 
 import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.data.model.OrbitWorkspaceSnapshot
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.HttpClientEngineBase
+import io.ktor.client.engine.HttpClientEngineConfig
+import io.ktor.client.engine.callContext
+import io.ktor.client.request.HttpRequestData
+import io.ktor.client.request.HttpResponseData
+import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpProtocolVersion
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.headersOf
+import io.ktor.util.date.GMTDate
+import io.ktor.utils.io.ByteReadChannel
+import io.ktor.utils.io.InternalAPI
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
@@ -111,5 +128,27 @@ class SimpleFinDirectClientTest {
         assertEquals(AccountType.SAVINGS, outcome.updatedSnapshot.accounts.single().type)
         assertEquals(12345678999L, outcome.updatedSnapshot.accounts.single().currentBalanceCents)
         assertEquals(1, outcome.newTransactionCount)
+    }
+
+    @OptIn(InternalAPI::class, ExperimentalCoroutinesApi::class)
+    @Test
+    fun fetchBridgeDataSurfacesNon2xxHttpStatusAsFailure() = runTest(UnconfinedTestDispatcher()) {
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val engine = object : HttpClientEngineBase("simplefin-http-500") {
+            override val dispatcher: CoroutineDispatcher = dispatcher
+            override val config: HttpClientEngineConfig = HttpClientEngineConfig()
+            override suspend fun execute(data: HttpRequestData): HttpResponseData =
+                HttpResponseData(
+                    statusCode = HttpStatusCode.InternalServerError,
+                    requestTime = GMTDate(),
+                    headers = headersOf(HttpHeaders.ContentType, ContentType.Text.Plain.toString()),
+                    version = HttpProtocolVersion.HTTP_1_1,
+                    body = ByteReadChannel("Upstream SimpleFIN outage"),
+                    callContext = callContext()
+                )
+        }
+        val sfClient = SimpleFinDirectClient(HttpClient(engine))
+        val res = sfClient.fetchBridgeData("https://u:p@bridge.example.com/simplefin")
+        assertTrue(res.isFailure)
     }
 }

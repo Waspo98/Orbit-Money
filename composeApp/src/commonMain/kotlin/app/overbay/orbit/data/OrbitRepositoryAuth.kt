@@ -43,7 +43,6 @@ internal suspend fun OrbitRepository.refreshSelfHostedSessionImpl(
     if (me != null && me.authenticated) {
         _isOffline.value = false
         storage.delete(OidcCallbackBridge.PENDING_SERVER_URL_KEY)
-        _isAuthenticated.value = true
         _currentUser.value = me.displayName ?: me.username ?: me.email
         persistAuthMethod(resolveAuthMethod(me.authMethod, me.authProvider, _authMethod.value))
         val loaded = remoteEngine.loadSnapshot(preFetchedMe = me)
@@ -53,6 +52,9 @@ internal suspend fun OrbitRepository.refreshSelfHostedSessionImpl(
         ) == existing
         if (!sameData) updateMemoryState(loaded) else _preferences.value = loaded.preferences
         localEngine.saveStartupPreferences(loaded.preferences)
+        // Publish authentication AFTER snapshot/accounts are populated so onboarding OIDC observers
+        // see existing server accounts before deciding whether to skip DATA_CONNECT.
+        _isAuthenticated.value = true
     } else {
         val errMsg = meResult.exceptionOrNull()?.message.orEmpty()
         val is401 = (me != null && !me.authenticated) || errMsg.contains("401") || !hadCachedSession

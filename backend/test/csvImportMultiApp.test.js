@@ -137,3 +137,35 @@ test('importNormalizedCsvTransactions skips blank/null amounts and non-object en
   assert.equal(rows[0].amount, 1234);
   assert.equal(rows[0].original_merchant, 'Valid Dollar Row');
 });
+
+test('importNormalizedCsvTransactions reuses existing account with institution when CSV omits institution', () => {
+  const db = createTestDb();
+  const insertExisting = db.prepare(
+    `INSERT INTO accounts (household_id, name, type, institution, is_manual, current_balance, sort_order)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
+  ).run(1, 'Chase Checking', 'checking', 'Chase', 0, 150000, 10);
+  const existingAccountId = Number(insertExisting.lastInsertRowid);
+
+  const result = importNormalizedCsvTransactions(db, 1, {
+    fileName: 'mint.csv',
+    source: 'mint',
+    accounts: [
+      { key: '|Chase Checking|', name: 'Chase Checking', type: 'checking', institution: null, last4: null }
+    ],
+    transactions: [
+      {
+        accountKey: '|Chase Checking|',
+        date: '2026-11-06',
+        amountCents: -4815,
+        merchant: 'Trader Joes',
+        description: 'TRADER JOES #104',
+        externalId: 'mint_chase_1'
+      }
+    ]
+  });
+
+  assert.equal(result.accountsCreated, 0);
+  assert.equal(result.inserted, 1);
+  const tx = db.prepare('SELECT account_id FROM transactions WHERE household_id = 1').get();
+  assert.equal(tx.account_id, existingAccountId);
+});

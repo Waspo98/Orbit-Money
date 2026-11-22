@@ -17,6 +17,7 @@ import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import io.ktor.client.request.post
 import io.ktor.client.statement.bodyAsText
+import io.ktor.http.isSuccess
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
@@ -148,6 +149,14 @@ class SimpleFinDirectClient(
             if (authHeader != null) header("Authorization", authHeader)
             if (startDateSeconds != null) parameter("start-date", startDateSeconds)
             if (endDateSeconds != null) parameter("end-date", endDateSeconds)
+        }
+        if (!response.status.isSuccess()) {
+            val errBody = runCatching { response.bodyAsText().trim() }.getOrDefault("")
+            val detail = errBody.takeIf { it.isNotBlank() && it.length <= 140 }
+            throw IllegalStateException(
+                if (detail != null) "SimpleFIN Bridge returned HTTP ${response.status.value}: $detail"
+                else "SimpleFIN Bridge returned HTTP ${response.status.value}"
+            )
         }
         response.body()
     }

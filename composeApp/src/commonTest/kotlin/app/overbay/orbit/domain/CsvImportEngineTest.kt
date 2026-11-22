@@ -114,4 +114,12 @@ class CsvImportEngineTest {
         assertNull(CsvFormatDetector.normalizeDateToIso("04/31/2026"))
         assertEquals("2024-02-29", CsvFormatDetector.normalizeDateToIso("2024-02-29"))
     }
+
+    @Test
+    fun parsesCurrencyAndParentheticalNegativeAmounts() {
+        assertEquals(-4815L, CsvFormatDetector.parseSignedMoneyToCents("$(48.15)"))
+        assertEquals(-4815L, CsvFormatDetector.parseSignedMoneyToCents("($48.15)"))
+        assertEquals(-123450L, CsvFormatDetector.parseSignedMoneyToCents("$(1,234.50)"))
+        assertEquals(4815L, CsvFormatDetector.parseSignedMoneyToCents("$48.15"))
+    }
 }

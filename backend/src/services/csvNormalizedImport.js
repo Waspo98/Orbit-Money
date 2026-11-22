@@ -31,6 +31,13 @@ export function importNormalizedCsvTransactions(db, householdId = 1, payload = {
        AND COALESCE(lower(institution), '') = COALESCE(lower(?), '')
      LIMIT 1
   `);
+  const findAccountByNameOnly = db.prepare(`
+    SELECT id FROM accounts
+     WHERE household_id = ?
+       AND lower(name) = lower(?)
+     ORDER BY id ASC
+     LIMIT 1
+  `);
   const findAccountById = db.prepare('SELECT id FROM accounts WHERE id = ? AND household_id = ?');
   const insertAccount = db.prepare(`
     INSERT INTO accounts (household_id, name, type, institution, account_number_last4, is_manual, current_balance, sort_order)
@@ -73,7 +80,8 @@ export function importNormalizedCsvTransactions(db, householdId = 1, payload = {
         ? String(acct.type).toLowerCase()
         : 'checking';
 
-      const existing = findAccountByKey.get(householdId, name, institution);
+      const existing = findAccountByKey.get(householdId, name, institution) ||
+        (!institution ? findAccountByNameOnly.get(householdId, name) : null);
       if (existing) {
         if (key) accountIdByKey.set(key, existing.id);
         continue;

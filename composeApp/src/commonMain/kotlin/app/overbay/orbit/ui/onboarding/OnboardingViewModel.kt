@@ -329,9 +329,12 @@ class OnboardingViewModel(
         scope.launch {
             persistMutex.withLock {
                 repository.setStorageMode(StorageMode.LOCAL)
-                repository.loadDemoData(DemoSeedGenerator.generateDemoSnapshot())
-                repository.updatePreferences(
-                    repository.preferences.value.copy(storageMode = StorageMode.LOCAL, onboardingCompleted = true)
+                val preservedPrefs = repository.preferences.value.copy(
+                    storageMode = StorageMode.LOCAL,
+                    onboardingCompleted = true
+                )
+                repository.loadDemoData(
+                    DemoSeedGenerator.generateDemoSnapshot().copy(preferences = preservedPrefs)
                 )
             }
             _uiState.update { it.copy(isSubmittingAuth = false, isCompleted = true) }
@@ -347,27 +350,38 @@ class OnboardingViewModel(
         storage.delete(OidcCallbackBridge.PENDING_ONBOARDING_OIDC_KEY)
         _uiState.update { it.copy(isSubmittingAuth = true, authError = null) }
         scope.launch {
+            var restoreFailureMessage: String? = null
             persistMutex.withLock {
                 repository.setStorageMode(StorageMode.LOCAL)
                 when (state.selectedLocalSeed) {
-                    LocalSeedChoice.DEMO -> repository.loadDemoData(DemoSeedGenerator.generateDemoSnapshot())
+                    LocalSeedChoice.DEMO -> {
+                        val preservedPrefs = repository.preferences.value.copy(
+                            storageMode = StorageMode.LOCAL,
+                            onboardingCompleted = false
+                        )
+                        repository.loadDemoData(
+                            DemoSeedGenerator.generateDemoSnapshot().copy(preferences = preservedPrefs)
+                        )
+                    }
                     LocalSeedChoice.RESTORE_FILE -> {
-                        val res = repository.restoreBackupJson(state.backupJsonContent.orEmpty())
-                        if (res.isFailure) {
-                            _uiState.update {
-                                it.copy(isSubmittingAuth = false, authError = res.exceptionOrNull()?.message ?: "Could not restore backup.")
-                            }
-                            return@launch
-                        }
-                        repository.updatePreferences(
-                            repository.preferences.value.copy(
+                        val res = repository.restoreBackupJson(state.backupJsonContent.orEmpty()) { restored ->
+                            restored.copy(
                                 storageMode = StorageMode.LOCAL,
                                 onboardingCompleted = false
                             )
-                        )
+                        }
+                        if (res.isFailure) {
+                            restoreFailureMessage = res.exceptionOrNull()?.message ?: "Could not restore backup."
+                        }
                     }
                     LocalSeedChoice.FRESH -> Unit
                 }
+            }
+            if (restoreFailureMessage != null) {
+                _uiState.update {
+                    it.copy(isSubmittingAuth = false, authError = restoreFailureMessage)
+                }
+                return@launch
             }
             val nextStep = if (state.selectedLocalSeed == LocalSeedChoice.FRESH) {
                 OnboardingStep.DATA_CONNECT

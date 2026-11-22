@@ -6,6 +6,8 @@ import app.overbay.orbit.data.model.EditSource
 import app.overbay.orbit.data.model.FilingStatus
 import app.overbay.orbit.data.model.HouseholdMember
 import app.overbay.orbit.data.model.MhaTaxProfile
+import app.overbay.orbit.data.model.MhaYearTaxRecord
+import app.overbay.orbit.data.model.TaxTrackingMode
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.util.PlatformStorage
 import kotlinx.coroutines.Dispatchers
@@ -604,6 +606,76 @@ class MhaTrackerViewModelTest {
         assertTrue(savedRecord.capsConfigured)
         assertEquals(30_000_00L, savedRecord.designatedCapCents)
         assertFalse(savedRecord.useLiveProfile)
+
+        collectJob.cancel()
+    }
+
+    @Test
+    fun switchingToGeneralTaxModeUncapsHistoricalCappedYear() = runTest(testDispatcher) {
+        val catUtility = Category(id = 10L, name = "Utilities", mhaDefaultEligible = true)
+        repository.saveCategory(catUtility)
+        repository.saveHouseholdMember(
+            HouseholdMember(
+                id = 1L,
+                name = "Jordan",
+                grossIncomeAnnualCents = 100_000_00L
+            )
+        )
+        val initialProfile = MhaTaxProfile(
+            trackingMode = TaxTrackingMode.MHA,
+            filingStatus = FilingStatus.SINGLE,
+            designatedCapCents = 12_000_00L,
+            fairMarketRentalValueCents = 12_000_00L,
+            yearlyRecords = mapOf(
+                "2025" to MhaYearTaxRecord(
+                    year = 2025,
+                    effectiveRatePercent = 25.0,
+                    designatedCapCents = 10_000_00L,
+                    capsConfigured = true,
+                    isLocked = true,
+                    useLiveProfile = false
+                )
+            )
+        )
+        repository.updateMhaTaxProfile(initialProfile)
+        repository.saveTransaction(
+            Transaction(
+                id = 1L,
+                accountId = 1L,
+                originalDate = "2025-05-01",
+                originalMerchant = "Electric Co",
+                originalAmountCents = -15_000_00L,
+                originalCategoryId = 10L
+            )
+        )
+        repository.saveTransaction(
+            Transaction(
+                id = 2L,
+                accountId = 1L,
+                originalDate = "2025-05-02",
+                originalMerchant = "Coffee Shop",
+                originalAmountCents = -5_00L
+            )
+        )
+
+        val collectJob = launch(testDispatcher) { viewModel.uiState.collect {} }
+        viewModel.setYear(2025)
+        viewModel.setShowExcludedInList(true)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(10_000_00L, viewModel.uiState.value.excludableAllowanceCents)
+        assertEquals(MhaLimitingFactor.DESIGNATION_CAP, viewModel.uiState.value.limitingFactor)
+
+        repository.updateMhaTaxProfile(initialProfile.copy(trackingMode = TaxTrackingMode.GENERAL))
+        testScheduler.advanceUntilIdle()
+
+        val generalState = viewModel.uiState.value
+        assertEquals(15_000_00L, generalState.excludableAllowanceCents)
+        assertEquals(3_750_00L, generalState.taxCalculationResult?.totalSavingsCents)
+        assertEquals(MhaLimitingFactor.UNCAPPED_ACTUAL, generalState.limitingFactor)
+        val excludedReason = generalState.visibleTransactions.first { it.id == 2L }.eligibilityReason
+        assertTrue(excludedReason.contains("Tax Ded."))
+        assertFalse(excludedReason.contains("MHA"))
 
         collectJob.cancel()
     }

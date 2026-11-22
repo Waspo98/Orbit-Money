@@ -3,7 +3,9 @@ package app.overbay.orbit.ui.onboarding
 import app.overbay.orbit.data.OrbitRepository
 import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.data.model.FilingStatus
+import app.overbay.orbit.data.model.OrbitAccentColorMode
 import app.overbay.orbit.data.model.OrbitPreferences
+import app.overbay.orbit.data.model.OrbitThemeMode
 import app.overbay.orbit.data.model.OrbitThemePreset
 import app.overbay.orbit.data.model.OrbitWorkspaceSnapshot
 import app.overbay.orbit.data.model.RetirementScenarioPreset
@@ -34,11 +36,13 @@ import io.ktor.utils.io.ByteReadChannel
 import io.ktor.utils.io.InternalAPI
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -579,5 +583,127 @@ class OnboardingViewModelTest {
         assertEquals(OnboardingStep.DATA_CONNECT, vm.uiState.value.currentStep)
         assertNull(storage.loadString(OidcCallbackBridge.PENDING_ONBOARDING_OIDC_KEY))
         storage.clear()
+    }
+
+    @OptIn(InternalAPI::class)
+    @Test
+    fun asyncWebOidcSessionRefreshWaitsForAccountsBeforeOnboardingTransitions() =
+        runTest(UnconfinedTestDispatcher()) {
+            val dispatcher = UnconfinedTestDispatcher(testScheduler)
+            val storage = PlatformStorage().apply { clear() }
+            storage.saveString(OidcCallbackBridge.PENDING_SERVER_URL_KEY, "/")
+            storage.saveString(OidcCallbackBridge.PENDING_ONBOARDING_OIDC_KEY, "1")
+            val accountsGate = CompletableDeferred<Unit>()
+            val wireJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+            val engine = object : HttpClientEngineBase("onboarding-async-oidc-mock") {
+                override val dispatcher: CoroutineDispatcher = dispatcher
+                override val config: HttpClientEngineConfig = HttpClientEngineConfig()
+                override suspend fun execute(data: HttpRequestData): HttpResponseData {
+                    if (data.url.encodedPath == "/api/accounts") {
+                        accountsGate.await()
+                    }
+                    val body = when (data.url.encodedPath) {
+                        "/api/auth/me" -> """{"authenticated":true,"username":"neal","displayName":"Neal","authProvider":"oidc","authMethod":"oidc","household":{"id":1,"name":"Home","role":"owner"}}"""
+                        "/api/accounts" -> """{"items":[{"id":1,"name":"Checking","type":"checking","current_balance":1000.0}]}"""
+                        "/api/transactions" -> """{"items":[],"total":0,"page":1,"totalPages":1}"""
+                        "/api/simplefin/status" -> """{"connected":false,"syncEnabled":false}"""
+                        else -> """{"items":[]}"""
+                    }
+                    return HttpResponseData(
+                        statusCode = HttpStatusCode.OK,
+                        requestTime = GMTDate(),
+                        headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
+                        version = HttpProtocolVersion.HTTP_1_1,
+                        body = ByteReadChannel(body),
+                        callContext = callContext()
+                    )
+                }
+            }
+            val apiClient = OrbitApiClient(
+                baseUrlProvider = { "" },
+                storage = storage,
+                customHttpClient = HttpClient(engine) { install(ContentNegotiation) { json(wireJson) } }
+            )
+            val repo = OrbitRepository(storage = storage, customApiClient = apiClient, scope = backgroundScope)
+            val vm = OnboardingViewModel(repo, customApiClient = apiClient, storage = storage, isWebPlatform = true, scope = backgroundScope)
+
+            val initJob = launch(dispatcher) { repo.initialize() }
+            vm.beginSession(isReplay = false)
+
+            // Snapshot is still loading — auth must NOT have flipped true prematurely
+            assertFalse(repo.isAuthenticated.value)
+            assertEquals(OnboardingStep.SERVER_AUTH, vm.uiState.value.currentStep)
+
+            accountsGate.complete(Unit)
+            initJob.join()
+
+            assertTrue(repo.isAuthenticated.value)
+            assertTrue(vm.uiState.value.existingServerDetected)
+            assertEquals(OnboardingStep.ALL_SET, vm.uiState.value.currentStep)
+            storage.clear()
+        }
+
+    @Test
+    fun localDemoAndQuickSamplePreserveStep2AppearancePreferences() = runTest(UnconfinedTestDispatcher()) {
+        val (repo, vm) = createVm(this)
+        vm.beginSession(isReplay = false)
+        vm.processIntent(OnboardingIntent.Next) // -> APPEARANCE
+        vm.processIntent(OnboardingIntent.SetThemePreset(OrbitThemePreset.ROYAL_INDIGO))
+        vm.processIntent(OnboardingIntent.SetThemeMode(OrbitThemeMode.DARK))
+        vm.processIntent(OnboardingIntent.SetAmoledDark(true))
+        vm.processIntent(OnboardingIntent.SetAccentColorMode(OrbitAccentColorMode.ALWAYS_GREEN_RED))
+
+        vm.processIntent(OnboardingIntent.Next) // -> STORAGE_MODE
+        vm.processIntent(OnboardingIntent.SelectStorageMode(StorageMode.LOCAL))
+        vm.processIntent(OnboardingIntent.Next) // -> LOCAL_WORKSPACE
+        vm.processIntent(OnboardingIntent.SelectLocalSeed(LocalSeedChoice.DEMO))
+        vm.processIntent(OnboardingIntent.ConfirmLocalWorkspace)
+
+        assertEquals(OnboardingStep.ALL_SET, vm.uiState.value.currentStep)
+        assertEquals(OrbitThemePreset.ROYAL_INDIGO, repo.preferences.value.themePreset)
+        assertEquals(OrbitThemeMode.DARK, repo.preferences.value.themeMode)
+        assertTrue(repo.preferences.value.amoledDarkMode)
+        assertEquals(OrbitAccentColorMode.ALWAYS_GREEN_RED, repo.preferences.value.accentColorMode)
+
+        // Quick-start sample from Step 1/2 also retains user-picked appearance
+        val (repo2, vm2) = createVm(this)
+        vm2.beginSession(isReplay = false)
+        vm2.processIntent(OnboardingIntent.SetThemePreset(OrbitThemePreset.SPACESHIP_RED))
+        vm2.processIntent(OnboardingIntent.SetAmoledDark(true))
+        vm2.processIntent(OnboardingIntent.SetAccentColorMode(OrbitAccentColorMode.ALWAYS_GREEN_RED))
+        vm2.processIntent(OnboardingIntent.ExploreSampleDataQuickStart)
+
+        assertEquals(OrbitThemePreset.SPACESHIP_RED, repo2.preferences.value.themePreset)
+        assertTrue(repo2.preferences.value.amoledDarkMode)
+        assertEquals(OrbitAccentColorMode.ALWAYS_GREEN_RED, repo2.preferences.value.accentColorMode)
+        assertTrue(repo2.preferences.value.onboardingCompleted)
+    }
+
+    @Test
+    fun localBackupRestoreNeverEmitsOnboardingCompletedTrueBeforeAct2() = runTest(UnconfinedTestDispatcher()) {
+        val (seedRepo, _) = createVm(this)
+        seedRepo.updatePreferences(seedRepo.preferences.value.copy(onboardingCompleted = true))
+        val backupJson = seedRepo.exportBackupJson()
+
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val (repo, vm) = createVm(this)
+        val observedCompletedFlags = mutableListOf<Boolean>()
+        val collectJob = launch(dispatcher) {
+            repo.preferences.collect { observedCompletedFlags.add(it.onboardingCompleted) }
+        }
+
+        vm.beginSession(isReplay = false)
+        vm.processIntent(OnboardingIntent.Next) // -> APPEARANCE
+        vm.processIntent(OnboardingIntent.Next) // -> STORAGE_MODE
+        vm.processIntent(OnboardingIntent.SelectStorageMode(StorageMode.LOCAL))
+        vm.processIntent(OnboardingIntent.Next) // -> LOCAL_WORKSPACE
+        vm.processIntent(OnboardingIntent.SelectLocalSeed(LocalSeedChoice.RESTORE_FILE))
+        vm.processIntent(OnboardingIntent.SetBackupFile("orbit-backup.json", backupJson))
+        vm.processIntent(OnboardingIntent.ConfirmLocalWorkspace)
+
+        assertEquals(OnboardingStep.ALL_SET, vm.uiState.value.currentStep)
+        assertFalse(repo.preferences.value.onboardingCompleted)
+        assertFalse(observedCompletedFlags.any { it })
+        collectJob.cancel()
     }
 }

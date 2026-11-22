@@ -356,28 +356,6 @@ class OrbitRepository(
         ids.forEach { activeEngine.deleteTransaction(it) }
     }
 
-
-    suspend fun importTransactions(
-        newTransactions: List<Transaction>,
-        newRules: List<TransactionRule> = emptyList()
-    ) {
-        val currentTxns = _transactions.value
-        var nextId = (currentTxns.maxOfOrNull { it.id } ?: 0L) + 1L
-        val assignedTxns = newTransactions.map { txn ->
-            if (txn.id <= 0L || currentTxns.any { it.id == txn.id }) txn.copy(id = nextId++)
-            else {
-                if (txn.id >= nextId) nextId = txn.id + 1L
-                txn
-            }
-        }
-        val currentRules = _rules.value
-        var nextRuleId = (currentRules.maxOfOrNull { it.id } ?: 0L) + 1L
-        val assignedRules = newRules.map { rule ->
-            if (rule.id <= 0L || currentRules.any { it.id == rule.id }) rule.copy(id = nextRuleId++) else rule
-        }
-        commitSnapshot(_snapshot.value.copy(transactions = currentTxns + assignedTxns, rules = currentRules + assignedRules))
-    }
-
     suspend fun splitTransaction(parentTransactionId: Long, splits: List<Pair<Cents, Long?>>) {
         val current = _transactions.value
         val parent = current.find { it.id == parentTransactionId } ?: return
@@ -573,7 +551,10 @@ class OrbitRepository(
     suspend fun searchMerchantLogos(transactionId: Long, query: String): Result<MerchantLogoSearchResponseDto> = searchMerchantLogosImpl(transactionId, query)
     suspend fun overrideMerchantLogo(transactionId: Long, logoUrl: String? = null, useCategoryIcon: Boolean = false): Result<MerchantLogo> = overrideMerchantLogoImpl(transactionId, logoUrl, useCategoryIcon)
     fun exportBackupJson(): String = exportBackupJsonImpl()
-    suspend fun restoreBackupJson(jsonString: String): Result<Unit> = restoreBackupJsonImpl(jsonString)
+    suspend fun restoreBackupJson(
+        jsonString: String,
+        overridePreferences: ((OrbitPreferences) -> OrbitPreferences)? = null
+    ): Result<Unit> = restoreBackupJsonImpl(jsonString, overridePreferences)
     suspend fun loadDemoData(snapshot: OrbitWorkspaceSnapshot) = loadDemoDataImpl(snapshot)
     suspend fun updateMhaTaxProfile(profile: MhaTaxProfile) = updateMhaTaxProfileImpl(profile)
     suspend fun updateHouseholdInfo(household: HouseholdInfo) = updateHouseholdInfoImpl(household)

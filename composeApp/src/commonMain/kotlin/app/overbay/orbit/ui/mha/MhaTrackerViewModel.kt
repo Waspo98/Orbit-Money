@@ -10,6 +10,7 @@ import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.MhaTaxProfile
 import app.overbay.orbit.data.model.MhaYearTaxRecord
+import app.overbay.orbit.data.model.TaxTrackingMode
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.LocalDateUtils
@@ -87,7 +88,13 @@ class MhaTrackerViewModel(
         val year = snapData.year
         val profile = snapshot.mhaTaxProfile
 
-        val classified = MhaTrackerTransform.classifyYearTransactions(year, transactions, accounts, categories)
+        val classified = MhaTrackerTransform.classifyYearTransactions(
+            year = year,
+            transactions = transactions,
+            accounts = accounts,
+            categories = categories,
+            trackingMode = profile.trackingMode
+        )
         val sortedAll = classified.allOutflows
         val sortedEligible = classified.eligible
         val actualSpentCents = classified.actualSpentCents
@@ -98,12 +105,15 @@ class MhaTrackerViewModel(
         val designatedCap = if (yearRecord?.capsConfigured == true) yearRecord.designatedCapCents else profile.designatedCapCents
         val fmrv = if (yearRecord?.capsConfigured == true) yearRecord.fairMarketRentalValueCents else profile.fairMarketRentalValueCents
 
+        val isGeneralMode = profile.trackingMode == TaxTrackingMode.GENERAL
+        val effectiveCap = if (isGeneralMode) null else designatedCap
+        val effectiveFmrv = if (isGeneralMode) null else fmrv
         val excludableCap = MhaTaxEngine.calculateParsonageCap(
             actualExpensesCents = actualSpentCents,
-            designatedCapCents = designatedCap,
-            fairMarketRentalValueCents = fmrv
+            designatedCapCents = effectiveCap,
+            fairMarketRentalValueCents = effectiveFmrv
         )
-        val bindingLimit = MhaTrackerTransform.resolveLimitingFactor(actualSpentCents, designatedCap, fmrv)
+        val bindingLimit = MhaTrackerTransform.resolveLimitingFactor(actualSpentCents, effectiveCap, effectiveFmrv)
         val taxCalc = MhaTaxEngine.calculateMhaSavingsForYear(
             year = year,
             currentYear = currentYear,

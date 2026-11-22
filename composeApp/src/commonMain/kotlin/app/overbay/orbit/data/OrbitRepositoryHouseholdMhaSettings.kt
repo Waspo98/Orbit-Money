@@ -14,6 +14,7 @@ import app.overbay.orbit.data.model.HouseholdSharingState
 import app.overbay.orbit.data.model.ImportBatchRecord
 import app.overbay.orbit.data.model.MhaTaxProfile
 import app.overbay.orbit.data.model.NotificationPreferencesConfig
+import app.overbay.orbit.data.model.OrbitPreferences
 import app.overbay.orbit.data.model.OrbitWorkspaceSnapshot
 import app.overbay.orbit.data.model.PushNotificationConfigInfo
 import app.overbay.orbit.data.model.RetirementAccountMonthBalance
@@ -50,13 +51,22 @@ suspend fun OrbitRepository.exportBackupPayload(): String {
     return exportBackupJson()
 }
 
-internal suspend fun OrbitRepository.restoreBackupJsonImpl(jsonString: String): Result<Unit> = runCatching {
+internal suspend fun OrbitRepository.restoreBackupJsonImpl(
+    jsonString: String,
+    overridePreferences: ((OrbitPreferences) -> OrbitPreferences)? = null
+): Result<Unit> = runCatching {
     if (storageMode.value == StorageMode.SELF_HOSTED) {
         createApiClient().restoreOrbitBackupRemote(jsonString).getOrThrow()
         sync(force = true)
         return@runCatching
     }
-    commitSnapshot(json.decodeFromString(OrbitWorkspaceSnapshot.serializer(), jsonString), immediate = true)
+    val decoded = json.decodeFromString(OrbitWorkspaceSnapshot.serializer(), jsonString)
+    val finalSnap = if (overridePreferences != null) {
+        decoded.copy(preferences = overridePreferences(decoded.preferences))
+    } else {
+        decoded
+    }
+    commitSnapshot(finalSnap, immediate = true)
 }
 
 internal suspend fun OrbitRepository.loadDemoDataImpl(snapshot: OrbitWorkspaceSnapshot) = commitSnapshot(snapshot)

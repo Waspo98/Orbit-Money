@@ -1,6 +1,7 @@
 package app.overbay.orbit.ui.transactions
 
 import app.overbay.orbit.data.OrbitRepository
+import app.overbay.orbit.data.importCsvPreview
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.data.model.Category
@@ -581,7 +582,18 @@ class TransactionsViewModelTest {
                 originalAmountCents = -1200L
             )
         }
-        repository.importTransactions(novTransactions + octTransactions, emptyList())
+        repository.importCsvPreview(
+            fileName = "transactions.csv",
+            preview = CsvImportPreview(
+                accounts = emptyList(),
+                rules = emptyList(),
+                transactions = novTransactions + octTransactions,
+                totalRowCount = novTransactions.size + octTransactions.size,
+                invalidRowCount = 0,
+                duplicateRowCount = 0
+            ),
+            fallbackAccountId = 1L
+        ).getOrThrow()
 
         val collectJob = launch(testDispatcher) {
             viewModel.uiState.collect {}

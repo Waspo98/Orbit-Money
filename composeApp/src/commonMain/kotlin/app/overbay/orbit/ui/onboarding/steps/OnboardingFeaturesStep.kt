@@ -132,7 +132,7 @@ fun OnboardingFeaturesStep(
             modifier = Modifier.fillMaxWidth()
         ) {
             Text(
-                text = "Core tools (Dashboard, Transactions, Budgets, Accounts, Categories, and Rules) stay on automatically. All 9 tools above can be toggled or reordered anytime under Settings → Workspace & Navigation.",
+                text = "Core tools (Dashboard, Transactions, Budgets, Accounts, Categories, and Rules) stay on automatically. All 9 tools above can be toggled or reordered anytime under Settings → Turn On/Off App Features.",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 lineHeight = 16.sp,

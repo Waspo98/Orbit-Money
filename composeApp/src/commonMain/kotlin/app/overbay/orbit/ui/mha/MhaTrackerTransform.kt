@@ -2,6 +2,8 @@ package app.overbay.orbit.ui.mha
 
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.Category
+import app.overbay.orbit.data.model.TaxTrackingLabels
+import app.overbay.orbit.data.model.TaxTrackingMode
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.displayEmoji
 import app.overbay.orbit.domain.Cents
@@ -20,7 +22,8 @@ internal object MhaTrackerTransform {
         year: Int,
         transactions: List<Transaction>,
         accounts: List<Account>,
-        categories: List<Category>
+        categories: List<Category>,
+        trackingMode: TaxTrackingMode = TaxTrackingMode.MHA
     ): YearTransactionsClassification {
         val accountMap = accounts.associateBy { it.id }
         val categoryMap = categories.associateBy { it.id }
@@ -28,6 +31,7 @@ internal object MhaTrackerTransform {
         val accountMhaSet = accounts.filter { it.mhaDefaultEligible }.map { it.id }.toSet()
         val catMhaSet = categories.filter { it.mhaDefaultEligible }.map { it.id }.toSet()
         val catIgnoredSet = categories.filter { it.mhaDefaultIgnored }.map { it.id }.toSet()
+        val taxBadge = TaxTrackingLabels.forMode(trackingMode).shortBadge
 
         val allItems = mutableListOf<MhaTransactionItem>()
         val eligibleItems = mutableListOf<MhaTransactionItem>()
@@ -62,7 +66,7 @@ internal object MhaTrackerTransform {
                 isEligible = isEligible,
                 isExplicitOverride = txn.editedMhaEligible != null,
                 isOverriddenByUser = txn.editedMhaEligibleSource == "user",
-                eligibilityReason = resolveEligibilityReason(txn, isIgnored, cat, acct)
+                eligibilityReason = resolveEligibilityReason(txn, isIgnored, cat, acct, taxBadge)
             )
             allItems.add(item)
             if (isEligible) {
@@ -107,17 +111,18 @@ internal object MhaTrackerTransform {
         txn: Transaction,
         isIgnored: Boolean,
         cat: Category?,
-        acct: Account?
+        acct: Account?,
+        taxBadge: String = "MHA"
     ): String = when {
         txn.editedMhaEligible == true -> "Manually marked eligible by you"
-        txn.editedMhaEligible == false -> "Manually excluded from MHA by you"
+        txn.editedMhaEligible == false -> "Manually excluded from $taxBadge by you"
         isIgnored -> "Excluded because transaction is marked ignored"
         cat?.mhaDefaultIgnored == true -> "Excluded by category rule (${cat.name})"
         acct?.mhaDefaultEligible == true && cat?.mhaDefaultEligible == true ->
             "Included via account (${acct.name}) and category (${cat.name}) defaults"
         acct?.mhaDefaultEligible == true -> "Included via designated account (${acct.name})"
         cat?.mhaDefaultEligible == true -> "Included via category default (${cat.name})"
-        else -> "Not matched by an MHA account or category default"
+        else -> "Not matched by a $taxBadge account or category default"
     }
 
     fun buildCategoryBreakdown(eligibleItems: List<MhaTransactionItem>): List<MhaCategoryTotal> =

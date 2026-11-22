@@ -183,16 +183,18 @@ object CsvFormatDetector {
     }
 
     fun parseSignedMoneyToCents(raw: String): Cents? {
-        val trimmed = raw.trim()
-        if (trimmed.isBlank()) return null
-        val isParenNegative = trimmed.startsWith("(") && trimmed.endsWith(")")
-        val stripped = trimmed
-            .removePrefix("(")
-            .removeSuffix(")")
+        val cleaned = raw.trim()
             .replace("$", "")
             .replace(",", "")
             .replace(" ", "")
             .trim()
+        if (cleaned.isBlank()) return null
+        val isParenNegative = cleaned.startsWith("(") && cleaned.endsWith(")")
+        val stripped = if (isParenNegative) {
+            cleaned.removePrefix("(").removeSuffix(")").trim()
+        } else {
+            cleaned
+        }
         if (stripped.isBlank() || stripped.toDoubleOrNull() == null) return null
         val cents = MoneyUtils.dollarsToCents(stripped)
         return if (isParenNegative && cents > 0L) -cents else cents
