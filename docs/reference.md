@@ -46,7 +46,7 @@ All server state lives in Docker named volume `orbit-money-data` mounted at `/ap
 
 ### Web PWA Service Worker and Caching
 
-`composeApp/src/wasmJsMain/resources/sw.js` (`CACHE_NAME = 'orbit-money-kmp-v3'`):
+`composeApp/src/wasmJsMain/resources/sw.js` (`CACHE_NAME = 'orbit-money-kmp-v6'`):
 
 - Pre-caches `/`, `/index.html`, `/manifest.webmanifest`, `/orbitApp.js`, and app icons on install.
 - Uses network-first for page navigations and cache-first for static assets, including Webpack's content-hashed `.wasm` chunks.
@@ -121,7 +121,7 @@ Customizable card grid (`DashboardScreen`, 15 widgets persisted via preferences,
 
 ### Transactions and Rules
 
-- Rocket Money CSV import (with preview, commit, and batch undo on the backend, plus direct local import in Local mode) auto-creates accounts when `(institution, last4)` does not match an existing account, flips signs, and generates rename rules from Custom Name columns.
+- Multi-app CSV import (`CsvFormatDetector`, `CsvImportEngine`, `CsvColumnMapperPanel`) auto-detects Rocket Money, Mint, Monarch Money, YNAB, and generic bank CSVs, supports interactive column mapping and sign inversion, generates rename rules from Custom Name columns, and imports via `POST /api/import/csv` with batch undo (or directly into `OrbitWorkspaceSnapshot` in Local mode). Legacy `POST /api/import/rocket-money*` multipart preview/commit endpoints remain available.
 - Full search, multi-account/multi-category filtering (including `uncategorized`), date presets, absolute-amount range, type filters, ignored/transfer filters, and sort options.
 - Inline editing for merchant, category, notes, transfer, and ignored flags, transaction splitting, per-field reset to original, and "Mark as recurring" / "Create rule from transaction" shortcuts.
 - Customizable transaction quick actions configured in Settings.
@@ -129,7 +129,7 @@ Customizable card grid (`DashboardScreen`, 15 widgets persisted via preferences,
 
 ### SimpleFIN Sync
 
-- Exchanges a one-shot base64 setup token for an access URL. Server mode stores the URL encrypted with AES-256-GCM using `SIMPLEFIN_ENCRYPTION_KEY`; Local mode syncs directly via `SimpleFinDirectClient`.
+- Exchanges a one-shot base64 setup token for an access URL. Server mode stores the URL encrypted with AES-256-GCM using `SIMPLEFIN_ENCRYPTION_KEY`; Local mode syncs directly via `SimpleFinDirectClient` (splitting Basic credentials into an `Authorization` header, honoring `cutoverDateIso`, inferring account types, and creating accounts and balance checkpoints).
 - Cutover-date overlap handling lets Rocket Money own pre-cutover history and SimpleFIN own post-cutover transactions.
 - Transfer auto-matcher pairs opposite-sign same-day transactions in transfer categories using resettable `system:transfer_matcher` edits.
 - Daily scheduler (default 6:00 AM) plus manual Sync Now, sync log tracking (`success`, `partial`, `error`), and missing/zero posted-date guards.
@@ -155,19 +155,20 @@ Powered by `CreditCardCycleEngine`, `CreditCardBenefitEngine`, `CreditCardStrate
 - **Goals (`GoalsScreen`):** Two-tab layout (**Goals** and **Funding**). Links multiple active asset accounts (`checking`, `savings`, `cash`, `investment`, `other`) by percent or fixed dollar amount, supports stealing allocation from other goals when confirmed, derives historical progress charts with touch scrubbing, and provides an "Imagine" extra-monthly-savings ETA slider.
 - **Upcoming (`UpcomingScreen`):** Tracks manual and accepted recurring bills, subscriptions, and income across weekly, biweekly, twice-monthly, monthly (day-of-month or nth-weekday), bimonthly, yearly, and custom cadences, with fixed or history-averaged amounts. Projects occurrences over the current month and next 62 days, reconciles synced transactions (marking unmatched items missed after 4 days), and surfaces recurring suggestions from transaction history.
 
-### Household, Calculators, and MHA Tracker
+### Household, Calculators, and Tax / MHA Tracker
 
 - **Household (`HouseholdScreen`):** Stores member profiles, employment, gross/net pay, pay cadence, retirement contributions, employer match, benefits, linked retirement/HSA accounts, and dated income history snapshots.
 - **Retirement Calculator (`RetirementCalculatorScreen`):** Three-tab workspace (**What-If**, **Runway**, **Accounts**) fed by Household profiles and user-selected linked accounts (`retirementIncludedAccountIds`). Compares Conservative, Balanced, and Aggressive scenarios in today's dollars with touch scrubbing, models retirement spending drawdown and depletion age, and separates HSA vs non-HSA bridge assets before age 65.
 - **Housing Calculator (`HousingCalculatorScreen`):** Models monthly mortgage payment breakdowns and home-selling net proceeds.
-- **MHA Tracker (`MhaTrackerScreen`):** Optional ministerial housing allowance tracker (**Tracker** and **Defaults** tabs) enforcing the IRS 3-limit exclusion test (actual eligible expenses, church designation cap, fair market rental value). Filters out ignored and transfer rows, supports per-year tax rate storage, Simple manual percentage mode, and Household estimate mode using bundled 2026 federal tax tables (`taxData2026.js` / `MhaTaxEngine.kt`) plus no-tax and single-rate state auto-estimates with freshness metadata.
+- **Tax Deductions / MHA Tracker (`MhaTrackerScreen`):** Optional tax-deductible expense tracker (**Tracker** and **Defaults** tabs) supporting two `TaxTrackingMode` options: **General Deductible Expenses** (`general`, omitting housing caps) and **Ministerial Housing Allowance** (`mha`, enforcing the IRS Section 107 3-limit exclusion test: actual eligible expenses, church designation cap, fair market rental value). Filters out ignored and transfer rows, supports per-year tax rate storage, Simple manual percentage mode, and Household estimate mode using bundled 2026 federal tax tables (`taxData2026.js` / `MhaTaxEngine.kt`) plus no-tax and single-rate state auto-estimates with freshness metadata.
 
 ### Layout, Navigation, Themes, and Android Integrations
 
+- **Onboarding (`OnboardingScreen` / `OnboardingStepResolver`):** Branching first-run wizard covering appearance, Local vs Self-Hosted storage mode, SimpleFIN/CSV connection, optional feature toggles, household, retirement target, and tax tracking mode; replayable from Settings -> About.
 - **Postures (`DevicePosture`):** `COMPACT_PHONE` (<600dp), `UNFOLDED_FOLDABLE` (>=600dp or unfolded hinge), `TABLET_DESKTOP` (>=1100dp or >=840dp landscape). Wide postures enable two-pane master-detail inspectors across Accounts, Budgets, Goals, Credit Card Tracker, and Settings.
 - **Navigation (`AdaptiveNavigationShell` / `OrbitNavKey`):** 4 locked primary bottom tabs (Dashboard, Transactions, Budgets, Accounts) plus a More sheet on phones, foldables, and tablets; desktop web browsers (>=1200dp) render a persistent left sidebar. Horizontal slide transitions move between primary tabs; vertical push/pop transitions move to and from More destinations.
 - **Settings (`SettingsScreen`):** Split-pane master-detail layout with live keyword search across 7 sections grouped into Personalize (**Look and Feel**, **Notifications**, **Turn On/Off App Features**), Connections & Data (**Storage, Sync & Sharing**, **SimpleFIN Sync**, **Backups & Maintenance**), and App (**About Orbit Money**).
-- **Themes:** 5 presets (`Orbit Emerald`, `Ocean Slate`, `Warm Terracotta`, `Royal Indigo`, `Monochrome Ink`), System/Light/Dark modes, optional AMOLED true-black dark mode, Android Material You dynamic color support, and haptic feedback toggle.
+- **Themes:** 6 presets (`Orbit Emerald`, `Ocean Slate`, `Warm Terracotta`, `Royal Indigo`, `Monochrome Ink`, `Spaceship Red`), a Custom Accent seed generator (`OrbitPaletteGenerator` / `CustomThemePickerSheet`, deriving WCAG AA-verified Light, Soft Dark, and AMOLED palettes from a hex seed), System/Light/Dark modes, optional AMOLED true-black dark mode, 3 accent color modes (`Always Green & Red`, `Tinted Green & Red`, `Match Theme`), Android Material You dynamic color support, and haptic feedback toggle.
 - **Android specifics:** Standalone beta package identity (`app.overbay.orbit.beta`, app title `Orbit Beta`, scheme `orbitmoneybeta://`, gold-ring beta icon) installs side-by-side with production (`app.overbay.orbit`, scheme `orbitmoney://`). Includes `BiometricPrompt` app lock, launcher shortcuts (`Add Transaction`, `Budgets`, `Accounts`), SAF file import/export, Custom Tabs OIDC exchange (`POST /api/auth/oidc/native-exchange`), and adaptive 120Hz display refresh rate.
 
 ### Push Notifications
@@ -214,6 +215,7 @@ All `/api/*` endpoints except `/api/auth/*` and `/api/health` require authentica
 | PATCH | `/api/transactions/:id` | Partial edit writing to `edited_*` with `source = 'user'` |
 | POST | `/api/transactions/:id/reset` | Clear edits on specified fields and reapply rules |
 | DELETE | `/api/transactions/:id` | Delete transaction |
+| POST | `/api/import/csv` | Import normalized multi-app CSV payload with batch tracking and rule reapply |
 | POST | `/api/import/rocket-money` | Upload and import Rocket Money CSV |
 | POST | `/api/import/rocket-money/preview` | Preview CSV import before committing |
 | POST | `/api/import/rocket-money/:id/commit` | Commit a previewed import batch |
@@ -287,9 +289,9 @@ All `/api/*` endpoints except `/api/auth/*` and `/api/health` require authentica
 
 - `commonMain/kotlin/app/overbay/orbit/`: `App.kt`, `Navigation.kt`, `NavigationBackStack.kt`, `NavigationKeys.kt`, `NavigationStateCoordinator.kt`
 - `data/`: `OrbitRepository*.kt`, `SnapshotFlushCoordinator.kt`, `engine/` (`LocalSnapshotEngine`, `SelfHostedApiEngine`, `OrbitStorageEngine`), `model/`, `network/` (`OrbitApi*Client`, `SimpleFinDirectClient`), `sync/` (`CloudSyncManager`, `RemoteDriveClient`)
-- `domain/`: `AccountClosureDetector`, `BalanceHistoryEngine`, `BudgetEngine`, `CardTransactionClassifier`, `CreditCardBenefitEngine`, `CreditCardCatalog*`, `CreditCardCycleEngine`, `CreditCardStrategyEngine`, `CreditCardTemplates`, `CsvImportEngine`, `DemoSeedGenerator`, `GoalAllocationEngine`, `HousingCalculatorEngine`, `LocalDateUtils`, `MhaTaxEngine`, `MoneyUtils`, `NetWorthEngine`, `RealEstatePropertyEngine`, `RetirementCalculatorEngine`, `ReviewQueueEngine`, `RuleMatcherEngine`, `SimpleFinWarningParser`, `SpendingTrendsEngine`, `TransferMatcherEngine`, `UpcomingEngine`, `UpcomingScheduleHelper`
-- `theme/`: `CardArtPalette`, `Color`, `CustomThemeColors`, `OrbitColorTokens`, `OrbitSprings`, `Theme`, `Type`
-- `ui/`: `accounts`, `budgets`, `calculators` (`housing`, `retirement`), `cardperks`, `categories`, `components`, `dashboard`, `goals`, `household`, `login`, `mha`, `networth`, `rules`, `settings`, `transactions`, `trends`, `upcoming`
+- `domain/`: `AccountClosureDetector`, `BalanceHistoryEngine`, `BudgetEngine`, `CardTransactionClassifier`, `CreditCardBenefitEngine`, `CreditCardCatalog*`, `CreditCardCycleEngine`, `CreditCardStrategyEngine`, `CreditCardTemplates`, `CsvFormatDetector`, `CsvImportEngine`, `DemoSeedGenerator`, `GoalAllocationEngine`, `HousingCalculatorEngine`, `LocalDateUtils`, `MhaTaxEngine`, `MoneyUtils`, `NetWorthEngine`, `RealEstatePropertyEngine`, `RetirementCalculatorEngine`, `ReviewQueueEngine`, `RuleMatcherEngine`, `SimpleFinWarningParser`, `SpendingTrendsEngine`, `TransferMatcherEngine`, `UpcomingEngine`, `UpcomingScheduleHelper`
+- `theme/`: `CardArtPalette`, `Color`, `CustomThemeColors`, `OrbitPaletteGenerator`, `OrbitPaletteMath`, `OrbitPresetPalettes*`, `OrbitPresetSpec`, `OrbitSprings`, `Theme`, `Type`
+- `ui/`: `accounts`, `budgets`, `calculators` (`housing`, `retirement`), `cardperks`, `categories`, `components`, `dashboard`, `goals`, `household`, `login`, `mha`, `networth`, `onboarding`, `rules`, `settings`, `transactions`, `trends`, `upcoming`
 - `androidMain/`: `AndroidGoogleDriveClient`, `BiometricAuthHelper`, `DevicePosture`, `DisplayRefreshRateHelper`, `FileImportExportHelper`, `FoldableDetector`, `OidcAuthLauncher`, `OrbitHaptics`, `PlatformRuntime`, `PlatformStorage`, `Theme`
 - `wasmJsMain/`: `main.kt`, `WasmGoogleDriveClient`, platform `util/` bindings, and `resources/` (`index.html`, `manifest.webmanifest`, `sw.js`, PNG/SVG icons, splash wordmarks)
 
@@ -304,7 +306,7 @@ All `/api/*` endpoints except `/api/auth/*` and `/api/health` require authentica
 - Database: `db/index.js`, `db/migrations.js`, `db/migrations/001` through `038`
 - Helpers (`lib/`): `editAssignments`, `effectiveSql`, `http`, `localDate`, `money`, `routeParams`, `upcomingProjection`, `upcomingSchedule`, `upcomingSuggestionConfidence`, `uploads`
 - Routes (`routes/`): `accounts`, `auth`, `budgets`, `cardCatalog`, `categories`, `data`, `goals`, `health`, `household`, `householdSharing`, `import`, `merchantLogos`, `mha`, `netWorth`, `notifications`, `preferences`, `rules`, `simplefin`, `spendingTrends`, `transactions`, `upcoming`
-- Services (`services/`): `accountBalanceRecordService`, `accountMerge`, `accountRealEstateService`, `budgetOverview`, `creditCardBenefitUsage`, `creditCardCatalog*`, `creditCardProfileService`, `csvImport`, `demoSeed`, `householdDefaults`, `householdSharing`, `institutionLogos`, `merchantLogos`, `mhaSummary`, `mhaTaxEstimate`, `monthlyBudgetOverview`, `notificationPreferences`, `notifications`, `oidc`, `orbitBackupRestore`, `orbitBackupSnapshotBridge`, `retirementHistoryService`, `ruleMatcher`, `sampleHouseholds`, `sessionStore`, `simplefinClient`, `simplefinSync`, `spendingTrends`, `taxData2026`, `transferMatcher`, `upcomingItemValidation`, `upcomingReconciliation`
+- Services (`services/`): `accountBalanceRecordService`, `accountMerge`, `accountRealEstateService`, `budgetOverview`, `creditCardBenefitUsage`, `creditCardCatalog*`, `creditCardProfileService`, `csvImport`, `csvImportHelpers`, `csvNormalizedImport`, `demoSeed`, `householdDefaults`, `householdSharing`, `institutionLogos`, `merchantLogos`, `mhaSummary`, `mhaTaxEstimate`, `monthlyBudgetOverview`, `notificationPreferences`, `notifications`, `oidc`, `orbitBackupRestore`, `orbitBackupSnapshotBridge`, `retirementHistoryService`, `ruleMatcher`, `sampleHouseholds`, `sessionStore`, `simplefinClient`, `simplefinSync`, `spendingTrends`, `taxData2026`, `transferMatcher`, `upcomingItemValidation`, `upcomingReconciliation`
 - Tests (`test/`): Node built-in test runner suites (`node --test`)
 
 ## Known Gotchas

@@ -1,20 +1,21 @@
 # Orbit Money
 
-Orbit Money is a local-first personal finance tracker for Android and the web. Run offline on Android in Local mode or self-host the Express and SQLite server in Docker (`linux/amd64` and `linux/arm64`), import Rocket Money CSV exports, and sync bank accounts through SimpleFIN.
+Orbit Money is a local-first personal finance tracker for Android and the web. Run offline in Local mode or self-host the Express and SQLite server in Docker (`linux/amd64` and `linux/arm64`), import CSV exports from Rocket Money, Mint, Monarch Money, YNAB, or bank accounts, and sync through SimpleFIN.
 
 ## Features
 
 - **Storage modes:** Run offline on-device in Local mode, or connect to a self-hosted Express and SQLite server for multi-device access and household sharing.
-- **Dashboard:** Configurable cards for accounts, budget pace, top spending, monthly cash flow, biggest expenses, subscriptions, upcoming bills, goals, retirement, mortgage, MHA, and a recent transaction review queue.
+- **Dashboard:** Configurable cards for accounts, budget pace, top spending, monthly cash flow, biggest expenses, subscriptions, upcoming bills, goals, retirement, mortgage, tax tracking, and a recent transaction review queue.
 - **Accounts and real estate:** Track checking, savings, credit, investment, loan, mortgage, cash, and property accounts with dated balance snapshots, linked mortgages, account merging, and SimpleFIN closed-account prompts.
 - **Transactions and rules:** Search, filter, edit, split, and categorize transactions without overwriting imported bank values. Priority-ordered rules rename, categorize, ignore, or flag transfers.
 - **Budgets and trends:** Set monthly category caps, inspect spending mix by category or merchant, and review 3, 6, or 12 months of income and category history.
 - **Credit card tracker:** Track annual fees, statement close and due dates, utilization, benefit credits across reset cadences, welcome bonus progress, and per-person Chase 5/24 slots.
 - **Goals and upcoming:** Allocate multiple asset accounts to savings goals by percent or fixed dollar amount with extra-savings ETA projections, and track recurring bills, subscriptions, and paychecks.
-- **Calculators and household:** Model retirement scenarios, drawdown runway, and home buying or selling costs from household profiles and linked retirement accounts. Includes an optional Ministerial Housing Allowance (MHA) tracker with per-year tax estimates.
-- **Bank sync and imports:** Import Rocket Money CSV exports, sync through SimpleFIN Bridge (server-side with AES-256-GCM encrypted credentials, or direct from the client in Local mode), and optionally enrich merchant logos with Logo.dev.
+- **Calculators and household:** Model retirement scenarios, drawdown runway, and home buying or selling costs from household profiles and linked retirement accounts. Includes an optional tax-deductible expense tracker supporting General Deductible Expenses and Ministerial Housing Allowance (MHA) modes with per-year tax estimates.
+- **Bank sync and imports:** Import CSV exports from Rocket Money, Mint, Monarch Money, YNAB, or generic bank CSVs using auto-detection and a column mapper, sync through SimpleFIN Bridge (server-side with AES-256-GCM encrypted credentials, or direct from the client in Local mode), and optionally enrich merchant logos with Logo.dev.
 - **Auth and sharing:** Local password login, OpenID Connect (OIDC) SSO, or both, plus partner sharing by invited email with read-only or read-write access.
 - **Backups and device controls:** Export and restore full JSON workspace backups, optionally sync backups to Google Drive, lock the Android app with biometrics, launch actions from Android shortcuts, and receive optional Web Push notifications.
+- **Onboarding and themes:** Guided first-run setup for storage mode, connections, and active tools (replayable from Settings), plus 6 theme presets, a custom accent color picker, AMOLED dark mode, and configurable positive/negative accent styles.
 
 ## Platforms
 
@@ -98,7 +99,7 @@ docker compose up -d
 ### Image Tags
 
 - `:latest` tracks the newest versioned GitHub release (`vX.Y.Z`).
-- `:v0.8.1`, `:0.8.1`, and `:0.8` pin to a specific release or minor series.
+- `:v0.8.4`, `:0.8.4`, and `:0.8` pin to a specific release or minor series.
 - `:main` and `:beta` track maintainer branch builds.
 
 ### Automatic Updates with Watchtower or DIUN
