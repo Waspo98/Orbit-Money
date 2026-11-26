@@ -1,7 +1,6 @@
 package app.overbay.orbit.data
 
 import app.overbay.orbit.data.model.*
-import app.overbay.orbit.data.network.MerchantLogoSearchResponseDto
 import app.overbay.orbit.data.network.*
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.CreditCardBenefitEngine
@@ -344,7 +343,10 @@ suspend fun OrbitRepository.resetTransactionFields(id: Long, fields: List<String
     // Temporarily pass EditSource.NONE so RuleMatcherEngine re-evaluates unlocked fields while respecting per-field "user" source locks
     val unlockedForRuleEval = cleared.copy(editSource = EditSource.NONE)
     val evaluated = RuleMatcherEngine.applyRules(listOf(unlockedForRuleEval), rules.value).firstOrNull() ?: unlockedForRuleEval
-    val ruleEvaluated = if (hasRemainingUserLock) evaluated.copy(editSource = EditSource.USER) else evaluated
+    val ruleEvaluated = resolveLocalTransactionLogoIfNeeded(
+        if (hasRemainingUserLock) evaluated.copy(editSource = EditSource.USER) else evaluated,
+        current
+    )
     commitSnapshot(snapshot.value.copy(transactions = current.map { if (it.id == id) ruleEvaluated else it }))
     val serverFields = fields.mapNotNull { f ->
         when (f.lowercase()) {
@@ -376,7 +378,7 @@ suspend fun OrbitRepository.setTransactionIgnored(id: Long, ignored: Boolean) {
 suspend fun OrbitRepository.setRuleEnabled(id: Long, enabled: Boolean) {
     val currentRules = rules.value
     val updatedRules = currentRules.map { if (it.id == id) it.copy(enabled = enabled) else it }
-    val updatedTxns = RuleMatcherEngine.applyRules(transactions.value, updatedRules)
+    val updatedTxns = reconcileLocalTransactionsIfNeeded(RuleMatcherEngine.applyRules(transactions.value, updatedRules))
     commitSnapshot(snapshot.value.copy(rules = updatedRules, transactions = updatedTxns))
     if (storageMode.value == StorageMode.SELF_HOSTED) {
         createApiClient().setRuleEnabled(id, enabled)
@@ -385,7 +387,7 @@ suspend fun OrbitRepository.setRuleEnabled(id: Long, enabled: Boolean) {
 
 suspend fun OrbitRepository.wipeAllRules(): Result<Int> = runCatching {
     val count = rules.value.size
-    val clearedTxns = RuleMatcherEngine.applyRules(transactions.value, emptyList())
+    val clearedTxns = reconcileLocalTransactionsIfNeeded(RuleMatcherEngine.applyRules(transactions.value, emptyList()))
     commitSnapshot(snapshot.value.copy(rules = emptyList(), transactions = clearedTxns))
     if (storageMode.value == StorageMode.SELF_HOSTED) {
         createApiClient().deleteAllRules().getOrThrow()
@@ -489,70 +491,4 @@ fun OrbitRepository.previewRuleLocal(rule: TransactionRule): RulePreviewResult {
         conflicts = conflicts,
         diffs = diffs
     )
-}
-
-// =============================================================================
-// Merchant Logos Extension Methods
-// =============================================================================
-
-internal suspend fun OrbitRepository.reportMerchantLogoStatusImpl(merchantKey: String, status: String) {
-    if (merchantKey.isBlank()) return
-    if (storageMode.value == StorageMode.SELF_HOSTED) {
-        runCatching { createApiClient().reportMerchantLogoStatus(merchantKey, status) }
-    }
-    if (status == "loaded") {
-        // "candidate" and "loaded" render identically in UI; avoid cloning all transactions
-        // and triggering full workspace snapshot emissions/disk flushes as each logo finishes loading.
-        return
-    }
-    val updatedList = transactions.value.map { txn ->
-        val currentLogo = txn.merchantLogo
-        if (currentLogo?.merchantKey == merchantKey && currentLogo.status == "candidate") {
-            txn.copy(merchantLogo = currentLogo.copy(status = status, url = if (status == "failed") null else currentLogo.url))
-        } else txn
-    }
-    if (updatedList != transactions.value) commitSnapshot(snapshot.value.copy(transactions = updatedList))
-}
-
-internal suspend fun OrbitRepository.searchMerchantLogosImpl(transactionId: Long, query: String): Result<MerchantLogoSearchResponseDto> = runCatching {
-    if (storageMode.value != StorageMode.SELF_HOSTED) {
-        MerchantLogoSearchResponseDto(configured = false, candidates = emptyList())
-    } else {
-        createApiClient().searchMerchantLogos(transactionId, query).getOrThrow()
-    }
-}
-
-internal suspend fun OrbitRepository.overrideMerchantLogoImpl(
-    transactionId: Long,
-    logoUrl: String? = null,
-    useCategoryIcon: Boolean = false
-): Result<MerchantLogo> = runCatching {
-    val target = transactions.value.find { it.id == transactionId }
-        ?: throw IllegalStateException("Transaction not found.")
-    val cleanedName = cleanMerchantNameForLogo(target.effectiveMerchant.ifBlank { target.originalMerchant })
-    val fallbackKey = target.resolvedMerchantKey
-    if (fallbackKey.isBlank()) throw IllegalStateException("This merchant does not have a logo entry to update yet.")
-    val updatedLogo = if (storageMode.value == StorageMode.SELF_HOSTED) {
-        val client = createApiClient()
-        val ensuredKey = target.merchantLogo?.merchantKey?.takeIf { it.isNotBlank() }
-            ?: client.ensureMerchantLogo(transactionId).getOrNull()?.merchantKey
-            ?: fallbackKey
-        client.overrideMerchantLogo(ensuredKey, logoUrl, useCategoryIcon).getOrThrow().toDomain()
-            ?: MerchantLogo(ensuredKey, cleanedName, url = if (useCategoryIcon) null else logoUrl, status = if (useCategoryIcon) "hidden" else "manual")
-    } else {
-        MerchantLogo(
-            merchantKey = fallbackKey,
-            merchantName = cleanedName,
-            providerQuery = cleanedName,
-            url = if (useCategoryIcon) null else logoUrl?.trim(),
-            status = if (useCategoryIcon) "hidden" else "manual"
-        )
-    }
-    val updatedList = transactions.value.map { txn ->
-        if (txn.id == transactionId || txn.resolvedMerchantKey == updatedLogo.merchantKey || merchantLogoKey(txn.effectiveMerchant) == updatedLogo.merchantKey) {
-            txn.copy(merchantLogo = updatedLogo)
-        } else txn
-    }
-    commitSnapshot(snapshot.value.copy(transactions = updatedList))
-    updatedLogo
 }

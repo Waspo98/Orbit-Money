@@ -61,12 +61,12 @@ internal suspend fun OrbitRepository.restoreBackupJsonImpl(
         return@runCatching
     }
     val decoded = json.decodeFromString(OrbitWorkspaceSnapshot.serializer(), jsonString)
-    val finalSnap = if (overridePreferences != null) {
+    val baseSnap = if (overridePreferences != null) {
         decoded.copy(preferences = overridePreferences(decoded.preferences))
     } else {
         decoded
     }
-    commitSnapshot(finalSnap, immediate = true)
+    commitSnapshot(reconcileSnapshotLogos(baseSnap), immediate = true)
 }
 
 internal suspend fun OrbitRepository.loadDemoDataImpl(snapshot: OrbitWorkspaceSnapshot) = commitSnapshot(snapshot)

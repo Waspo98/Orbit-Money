@@ -223,11 +223,19 @@ fun TransactionsScreen(
 
     val logoFinderTxn = state.logoFinderTransaction
     if (logoFinderTxn != null) {
+        val scopeContext = remember(logoFinderTxn, state.accounts, state.transactions) {
+            app.overbay.orbit.data.model.MerchantLogoResolver.buildScopeSelectorContext(
+                transaction = logoFinderTxn,
+                accounts = state.accounts,
+                transactions = state.transactions
+            )
+        }
         MerchantLogoFinderDialog(
             transaction = logoFinderTxn,
+            scopeContext = scopeContext,
             onSearchBrands = { query -> viewModel.searchMerchantLogos(logoFinderTxn.id, query) },
-            onSaveLogoUrl = { url -> viewModel.saveMerchantLogoOverride(logoFinderTxn.id, url) },
-            onUseCategoryIcon = { viewModel.useCategoryIconSuspend(logoFinderTxn.id) },
+            onSaveLogoUrl = { url, scope -> viewModel.saveMerchantLogoOverride(logoFinderTxn.id, url, scope) },
+            onUseCategoryIcon = { scope -> viewModel.useCategoryIconSuspend(logoFinderTxn.id, scope) },
             onDismiss = { viewModel.closeLogoFinder() }
         )
     }

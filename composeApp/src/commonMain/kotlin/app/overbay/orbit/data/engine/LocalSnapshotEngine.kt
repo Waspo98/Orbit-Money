@@ -4,6 +4,7 @@ import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.CategoryBudget
 import app.overbay.orbit.data.model.Goal
+import app.overbay.orbit.data.model.MerchantLogoResolver
 import app.overbay.orbit.data.model.OrbitPreferences
 import app.overbay.orbit.data.model.OrbitWorkspaceSnapshot
 import app.overbay.orbit.data.model.StorageMode
@@ -76,7 +77,12 @@ class LocalSnapshotEngine(
                 snapshot = snapshot,
                 cutoverDateIso = snapshot.preferences.simpleFinCutoverDate
             )
-            saveSnapshot(syncResult.updatedSnapshot)
+            val reconciledTransactions = MerchantLogoResolver.reconcileLocalTransactions(
+                syncResult.updatedSnapshot.transactions,
+                syncResult.updatedSnapshot.accounts,
+                syncResult.updatedSnapshot.preferences.merchantLogoOverrides
+            )
+            saveSnapshot(syncResult.updatedSnapshot.copy(transactions = reconciledTransactions))
             SyncResult.Success(
                 "Synced ${syncResult.accountsSyncedCount} accounts · ${syncResult.newTransactionCount} new transactions"
             )

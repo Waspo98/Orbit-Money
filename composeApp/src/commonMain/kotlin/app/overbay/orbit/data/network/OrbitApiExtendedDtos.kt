@@ -448,9 +448,9 @@ data class ImportRocketMoneyResponseDto(
 data class MerchantLogoDto(
     @SerialName("merchant_key") val merchantKey: String = "", @SerialName("merchant_name") val merchantName: String = "",
     val provider: String = "logo_dev", @SerialName("provider_query") val providerQuery: String = "",
-    val url: String? = null, val status: String = "candidate"
+    val url: String? = null, val status: String = "candidate", val scope: String? = null
 ) {
-    fun toDomain(): MerchantLogo? = if (merchantKey.isBlank()) null else MerchantLogo(merchantKey, merchantName, provider, providerQuery, url, status)
+    fun toDomain(): MerchantLogo? = if (merchantKey.isBlank()) null else MerchantLogo(merchantKey, merchantName, provider, providerQuery, url, status, scope)
 }
 
 @Serializable
@@ -467,10 +467,12 @@ data class MerchantLogoEnsureRequestDto(
 
 @Serializable
 data class MerchantLogoOverrideRequestDto(
-    @SerialName("merchant_key") val merchantKey: String,
+    @SerialName("merchant_key") val merchantKey: String = "",
     @SerialName("logo_url") val logoUrl: String? = null,
     @SerialName("use_category_icon") val useCategoryIcon: Boolean = false,
     @SerialName("account_id") val accountId: Long? = null,
+    @SerialName("transaction_id") val transactionId: Long? = null,
+    val scope: String? = null,
     @SerialName("merchant_name") val merchantName: String? = null
 )
 

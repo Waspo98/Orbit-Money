@@ -20,6 +20,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,6 +28,9 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import app.overbay.orbit.data.model.LogoOverrideScope
+import app.overbay.orbit.data.model.LogoScopeSelectorContext
+import app.overbay.orbit.data.model.MerchantLogoResolver
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.network.MerchantLogoCandidateDto
 import app.overbay.orbit.data.network.MerchantLogoSearchResponseDto
@@ -43,14 +47,19 @@ import kotlinx.coroutines.launch
 @Composable
 fun MerchantLogoFinderDialog(
     transaction: Transaction,
+    scopeContext: LogoScopeSelectorContext = remember(transaction.id) {
+        MerchantLogoResolver.buildScopeSelectorContext(transaction, emptyList(), emptyList())
+    },
     onSearchBrands: suspend (query: String) -> Result<MerchantLogoSearchResponseDto>,
-    onSaveLogoUrl: suspend (logoUrl: String) -> Result<Unit>,
-    onUseCategoryIcon: suspend () -> Result<Unit>,
+    onSaveLogoUrl: suspend (logoUrl: String, scope: LogoOverrideScope) -> Result<Unit>,
+    onUseCategoryIcon: suspend (scope: LogoOverrideScope) -> Result<Unit>,
     onDismiss: () -> Unit
 ) {
     val initialQuery = remember(transaction.id) {
         transaction.effectiveMerchant.ifBlank { transaction.merchantLogo?.merchantName ?: "" }
     }
+    var selectedScope by rememberSaveable(transaction.id) { mutableStateOf(scopeContext.defaultScope) }
+
     BrandLogoFinderDialog(
         targetKey = "txn:${transaction.id}",
         subjectName = transaction.effectiveMerchant.ifBlank { "this merchant" },
@@ -60,9 +69,18 @@ fun MerchantLogoFinderDialog(
         searchPlaceholder = "Merchant name",
         fallbackButtonLabel = "Use Category Icon",
         onSearchBrands = onSearchBrands,
-        onSaveLogoUrl = onSaveLogoUrl,
-        onUseFallbackIcon = onUseCategoryIcon,
-        onDismiss = onDismiss
+        onSaveLogoUrl = { url -> onSaveLogoUrl(url, selectedScope) },
+        onUseFallbackIcon = { onUseCategoryIcon(selectedScope) },
+        onDismiss = onDismiss,
+        scopeSelector = { saving ->
+            LogoScopeSelectorSection(
+                options = scopeContext.options,
+                selectedScope = selectedScope,
+                saving = saving,
+                onSelectScope = { selectedScope = it }
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+        }
     )
 }
 
@@ -79,7 +97,8 @@ fun BrandLogoFinderDialog(
     onSearchBrands: suspend (query: String) -> Result<MerchantLogoSearchResponseDto>,
     onSaveLogoUrl: suspend (logoUrl: String) -> Result<Unit>,
     onUseFallbackIcon: suspend () -> Result<Unit>,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    scopeSelector: (@Composable (saving: Boolean) -> Unit)? = null
 ) {
     val haptics = LocalOrbitHaptics.current
     val uriHandler = LocalUriHandler.current
@@ -217,6 +236,8 @@ fun BrandLogoFinderDialog(
             )
 
             Spacer(modifier = Modifier.height(12.dp))
+
+            scopeSelector?.invoke(saving)
 
             MerchantLogoPreviewAndToolsRow(
                 imageUrl = imageUrl,

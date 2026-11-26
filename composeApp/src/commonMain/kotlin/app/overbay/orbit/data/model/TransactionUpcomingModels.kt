@@ -27,7 +27,8 @@ data class MerchantLogo(
     val provider: String = "logo_dev",
     val providerQuery: String = "",
     val url: String? = null,
-    val status: String = "candidate"
+    val status: String = "candidate",
+    val scope: String? = null
 )
 
 private val PAYMENT_PREFIX_REGEX = Regex("^(sq|tst|sp|paypal|pp|stripe|sumup|toast|clover)[\\s*.-]+", RegexOption.IGNORE_CASE)

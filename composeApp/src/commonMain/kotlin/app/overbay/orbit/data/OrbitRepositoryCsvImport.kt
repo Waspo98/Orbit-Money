@@ -3,6 +3,7 @@ package app.overbay.orbit.data
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.data.model.ImportBatchRecord
+import app.overbay.orbit.data.model.MerchantLogoResolver
 import app.overbay.orbit.data.model.RuleAction
 import app.overbay.orbit.data.model.RuleActionType
 import app.overbay.orbit.data.model.RuleCondition
@@ -186,11 +187,17 @@ suspend fun OrbitRepository.importCsvPreview(
         createdRuleIds = createdRules.map { it.id }
     )
 
+    val updatedAccounts = curAccounts + createdAccounts
+    val updatedTransactions = MerchantLogoResolver.reconcileLocalTransactions(
+        curTxns + assignedTxns,
+        updatedAccounts,
+        preferences.value.merchantLogoOverrides
+    )
     commitSnapshot(
         snapshot.value.copy(
-            accounts = curAccounts + createdAccounts,
+            accounts = updatedAccounts,
             rules = curRules + createdRules,
-            transactions = curTxns + assignedTxns,
+            transactions = updatedTransactions,
             importBatches = snapshot.value.importBatches + batch
         ),
         immediate = true

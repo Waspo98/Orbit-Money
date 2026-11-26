@@ -6,7 +6,11 @@ import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.EditSource
+import app.overbay.orbit.data.model.InstitutionLogoDefaults
 import app.overbay.orbit.data.model.Transaction
+import app.overbay.orbit.data.model.LogoOverrideScope
+import app.overbay.orbit.data.model.MerchantLogo
+import app.overbay.orbit.data.model.MerchantLogoResolver
 import app.overbay.orbit.data.model.merchantLogoKey
 import app.overbay.orbit.domain.CsvImportPreview
 import app.overbay.orbit.domain.LocalDateUtils
@@ -632,5 +636,190 @@ class TransactionsViewModelTest {
         assertEquals(55, filteredPage1.groupedTransactions[0].count)
 
         collectJob.cancel()
+    }
+
+    @Test
+    fun testSmartLogoScoping_isolatesChaseAndBettermentInterestAndSupportsScopeCascade() = runTest(testDispatcher) {
+        val chase = Account(id = 1L, name = "Chase Checking", type = AccountType.CHECKING, institution = "Chase Bank")
+        val chaseSavings = Account(id = 2L, name = "Chase Savings", type = AccountType.SAVINGS, institution = "Chase Bank")
+        val betterment = Account(id = 3L, name = "Betterment Cash", type = AccountType.SAVINGS, institution = "Betterment")
+        repository.saveAccount(chase)
+        repository.saveAccount(chaseSavings)
+        repository.saveAccount(betterment)
+
+        repository.saveTransaction(
+            Transaction(
+                id = 10L,
+                accountId = 1L,
+                originalDate = "2026-11-01",
+                originalMerchant = "JPMORGAN CHASE INT",
+                editedMerchant = "Interest Payment",
+                editedMerchantSource = "rule:1",
+                originalAmountCents = 1250L
+            )
+        )
+        repository.saveTransaction(
+            Transaction(
+                id = 11L,
+                accountId = 2L,
+                originalDate = "2026-11-02",
+                originalMerchant = "INTEREST CREDIT",
+                editedMerchant = "Interest Payment",
+                editedMerchantSource = "rule:1",
+                originalAmountCents = 3400L
+            )
+        )
+        repository.saveTransaction(
+            Transaction(
+                id = 12L,
+                accountId = 3L,
+                originalDate = "2026-11-02",
+                originalMerchant = "BETTERMENT INTEREST",
+                editedMerchant = "Interest Payment",
+                editedMerchantSource = "rule:1",
+                originalAmountCents = 5800L
+            )
+        )
+
+        val collectJob = launch(testDispatcher) { viewModel.uiState.collect {} }
+        testScheduler.advanceUntilIdle()
+
+        val initialChase = repository.transactions.value.first { it.id == 10L }
+        val initialBetterment = repository.transactions.value.first { it.id == 12L }
+        assertEquals("interest-payment@inst:chase.com", initialChase.merchantLogo?.merchantKey)
+        assertTrue(initialChase.merchantLogo?.url?.contains("chase.com") == true)
+        assertEquals("interest-payment@inst:betterment.com", initialBetterment.merchantLogo?.merchantKey)
+        assertTrue(initialBetterment.merchantLogo?.url?.contains("betterment.com") == true)
+
+        // Default scope for Interest Payment is INSTITUTION
+        val chaseContext = MerchantLogoResolver.buildScopeSelectorContext(
+            initialChase,
+            repository.accounts.value,
+            repository.transactions.value
+        )
+        assertEquals(LogoOverrideScope.INSTITUTION, chaseContext.defaultScope)
+
+        // Overriding Chase Interest (at default INSTITUTION scope) updates both Chase Checking & Chase Savings, NOT Betterment
+        val chaseCustomUrl = "https://example.com/chase-interest.png"
+        val saveChaseRes = viewModel.saveMerchantLogoOverride(10L, chaseCustomUrl, LogoOverrideScope.INSTITUTION)
+        assertTrue(saveChaseRes.isSuccess)
+        testScheduler.advanceUntilIdle()
+
+        val afterChaseChecking = repository.transactions.value.first { it.id == 10L }
+        val afterChaseSavings = repository.transactions.value.first { it.id == 11L }
+        val afterBetterment = repository.transactions.value.first { it.id == 12L }
+        assertEquals(chaseCustomUrl, afterChaseChecking.merchantLogo?.url)
+        assertEquals(chaseCustomUrl, afterChaseSavings.merchantLogo?.url)
+        assertTrue(afterBetterment.merchantLogo?.url?.contains("betterment.com") == true)
+
+        // Transaction-only override on 11L stays isolated from 10L
+        val oneOffUrl = "https://example.com/one-off.png"
+        val saveTxnRes = viewModel.saveMerchantLogoOverride(11L, oneOffUrl, LogoOverrideScope.TRANSACTION)
+        assertTrue(saveTxnRes.isSuccess)
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(chaseCustomUrl, repository.transactions.value.first { it.id == 10L }.merchantLogo?.url)
+        assertEquals(oneOffUrl, repository.transactions.value.first { it.id == 11L }.merchantLogo?.url)
+        assertEquals("txn:11", repository.transactions.value.first { it.id == 11L }.merchantLogo?.merchantKey)
+
+        // Re-overriding Chase Checking with INSTITUTION does NOT clobber 11L's TRANSACTION pin
+        val chaseCustomUrl2 = "https://example.com/chase-interest-v2.png"
+        viewModel.saveMerchantLogoOverride(10L, chaseCustomUrl2, LogoOverrideScope.INSTITUTION)
+        testScheduler.advanceUntilIdle()
+        assertEquals(chaseCustomUrl2, repository.transactions.value.first { it.id == 10L }.merchantLogo?.url)
+        assertEquals(oneOffUrl, repository.transactions.value.first { it.id == 11L }.merchantLogo?.url)
+
+        // Pin Betterment with its own INSTITUTION logo, then broaden Chase 11L to GLOBAL:
+        // Chase's scoped override is cleared so 10L & 11L reflect GLOBAL, while Betterment keeps its INSTITUTION pin.
+        val bettermentUrl = "https://example.com/betterment-interest.png"
+        viewModel.saveMerchantLogoOverride(12L, bettermentUrl, LogoOverrideScope.INSTITUTION)
+        testScheduler.advanceUntilIdle()
+
+        val globalUrl = "https://example.com/global-interest.png"
+        viewModel.saveMerchantLogoOverride(11L, globalUrl, LogoOverrideScope.GLOBAL)
+        testScheduler.advanceUntilIdle()
+        assertEquals(globalUrl, repository.transactions.value.first { it.id == 10L }.merchantLogo?.url)
+        assertEquals(globalUrl, repository.transactions.value.first { it.id == 11L }.merchantLogo?.url)
+        assertEquals(bettermentUrl, repository.transactions.value.first { it.id == 12L }.merchantLogo?.url)
+
+        collectJob.cancel()
+    }
+
+    @Test
+    fun testLogoParityAndLocalReconciliation_domainMatchesRenamesAndCsvImport() = runTest(testDispatcher) {
+        assertEquals("chase.com", InstitutionLogoDefaults.extractDomain("PAYMENT TO CHASE.COM"))
+        assertNull(InstitutionLogoDefaults.extractDomain("SQ *ST.LOUIS MO"))
+        assertEquals("apple.com", InstitutionLogoDefaults.resolveCounterpartyDomainInText("ONLINE PAYMENT TO APPLE CARD", "chase.com"))
+        assertEquals("morganstanley.com", InstitutionLogoDefaults.resolveCounterpartyDomainInText("MORGAN STANLEY ACH", "chase.com"))
+        assertFalse(MerchantLogoResolver.isInstitutionScopedMerchant("Costco Membership Fee"))
+        assertTrue(MerchantLogoResolver.isInstitutionScopedMerchant("Checking Monthly Service Fee"))
+
+        val chase = Account(id = 1L, name = "Chase Checking", type = AccountType.CHECKING, institution = "Chase Bank")
+        repository.saveAccount(chase)
+
+        // CSV import reconciles generic merchant logos immediately in local mode
+        repository.importCsvPreview(
+            fileName = "chase.csv",
+            preview = CsvImportPreview(
+                accounts = emptyList(),
+                rules = emptyList(),
+                transactions = listOf(
+                    Transaction(
+                        id = 1L,
+                        accountId = 1L,
+                        originalDate = "2026-11-05",
+                        originalMerchant = "Interest Payment",
+                        originalAmountCents = 1500L
+                    )
+                ),
+                totalRowCount = 1,
+                invalidRowCount = 0,
+                duplicateRowCount = 0
+            ),
+            fallbackAccountId = 1L
+        ).getOrThrow()
+
+        val imported = repository.transactions.value.first()
+        assertEquals("interest-payment@inst:chase.com", imported.merchantLogo?.merchantKey)
+        assertTrue(imported.merchantLogo?.url?.contains("chase.com") == true)
+
+        // Renaming a domain-cached merchant clears the stale domain-* logo and resetTransaction restores it
+        val amazonTxn = Transaction(
+            id = 50L,
+            accountId = 1L,
+            originalDate = "2026-11-06",
+            originalMerchant = "WWW.AMAZON.COM",
+            originalAmountCents = -2500L,
+            merchantLogo = MerchantLogo(
+                merchantKey = "domain-amazon.com",
+                merchantName = "amazon.com",
+                url = "https://img.logo.dev/amazon.com?format=png",
+                status = "candidate"
+            )
+        )
+        repository.saveTransaction(amazonTxn)
+        assertEquals("domain-amazon.com", repository.transactions.value.first { it.id == 50L }.merchantLogo?.merchantKey)
+
+        repository.editTransaction(id = 50L, merchant = "Target")
+        testScheduler.advanceUntilIdle()
+        assertNull(repository.transactions.value.first { it.id == 50L }.merchantLogo)
+
+        repository.resetTransaction(50L)
+        testScheduler.advanceUntilIdle()
+        val afterReset = repository.transactions.value.first { it.id == 50L }
+        assertEquals("WWW.AMAZON.COM", afterReset.effectiveMerchant)
+        assertNull(afterReset.editedMerchant)
+
+        // Editing an Interest Payment away to Target clears its Chase logo, and resetTransaction restores it
+        val importedId = imported.id
+        repository.editTransaction(id = importedId, merchant = "Target")
+        testScheduler.advanceUntilIdle()
+        assertNull(repository.transactions.value.first { it.id == importedId }.merchantLogo)
+
+        repository.resetTransaction(importedId)
+        testScheduler.advanceUntilIdle()
+        val resetInterest = repository.transactions.value.first { it.id == importedId }
+        assertEquals("interest-payment@inst:chase.com", resetInterest.merchantLogo?.merchantKey)
+        assertTrue(resetInterest.merchantLogo?.url?.contains("chase.com") == true)
     }
 }

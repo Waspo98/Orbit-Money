@@ -143,7 +143,8 @@ class OrbitRepository(
             _authMethod.value = null
             activeEngine = localEngine
             val rawLocal = (localSnap ?: localEngine.loadSnapshot()).copy(preferences = pref)
-            val hydratedLocal = BalanceHistoryEngine.ensureDailySnapshotCheckpoints(rawLocal, LocalDateUtils.todayIsoDate())
+            val withDailyCheckpoints = BalanceHistoryEngine.ensureDailySnapshotCheckpoints(rawLocal, LocalDateUtils.todayIsoDate())
+            val hydratedLocal = reconcileSnapshotLogos(withDailyCheckpoints)
             _simpleFinStatus.value = SimpleFinStatusInfo(
                 configured = !pref.simpleFinToken.isNullOrBlank(),
                 connected = !pref.simpleFinToken.isNullOrBlank(),
@@ -267,16 +268,18 @@ class OrbitRepository(
         val current = _transactions.value
         val exists = current.any { it.id == transaction.id && transaction.id != 0L }
         val localId = if (exists) transaction.id else if (transaction.id == 0L) (current.maxOfOrNull { it.id } ?: 0L) + 1L else transaction.id
-        val updatedList = if (exists) current.map { if (it.id == transaction.id) transaction else it } else current + transaction.copy(id = localId)
+        val baseSaved = if (exists) transaction else transaction.copy(id = localId)
+        val localResolved = resolveLocalTransactionLogoIfNeeded(baseSaved, current)
+        val updatedList = if (exists) current.map { if (it.id == transaction.id) localResolved else it } else current + localResolved
         if (exists || transaction.id == 0L) {
             commitTransactionsWithManualBalanceSync(current, updatedList)
         } else {
             commitSnapshot(_snapshot.value.copy(transactions = updatedList))
         }
-        val pushed = activeEngine.pushTransaction(if (exists) transaction else transaction.copy(id = 0L)).getOrNull()
-        if (pushed != null && (pushed.id != localId || pushed.merchantLogo != transaction.merchantLogo)) {
+        val pushed = activeEngine.pushTransaction(if (exists) localResolved else localResolved.copy(id = 0L)).getOrNull()
+        if (pushed != null && (pushed.id != localId || pushed.merchantLogo != localResolved.merchantLogo)) {
             val syncedId = if (pushed.id > 0L) pushed.id else localId
-            commitSnapshot(_snapshot.value.copy(transactions = _transactions.value.map { if (it.id == localId) it.copy(id = syncedId, merchantLogo = pushed.merchantLogo ?: it.merchantLogo) else it }))
+            commitSnapshot(_snapshot.value.copy(transactions = _transactions.value.map { if (it.id == localId) it.copy(id = syncedId, merchantLogo = pushed.merchantLogo) else it }))
         }
     }
 
@@ -287,7 +290,7 @@ class OrbitRepository(
     ) {
         val current = _transactions.value
         val target = current.find { it.id == id } ?: return
-        val updated = target.copy(
+        val baseUpdated = target.copy(
             editedMerchant = merchant ?: target.editedMerchant,
             editedMerchantSource = if (merchant != null) "user" else target.editedMerchantSource,
             editedAmountCents = amountCents ?: target.editedAmountCents,
@@ -297,23 +300,30 @@ class OrbitRepository(
             notes = notes ?: target.notes,
             editSource = EditSource.USER
         )
+        val updated = resolveLocalTransactionLogoIfNeeded(baseUpdated, current)
         commitTransactionsWithManualBalanceSync(current, current.map { if (it.id == id) updated else it })
-        activeEngine.pushTransaction(updated)
+        val pushed = activeEngine.pushTransaction(updated).getOrNull()
+        if (pushed != null && pushed.merchantLogo != updated.merchantLogo) {
+            commitSnapshot(_snapshot.value.copy(transactions = _transactions.value.map { if (it.id == id) it.copy(merchantLogo = pushed.merchantLogo) else it }))
+        }
     }
 
     /** Resets user edits: Clears all edited_* fields and resets editSource to NONE. */
     suspend fun resetTransaction(id: Long) {
         val current = _transactions.value
         val target = current.find { it.id == id } ?: return
-        val reset = target.copy(
-            editedMerchant = null, editedMerchantSource = null, editedAmountCents = null, editedDate = null,
-            editedCategoryId = null, editedCategoryIdSource = null, editedIsTransfer = null, editedIsTransferSource = null,
-            editedIsIgnored = null, editedIsIgnoredSource = null, editedMhaEligible = null, editedMhaEligibleSource = null,
-            editSource = EditSource.NONE
+        val reset = resolveLocalTransactionLogoIfNeeded(
+            target.copy(
+                editedMerchant = null, editedMerchantSource = null, editedAmountCents = null, editedDate = null,
+                editedCategoryId = null, editedCategoryIdSource = null, editedIsTransfer = null, editedIsTransferSource = null,
+                editedIsIgnored = null, editedIsIgnoredSource = null, editedMhaEligible = null, editedMhaEligibleSource = null,
+                editSource = EditSource.NONE
+            ),
+            current
         )
         commitTransactionsWithManualBalanceSync(current, current.map { if (it.id == id) reset else it })
         val pushed = activeEngine.resetTransaction(id).getOrNull()
-        if (pushed != null && pushed.merchantLogo != reset.merchantLogo) {
+        if (_storageMode.value == StorageMode.SELF_HOSTED && pushed != null && pushed.merchantLogo != reset.merchantLogo) {
             commitSnapshot(_snapshot.value.copy(transactions = _transactions.value.map { if (it.id == id) it.copy(merchantLogo = pushed.merchantLogo) else it }))
         }
     }
@@ -365,11 +375,14 @@ class OrbitRepository(
             if (index == 0) {
                 parent.copy(editedAmountCents = amount, editedCategoryId = categoryId, editedCategoryIdSource = "user", editSource = EditSource.USER)
             } else {
-                Transaction(
-                    id = nextId++, householdId = parent.householdId, accountId = parent.accountId, accountName = parent.accountName,
-                    originalDate = parent.effectiveDate, originalMerchant = parent.effectiveMerchant, originalAmountCents = amount,
-                    originalCategoryId = categoryId, originalDescription = "Split from #${parent.id}: ${parent.notes ?: ""}".trim(),
-                    externalId = "${parent.externalId ?: parent.id}_split_$index", editSource = EditSource.USER, source = "split"
+                resolveLocalTransactionLogoIfNeeded(
+                    Transaction(
+                        id = nextId++, householdId = parent.householdId, accountId = parent.accountId, accountName = parent.accountName,
+                        originalDate = parent.effectiveDate, originalMerchant = parent.effectiveMerchant, originalAmountCents = amount,
+                        originalCategoryId = categoryId, originalDescription = "Split from #${parent.id}: ${parent.notes ?: ""}".trim(),
+                        externalId = "${parent.externalId ?: parent.id}_split_$index", editSource = EditSource.USER, source = "split"
+                    ),
+                    current
                 )
             }
         }
@@ -386,7 +399,11 @@ class OrbitRepository(
         val localId = if (exists) account.id else if (account.id == 0L) (current.maxOfOrNull { it.id } ?: 0L) + 1L else account.id
         val savedLocal = if (exists) account else account.copy(id = localId)
         val updatedList = if (exists) current.map { if (it.id == account.id) savedLocal else it } else current + savedLocal
-        commitSnapshot(BalanceHistoryEngine.applySavedAccount(_snapshot.value, savedLocal, updatedList, LocalDateUtils.todayIsoDate()))
+        val instChanged = exists && current.find { it.id == savedLocal.id }?.institution != savedLocal.institution
+        val baseAccountSnap = BalanceHistoryEngine.applySavedAccount(_snapshot.value, savedLocal, updatedList, LocalDateUtils.todayIsoDate())
+        commitSnapshot(
+            if (instChanged && _storageMode.value != StorageMode.SELF_HOSTED) reconcileSnapshotLogos(baseAccountSnap) else baseAccountSnap
+        )
         val pushed = activeEngine.pushAccount(if (exists) account else account.copy(id = 0L)).getOrNull()
         return if (pushed != null && ((pushed.id > 0L && pushed.id != localId) || pushed.institutionLogo != savedLocal.institutionLogo)) {
             val resolvedId = if (pushed.id > 0L) pushed.id else localId
@@ -486,7 +503,8 @@ class OrbitRepository(
         val localId = if (exists) rule.id else if (rule.id == 0L) (current.maxOfOrNull { it.id } ?: 0L) + 1L else rule.id
         val saved = if (exists) rule else rule.copy(id = localId)
         val updatedRules = if (exists) current.map { if (it.id == rule.id) saved else it } else current + saved
-        val updatedTxns = if (!exists && saved.enabled) RuleMatcherEngine.applyNewRuleIncrementally(_transactions.value, updatedRules, saved) else RuleMatcherEngine.applyRules(_transactions.value, updatedRules)
+        val rawUpdatedTxns = if (!exists && saved.enabled) RuleMatcherEngine.applyNewRuleIncrementally(_transactions.value, updatedRules, saved) else RuleMatcherEngine.applyRules(_transactions.value, updatedRules)
+        val updatedTxns = reconcileLocalTransactionsIfNeeded(rawUpdatedTxns)
         commitSnapshot(_snapshot.value.copy(rules = updatedRules, transactions = updatedTxns))
         val pushed = activeEngine.pushRule(if (exists) rule else rule.copy(id = 0L)).getOrNull()
         if (pushed != null && pushed.id > 0L && pushed.id != localId) {
@@ -498,15 +516,21 @@ class OrbitRepository(
     }
     suspend fun deleteRule(id: Long) {
         val remaining = _rules.value.filterNot { it.id == id }
-        commitSnapshot(_snapshot.value.copy(rules = remaining, transactions = RuleMatcherEngine.applyRules(_transactions.value, remaining)))
+        val updatedTxns = reconcileLocalTransactionsIfNeeded(RuleMatcherEngine.applyRules(_transactions.value, remaining))
+        commitSnapshot(_snapshot.value.copy(rules = remaining, transactions = updatedTxns))
         activeEngine.deleteRule(id)
     }
     suspend fun runRulesOnAllTransactions() {
-        commitSnapshot(_snapshot.value.copy(transactions = RuleMatcherEngine.evaluateAll(_rules.value, _transactions.value)))
+        val updatedTxns = reconcileLocalTransactionsIfNeeded(RuleMatcherEngine.evaluateAll(_rules.value, _transactions.value))
+        commitSnapshot(_snapshot.value.copy(transactions = updatedTxns))
         activeEngine.runRules()
     }
 
-    suspend fun pairTransfers() = commitSnapshot(_snapshot.value.copy(transactions = TransferMatcherEngine.matchTransfers(_transactions.value)))
+    suspend fun pairTransfers() = commitSnapshot(
+        _snapshot.value.copy(
+            transactions = reconcileLocalTransactionsIfNeeded(TransferMatcherEngine.matchTransfers(_transactions.value))
+        )
+    )
 
     // Upcoming Items
     suspend fun saveUpcoming(item: UpcomingItem) {
@@ -549,7 +573,12 @@ class OrbitRepository(
 
     suspend fun reportMerchantLogoStatus(merchantKey: String, status: String) = reportMerchantLogoStatusImpl(merchantKey, status)
     suspend fun searchMerchantLogos(transactionId: Long, query: String): Result<MerchantLogoSearchResponseDto> = searchMerchantLogosImpl(transactionId, query)
-    suspend fun overrideMerchantLogo(transactionId: Long, logoUrl: String? = null, useCategoryIcon: Boolean = false): Result<MerchantLogo> = overrideMerchantLogoImpl(transactionId, logoUrl, useCategoryIcon)
+    suspend fun overrideMerchantLogo(
+        transactionId: Long,
+        logoUrl: String? = null,
+        useCategoryIcon: Boolean = false,
+        scope: LogoOverrideScope? = null
+    ): Result<MerchantLogo> = overrideMerchantLogoImpl(transactionId, logoUrl, useCategoryIcon, scope)
     fun exportBackupJson(): String = exportBackupJsonImpl()
     suspend fun restoreBackupJson(
         jsonString: String,
