@@ -64,8 +64,8 @@ android {
         applicationId = if (isBeta) "app.overbay.orbit.beta" else "app.overbay.orbit"
         minSdk = 24
         targetSdk = 35
-        versionCode = 76
-        versionName = if (isBeta) "0.8.4-beta" else "0.8.4"
+        versionCode = 77
+        versionName = if (isBeta) "0.8.5-beta" else "0.8.5"
         manifestPlaceholders["appName"] = if (isBeta) "Orbit Beta" else "Orbit Money"
         manifestPlaceholders["appScheme"] = if (isBeta) "orbitmoneybeta" else "orbitmoney"
     }
