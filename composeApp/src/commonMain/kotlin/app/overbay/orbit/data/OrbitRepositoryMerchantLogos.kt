@@ -3,6 +3,7 @@ package app.overbay.orbit.data
 import app.overbay.orbit.data.model.LogoOverrideScope
 import app.overbay.orbit.data.model.MerchantLogo
 import app.overbay.orbit.data.model.MerchantLogoResolver
+import app.overbay.orbit.data.model.OrbitWorkspaceSnapshot
 import app.overbay.orbit.data.model.StorageMode
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.network.MerchantLogoSearchResponseDto
@@ -160,4 +161,13 @@ internal fun OrbitRepository.reconcileLocalTransactionsIfNeeded(
     } else {
         MerchantLogoResolver.reconcileLocalTransactions(txns, accounts.value, preferences.value.merchantLogoOverrides)
     }
+
+internal fun reconcileSnapshotLogos(snapshot: OrbitWorkspaceSnapshot): OrbitWorkspaceSnapshot {
+    val reconciled = MerchantLogoResolver.reconcileLocalTransactions(
+        snapshot.transactions,
+        snapshot.accounts,
+        snapshot.preferences.merchantLogoOverrides
+    )
+    return if (reconciled !== snapshot.transactions) snapshot.copy(transactions = reconciled) else snapshot
+}
 

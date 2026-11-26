@@ -6,8 +6,10 @@ import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.AccountType
 import app.overbay.orbit.data.model.Category
 import app.overbay.orbit.data.model.EditSource
+import app.overbay.orbit.data.model.InstitutionLogoDefaults
 import app.overbay.orbit.data.model.Transaction
 import app.overbay.orbit.data.model.LogoOverrideScope
+import app.overbay.orbit.data.model.MerchantLogo
 import app.overbay.orbit.data.model.MerchantLogoResolver
 import app.overbay.orbit.data.model.merchantLogoKey
 import app.overbay.orbit.domain.CsvImportPreview
@@ -741,5 +743,83 @@ class TransactionsViewModelTest {
         assertEquals(bettermentUrl, repository.transactions.value.first { it.id == 12L }.merchantLogo?.url)
 
         collectJob.cancel()
+    }
+
+    @Test
+    fun testLogoParityAndLocalReconciliation_domainMatchesRenamesAndCsvImport() = runTest(testDispatcher) {
+        assertEquals("chase.com", InstitutionLogoDefaults.extractDomain("PAYMENT TO CHASE.COM"))
+        assertNull(InstitutionLogoDefaults.extractDomain("SQ *ST.LOUIS MO"))
+        assertEquals("apple.com", InstitutionLogoDefaults.resolveCounterpartyDomainInText("ONLINE PAYMENT TO APPLE CARD", "chase.com"))
+        assertEquals("morganstanley.com", InstitutionLogoDefaults.resolveCounterpartyDomainInText("MORGAN STANLEY ACH", "chase.com"))
+        assertFalse(MerchantLogoResolver.isInstitutionScopedMerchant("Costco Membership Fee"))
+        assertTrue(MerchantLogoResolver.isInstitutionScopedMerchant("Checking Monthly Service Fee"))
+
+        val chase = Account(id = 1L, name = "Chase Checking", type = AccountType.CHECKING, institution = "Chase Bank")
+        repository.saveAccount(chase)
+
+        // CSV import reconciles generic merchant logos immediately in local mode
+        repository.importCsvPreview(
+            fileName = "chase.csv",
+            preview = CsvImportPreview(
+                accounts = emptyList(),
+                rules = emptyList(),
+                transactions = listOf(
+                    Transaction(
+                        id = 1L,
+                        accountId = 1L,
+                        originalDate = "2026-11-05",
+                        originalMerchant = "Interest Payment",
+                        originalAmountCents = 1500L
+                    )
+                ),
+                totalRowCount = 1,
+                invalidRowCount = 0,
+                duplicateRowCount = 0
+            ),
+            fallbackAccountId = 1L
+        ).getOrThrow()
+
+        val imported = repository.transactions.value.first()
+        assertEquals("interest-payment@inst:chase.com", imported.merchantLogo?.merchantKey)
+        assertTrue(imported.merchantLogo?.url?.contains("chase.com") == true)
+
+        // Renaming a domain-cached merchant clears the stale domain-* logo and resetTransaction restores it
+        val amazonTxn = Transaction(
+            id = 50L,
+            accountId = 1L,
+            originalDate = "2026-11-06",
+            originalMerchant = "WWW.AMAZON.COM",
+            originalAmountCents = -2500L,
+            merchantLogo = MerchantLogo(
+                merchantKey = "domain-amazon.com",
+                merchantName = "amazon.com",
+                url = "https://img.logo.dev/amazon.com?format=png",
+                status = "candidate"
+            )
+        )
+        repository.saveTransaction(amazonTxn)
+        assertEquals("domain-amazon.com", repository.transactions.value.first { it.id == 50L }.merchantLogo?.merchantKey)
+
+        repository.editTransaction(id = 50L, merchant = "Target")
+        testScheduler.advanceUntilIdle()
+        assertNull(repository.transactions.value.first { it.id == 50L }.merchantLogo)
+
+        repository.resetTransaction(50L)
+        testScheduler.advanceUntilIdle()
+        val afterReset = repository.transactions.value.first { it.id == 50L }
+        assertEquals("WWW.AMAZON.COM", afterReset.effectiveMerchant)
+        assertNull(afterReset.editedMerchant)
+
+        // Editing an Interest Payment away to Target clears its Chase logo, and resetTransaction restores it
+        val importedId = imported.id
+        repository.editTransaction(id = importedId, merchant = "Target")
+        testScheduler.advanceUntilIdle()
+        assertNull(repository.transactions.value.first { it.id == importedId }.merchantLogo)
+
+        repository.resetTransaction(importedId)
+        testScheduler.advanceUntilIdle()
+        val resetInterest = repository.transactions.value.first { it.id == importedId }
+        assertEquals("interest-payment@inst:chase.com", resetInterest.merchantLogo?.merchantKey)
+        assertTrue(resetInterest.merchantLogo?.url?.contains("chase.com") == true)
     }
 }

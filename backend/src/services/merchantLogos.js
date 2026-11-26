@@ -16,8 +16,6 @@ import {
   VALID_LOGO_SCOPES,
   cleanMerchantName,
   extractDomain,
-  isCuratedMerchantName,
-  isStrictNameCandidate,
   merchantLogoKey,
   resolveTransactionScopeKeys
 } from './merchantLogoClassifier.js';
@@ -266,7 +264,7 @@ export function ensureMerchantLogoEntryForTransaction(db, transactionId, househo
   const { keys } = buildRowResolution(row, contextMaps);
   const fallbackKey = keys.defaultScope === 'institution'
     ? (keys.scopedKey || keys.txnKey)
-    : (keys.globalDomainKey || keys.globalSlugKey || keys.txnKey);
+    : (keys.globalSlugKey || keys.globalDomainKey || keys.txnKey);
   if (!fallbackKey) return { found: true, merchant_logo: null };
 
   return {

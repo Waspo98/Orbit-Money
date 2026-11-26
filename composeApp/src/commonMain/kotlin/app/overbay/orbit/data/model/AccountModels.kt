@@ -256,9 +256,11 @@ object InstitutionLogoDefaults {
         "chase bank" to "chase.com",
         "jpmorgan" to "chase.com",
         "jpmorgan chase" to "chase.com",
+        "jp morgan" to "chase.com",
         "betterment" to "betterment.com",
         "fidelity" to "fidelity.com",
         "fidelity investments" to "fidelity.com",
+        "fidelity netbenefits" to "fidelity.com",
         "vanguard" to "vanguard.com",
         "schwab" to "schwab.com",
         "charles schwab" to "schwab.com",
@@ -274,6 +276,7 @@ object InstitutionLogoDefaults {
         "citi" to "citi.com",
         "citibank" to "citi.com",
         "discover" to "discover.com",
+        "discover bank" to "discover.com",
         "wealthfront" to "wealthfront.com",
         "marcus" to "marcus.com",
         "goldman sachs" to "marcus.com",
@@ -287,17 +290,28 @@ object InstitutionLogoDefaults {
         "td bank" to "td.com",
         "truist" to "truist.com",
         "fifth third" to "53.com",
+        "fifth third bank" to "53.com",
         "huntington" to "huntington.com",
+        "huntington bank" to "huntington.com",
         "citizens" to "citizensbank.com",
+        "citizens bank" to "citizensbank.com",
         "bmo" to "bmo.com",
+        "bmo harris" to "bmo.com",
+        "m and t bank" to "mtb.com",
+        "mt bank" to "mtb.com",
         "synchrony" to "synchrony.com",
+        "synchrony bank" to "synchrony.com",
         "barclays" to "barclaysus.com",
         "robinhood" to "robinhood.com",
         "coinbase" to "coinbase.com",
+        "m1" to "m1.com",
         "m1 finance" to "m1.com",
         "etrade" to "etrade.com",
         "e trade" to "etrade.com",
+        "morgan stanley" to "morganstanley.com",
         "merrill" to "ml.com",
+        "merrill lynch" to "ml.com",
+        "merrill edge" to "ml.com",
         "empower" to "empower.com",
         "personal capital" to "empower.com",
         "principal" to "principal.com",
@@ -305,6 +319,8 @@ object InstitutionLogoDefaults {
         "paypal" to "paypal.com",
         "venmo" to "venmo.com",
         "apple" to "apple.com",
+        "apple cash" to "apple.com",
+        "apple card" to "apple.com",
         "rocket mortgage" to "rocketmortgage.com",
         "new american funding" to "newamericanfunding.com",
         "guild mortgage" to "guildmortgage.com",
@@ -319,9 +335,12 @@ object InstitutionLogoDefaults {
         "mr cooper" to "mrcooper.com",
         "pennymac" to "pennymac.com",
         "alliant" to "alliantcreditunion.org",
+        "alliant credit union" to "alliantcreditunion.org",
         "becu" to "becu.org",
         "penfed" to "penfed.org",
-        "chime" to "chime.com"
+        "chime" to "chime.com",
+        "wise" to "wise.com",
+        "revolut" to "revolut.com"
     )
 
     private val AMBIGUOUS_FREE_TEXT_NAMES = setOf("ally", "apple", "m1", "principal", "wise", "citizens")
@@ -333,35 +352,49 @@ object InstitutionLogoDefaults {
             .map { (key, domain) -> Regex("\\b${Regex.escape(key)}\\b", RegexOption.IGNORE_CASE) to domain }
     }
 
-    private val EXPLICIT_DOMAIN_REGEX = Regex(
-        "\\b(?:https?://)?(?:www\\.)?([a-z0-9][a-z0-9-]*(?:\\.[a-z0-9][a-z0-9-]*)+\\.[a-z]{2,})\\b",
+    private val PREFIXED_DOMAIN_REGEX = Regex(
+        "\\b(?:https?://(?:www\\.)?|www\\.)([a-z0-9][a-z0-9-]*(?:\\.[a-z0-9][a-z0-9-]*)*\\.[a-z]{2,})\\b",
         RegexOption.IGNORE_CASE
     )
+    private val BARE_DOMAIN_REGEX = Regex(
+        "\\b([a-z0-9][a-z0-9-]*(?:\\.[a-z0-9][a-z0-9-]*)*\\.(?:com|org|net|io|co|us|edu|gov|bank|ai|app|dev|me|tv|biz|info|ca|uk|de|eu|cc|gg|so|fm|ly|to|shop|store|online|xyz|money|finance|financial|coop))\\b",
+        RegexOption.IGNORE_CASE
+    )
+    private val NON_ALPHANUM_REGEX = Regex("[^a-z0-9]+")
+    private val CORP_SUFFIX_REGEX = Regex("\\s+(n a|na|inc|llc|corp|corporation|co|ltd)$")
+    private val INSTITUTION_SUFFIX_REGEX = Regex("\\s+(bank|financial|investments|savings|mortgage)$")
+
+    private fun normalizeInstitutionName(raw: String?): String =
+        (raw ?: "")
+            .trim()
+            .lowercase()
+            .replace("&", " and ")
+            .replace(NON_ALPHANUM_REGEX, " ")
+            .replace(CORP_SUFFIX_REGEX, "")
+            .trim()
+
+    fun extractDomain(raw: String?): String? {
+        val lower = raw?.trim()?.takeIf { it.isNotBlank() }?.lowercase() ?: return null
+        val match = PREFIXED_DOMAIN_REGEX.find(lower) ?: BARE_DOMAIN_REGEX.find(lower) ?: return null
+        val domain = match.groupValues.getOrNull(1)?.removePrefix("www.") ?: return null
+        return domain.takeUnless { it.endsWith(".local") || it.endsWith(".invalid") }
+    }
 
     fun resolveDomain(institution: String?): String? {
-        val raw = institution?.trim()?.takeIf { it.isNotBlank() } ?: return null
-        val norm = raw.lowercase()
-            .replace("&", " and ")
-            .replace(Regex("[^a-z0-9]+"), " ")
-            .trim()
+        extractDomain(institution)?.let { return it }
+        val norm = normalizeInstitutionName(institution)
         if (norm.isBlank()) return null
         DOMAIN_BY_NAME[norm]?.let { return it }
-        val stripped = norm.replace(Regex("\\s+(bank|financial|investments|savings|mortgage)$"), "").trim()
+        val stripped = norm.replace(INSTITUTION_SUFFIX_REGEX, "").trim()
         return DOMAIN_BY_NAME[stripped]
     }
 
     fun resolveCounterpartyDomainInText(rawText: String?, owningDomain: String? = null): String? {
         val raw = rawText?.trim()?.takeIf { it.isNotBlank() } ?: return null
-        val explicit = EXPLICIT_DOMAIN_REGEX.find(raw.lowercase())
-            ?.groupValues?.getOrNull(1)
-            ?.removePrefix("www.")
-            ?.takeUnless { it.endsWith(".local") || it.endsWith(".invalid") }
+        val explicit = extractDomain(raw)
         if (explicit != null && (owningDomain == null || explicit != owningDomain)) return explicit
 
-        val norm = raw.lowercase()
-            .replace("&", " and ")
-            .replace(Regex("[^a-z0-9]+"), " ")
-            .trim()
+        val norm = normalizeInstitutionName(raw)
         if (norm.isBlank()) return explicit
 
         var firstMatch: String? = null

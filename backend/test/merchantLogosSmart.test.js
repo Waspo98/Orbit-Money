@@ -6,14 +6,20 @@ process.env.SESSION_SECRET ??= 'test-session-secret-1234567890';
 process.env.ADMIN_PASSWORD ??= 'test-admin-password-1234567890';
 process.env.LOGO_DEV_PUBLISHABLE_KEY ??= 'pk_test_orbit';
 
+const { config } = await import('../src/config.js');
 const { runMigrations } = await import('../src/db/migrations.js');
-const { attachInstitutionLogos } = await import('../src/services/institutionLogos.js');
+const {
+  attachInstitutionLogos,
+  resolveCounterpartyInstitutionDomain
+} = await import('../src/services/institutionLogos.js');
 const {
   attachMerchantLogos,
+  ensureMerchantLogoEntryForTransaction,
   overrideMerchantLogo,
   reportMerchantLogoStatus
 } = await import('../src/services/merchantLogos.js');
 const {
+  extractDomain,
   isInstitutionScopedMerchant
 } = await import('../src/services/merchantLogoClassifier.js');
 
@@ -307,4 +313,89 @@ test('reportMerchantLogoStatus on scoped fallback updates underlying inst: candi
 
   const instRow = db.prepare('SELECT status FROM merchant_logo_cache WHERE merchant_key = ?').get('inst:chase.com');
   assert.equal(instRow.status, 'loaded');
+});
+
+test('extractDomain matches single-dot domains and ignores city/title abbreviations', () => {
+  assert.equal(extractDomain('chase.com'), 'chase.com');
+  assert.equal(extractDomain('https://localcu.org/login'), 'localcu.org');
+  assert.equal(extractDomain('PAYMENT TO CHASE.COM'), 'chase.com');
+  assert.equal(extractDomain('SQ *ST.LOUIS MO'), null);
+  assert.equal(extractDomain('MT.PLEASANT BAKERY'), null);
+  assert.equal(extractDomain('P.O.BOX 123'), null);
+});
+
+test('generic fee pattern excludes branded membership/service fees while preserving bank fees', () => {
+  assert.equal(isInstitutionScopedMerchant('Annual Fee'), true);
+  assert.equal(isInstitutionScopedMerchant('Checking Monthly Service Fee'), true);
+  assert.equal(isInstitutionScopedMerchant('Credit Card Annual Fee'), true);
+  assert.equal(isInstitutionScopedMerchant('Costco Membership Fee'), false);
+  assert.equal(isInstitutionScopedMerchant('Ticketmaster Service Fee'), false);
+});
+
+test('institution and counterparty favicon fallbacks resolve when LOGO_DEV_PUBLISHABLE_KEY is unset', () => {
+  const db = makeDb();
+  const { chase, amex } = seedAccounts(db);
+  const chaseToAmex = insertTxn(db, {
+    accountId: chase,
+    amount: -40000,
+    originalMerchant: 'AMERICAN EXPRESS ACH PMT',
+    editedMerchant: 'Credit Card Payment',
+    editedMerchantSource: 'user'
+  });
+  const amexFee = insertTxn(db, {
+    accountId: amex,
+    amount: -25000,
+    originalMerchant: 'Annual Fee'
+  });
+
+  const previousKey = config.logoDevPublishableKey;
+  config.logoDevPublishableKey = null;
+  try {
+    const [enrichedAcct] = attachInstitutionLogos(db, [
+      { id: chase, name: 'Chase Checking', institution: 'Chase Bank' }
+    ]);
+    assert.ok(enrichedAcct.institution_logo.url.includes('google.com/s2/favicons'));
+    assert.ok(enrichedAcct.institution_logo.url.includes('chase.com'));
+
+    const rows = db.prepare(`
+      SELECT id, account_id, COALESCE(edited_merchant, original_merchant) AS merchant,
+             original_merchant, original_description, edited_merchant_source, transfer_pair_id
+        FROM transactions WHERE id IN (?, ?) ORDER BY id ASC
+    `).all(chaseToAmex, amexFee);
+    const enrichedTxns = attachMerchantLogos(db, rows);
+    assert.equal(enrichedTxns[0].merchant_logo.merchant_key, 'credit-card-payment@inst:americanexpress.com');
+    assert.ok(enrichedTxns[0].merchant_logo.url.includes('google.com/s2/favicons'));
+    assert.ok(enrichedTxns[0].merchant_logo.url.includes('americanexpress.com'));
+    assert.equal(enrichedTxns[1].merchant_logo.merchant_key, 'annual-fee@inst:americanexpress.com');
+    assert.ok(enrichedTxns[1].merchant_logo.url.includes('americanexpress.com'));
+  } finally {
+    config.logoDevPublishableKey = previousKey;
+  }
+});
+
+test('counterparty resolution detects Apple Card and Morgan Stanley without ambiguous word false positives', () => {
+  assert.equal(resolveCounterpartyInstitutionDomain('ONLINE PAYMENT TO APPLE CARD', 'chase.com'), 'apple.com');
+  assert.equal(resolveCounterpartyInstitutionDomain('MORGAN STANLEY BANK TRANSFER', 'chase.com'), 'morganstanley.com');
+  assert.equal(resolveCounterpartyInstitutionDomain('WISE HARDWARE SUPPLY', 'chase.com'), null);
+});
+
+test('ensureMerchantLogoEntryForTransaction and global override agree on globalSlugKey for domain-matched brands', () => {
+  const db = makeDb();
+  const { chase } = seedAccounts(db);
+  const txnId = insertTxn(db, { accountId: chase, originalMerchant: 'www.amazon.com' });
+
+  const ensured = ensureMerchantLogoEntryForTransaction(db, txnId, 1);
+  assert.equal(ensured.found, true);
+
+  const overrideRes = overrideMerchantLogo(db, {
+    transactionId: txnId,
+    scope: 'global',
+    logoUrl: 'https://example.com/amazon-custom.png'
+  });
+  assert.equal(overrideRes.updated, true);
+  assert.equal(overrideRes.merchant_logo.merchant_key, 'www-amazon-com');
+
+  const afterEnsure = ensureMerchantLogoEntryForTransaction(db, txnId, 1);
+  assert.equal(afterEnsure.merchant_logo.merchant_key, 'www-amazon-com');
+  assert.equal(afterEnsure.merchant_logo.url, 'https://example.com/amazon-custom.png');
 });

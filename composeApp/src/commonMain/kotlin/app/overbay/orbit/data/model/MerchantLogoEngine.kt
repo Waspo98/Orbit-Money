@@ -22,13 +22,14 @@ data class TransactionLogoScopeKeys(
     val txnKey: String?,
     val scopedKey: String?,
     val globalSlugKey: String?,
+    val globalDomainKey: String?,
     val explicitGlobalGenericKey: String?,
     val fallbackInstKey: String?,
     val counterpartyDomain: String?,
     val institutionLabel: String?
 ) {
     val globalTargetKey: String?
-        get() = if (isGeneric) explicitGlobalGenericKey ?: txnKey else globalSlugKey ?: txnKey
+        get() = if (isGeneric) explicitGlobalGenericKey ?: txnKey else globalSlugKey ?: globalDomainKey ?: txnKey
 }
 
 data class LogoScopeOption(
@@ -128,7 +129,7 @@ object MerchantLogoResolver {
     private val GENERIC_EVENT_PATTERNS = listOf(
         Regex("^(savings|checking|hysa|apy|monthly|quarterly|bank|account)\\s+interest(\\s+(payment|credit|earned|income|paid|charge))?$", RegexOption.IGNORE_CASE),
         Regex("^(interest|dividend)\\s+(payments?|credits?|earned|income|paid|reinvestment|charges?)$", RegexOption.IGNORE_CASE),
-        Regex("^[a-z0-9\\s-]*\\b(annual|monthly|maintenance|service|overdraft|nsf|wire|atm|late|foreign\\s+transaction|returned\\s+item|account|membership)\\s+fees?$", RegexOption.IGNORE_CASE),
+        Regex("^(?:(?:bank|account|checking|savings|card|credit\\s+card|monthly|quarterly|annual|minimum\\s+balance)\\s+)*(?:annual|monthly|maintenance|service|overdraft|nsf|wire|atm|late|foreign\\s+transaction|returned\\s+item|account|membership)\\s+fees?$", RegexOption.IGNORE_CASE),
         Regex("^(atm|cash|check|mobile|remote|branch|ach|wire|direct)\\s+(deposits?|withdrawals?|transfers?|payments?)$", RegexOption.IGNORE_CASE)
     )
 
@@ -245,6 +246,20 @@ object MerchantLogoResolver {
         val explicitGlobalGenericKey = if (isGeneric && slug.isNotBlank()) "global:$slug" else null
         val globalSlugKey = if (!isGeneric && slug.isNotBlank()) slug else null
 
+        var domain: String? = null
+        if (!isGeneric) {
+            domain = InstitutionLogoDefaults.extractDomain(transaction.effectiveMerchant)
+            if (domain == null && transaction.editedMerchantSource == null) {
+                val combined = listOfNotNull(
+                    transaction.effectiveMerchant.takeIf { it.isNotBlank() },
+                    transaction.originalMerchant.takeIf { it.isNotBlank() },
+                    transaction.originalDescription?.takeIf { it.isNotBlank() }
+                ).joinToString(" ")
+                domain = InstitutionLogoDefaults.extractDomain(combined)
+            }
+        }
+        val globalDomainKey = if (!isGeneric && domain != null) "domain-$domain" else null
+
         val institutionLabel = when {
             pairedInstKey != null -> pairedAccount?.institution?.takeIf { it.isNotBlank() } ?: pairedAccount?.name
             counterpartyDomain != null -> InstitutionLogoDefaults.displayNameForDomain(counterpartyDomain) ?: counterpartyDomain
@@ -259,6 +274,7 @@ object MerchantLogoResolver {
             txnKey = txnKey,
             scopedKey = scopedKey,
             globalSlugKey = globalSlugKey,
+            globalDomainKey = globalDomainKey,
             explicitGlobalGenericKey = explicitGlobalGenericKey,
             fallbackInstKey = if (isGeneric) resolvedInstKey else null,
             counterpartyDomain = counterpartyDomain,
@@ -381,13 +397,16 @@ object MerchantLogoResolver {
         keys.globalSlugKey?.let { gKey ->
             overrides[gKey]?.takeIf(isOverride)?.let { return it.copy(scope = LogoOverrideScope.GLOBAL.wireValue) }
         }
+        keys.globalDomainKey?.let { dKey ->
+            overrides[dKey]?.takeIf(isOverride)?.let { return it.copy(scope = LogoOverrideScope.GLOBAL.wireValue) }
+        }
 
         val existing = transaction.merchantLogo
         if (existing != null) {
             val matchesCurrentBrand = existing.merchantKey == keys.txnKey ||
                 existing.merchantKey == keys.scopedKey ||
                 existing.merchantKey == keys.globalSlugKey ||
-                existing.merchantKey.startsWith("domain-")
+                (keys.globalDomainKey != null && existing.merchantKey == keys.globalDomainKey)
             if (matchesCurrentBrand) return existing
         }
         return null

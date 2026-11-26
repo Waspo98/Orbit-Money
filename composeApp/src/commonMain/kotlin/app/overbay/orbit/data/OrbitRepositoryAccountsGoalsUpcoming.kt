@@ -343,7 +343,10 @@ suspend fun OrbitRepository.resetTransactionFields(id: Long, fields: List<String
     // Temporarily pass EditSource.NONE so RuleMatcherEngine re-evaluates unlocked fields while respecting per-field "user" source locks
     val unlockedForRuleEval = cleared.copy(editSource = EditSource.NONE)
     val evaluated = RuleMatcherEngine.applyRules(listOf(unlockedForRuleEval), rules.value).firstOrNull() ?: unlockedForRuleEval
-    val ruleEvaluated = if (hasRemainingUserLock) evaluated.copy(editSource = EditSource.USER) else evaluated
+    val ruleEvaluated = resolveLocalTransactionLogoIfNeeded(
+        if (hasRemainingUserLock) evaluated.copy(editSource = EditSource.USER) else evaluated,
+        current
+    )
     commitSnapshot(snapshot.value.copy(transactions = current.map { if (it.id == id) ruleEvaluated else it }))
     val serverFields = fields.mapNotNull { f ->
         when (f.lowercase()) {
@@ -375,7 +378,7 @@ suspend fun OrbitRepository.setTransactionIgnored(id: Long, ignored: Boolean) {
 suspend fun OrbitRepository.setRuleEnabled(id: Long, enabled: Boolean) {
     val currentRules = rules.value
     val updatedRules = currentRules.map { if (it.id == id) it.copy(enabled = enabled) else it }
-    val updatedTxns = RuleMatcherEngine.applyRules(transactions.value, updatedRules)
+    val updatedTxns = reconcileLocalTransactionsIfNeeded(RuleMatcherEngine.applyRules(transactions.value, updatedRules))
     commitSnapshot(snapshot.value.copy(rules = updatedRules, transactions = updatedTxns))
     if (storageMode.value == StorageMode.SELF_HOSTED) {
         createApiClient().setRuleEnabled(id, enabled)
@@ -384,7 +387,7 @@ suspend fun OrbitRepository.setRuleEnabled(id: Long, enabled: Boolean) {
 
 suspend fun OrbitRepository.wipeAllRules(): Result<Int> = runCatching {
     val count = rules.value.size
-    val clearedTxns = RuleMatcherEngine.applyRules(transactions.value, emptyList())
+    val clearedTxns = reconcileLocalTransactionsIfNeeded(RuleMatcherEngine.applyRules(transactions.value, emptyList()))
     commitSnapshot(snapshot.value.copy(rules = emptyList(), transactions = clearedTxns))
     if (storageMode.value == StorageMode.SELF_HOSTED) {
         createApiClient().deleteAllRules().getOrThrow()

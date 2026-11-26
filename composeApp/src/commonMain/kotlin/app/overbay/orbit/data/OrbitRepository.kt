@@ -144,14 +144,7 @@ class OrbitRepository(
             activeEngine = localEngine
             val rawLocal = (localSnap ?: localEngine.loadSnapshot()).copy(preferences = pref)
             val withDailyCheckpoints = BalanceHistoryEngine.ensureDailySnapshotCheckpoints(rawLocal, LocalDateUtils.todayIsoDate())
-            val reconciledTxns = MerchantLogoResolver.reconcileLocalTransactions(
-                withDailyCheckpoints.transactions,
-                withDailyCheckpoints.accounts,
-                withDailyCheckpoints.preferences.merchantLogoOverrides
-            )
-            val hydratedLocal = if (reconciledTxns !== withDailyCheckpoints.transactions) {
-                withDailyCheckpoints.copy(transactions = reconciledTxns)
-            } else withDailyCheckpoints
+            val hydratedLocal = reconcileSnapshotLogos(withDailyCheckpoints)
             _simpleFinStatus.value = SimpleFinStatusInfo(
                 configured = !pref.simpleFinToken.isNullOrBlank(),
                 connected = !pref.simpleFinToken.isNullOrBlank(),
@@ -319,15 +312,18 @@ class OrbitRepository(
     suspend fun resetTransaction(id: Long) {
         val current = _transactions.value
         val target = current.find { it.id == id } ?: return
-        val reset = target.copy(
-            editedMerchant = null, editedMerchantSource = null, editedAmountCents = null, editedDate = null,
-            editedCategoryId = null, editedCategoryIdSource = null, editedIsTransfer = null, editedIsTransferSource = null,
-            editedIsIgnored = null, editedIsIgnoredSource = null, editedMhaEligible = null, editedMhaEligibleSource = null,
-            editSource = EditSource.NONE
+        val reset = resolveLocalTransactionLogoIfNeeded(
+            target.copy(
+                editedMerchant = null, editedMerchantSource = null, editedAmountCents = null, editedDate = null,
+                editedCategoryId = null, editedCategoryIdSource = null, editedIsTransfer = null, editedIsTransferSource = null,
+                editedIsIgnored = null, editedIsIgnoredSource = null, editedMhaEligible = null, editedMhaEligibleSource = null,
+                editSource = EditSource.NONE
+            ),
+            current
         )
         commitTransactionsWithManualBalanceSync(current, current.map { if (it.id == id) reset else it })
         val pushed = activeEngine.resetTransaction(id).getOrNull()
-        if (pushed != null && pushed.merchantLogo != reset.merchantLogo) {
+        if (_storageMode.value == StorageMode.SELF_HOSTED && pushed != null && pushed.merchantLogo != reset.merchantLogo) {
             commitSnapshot(_snapshot.value.copy(transactions = _transactions.value.map { if (it.id == id) it.copy(merchantLogo = pushed.merchantLogo) else it }))
         }
     }
@@ -379,11 +375,14 @@ class OrbitRepository(
             if (index == 0) {
                 parent.copy(editedAmountCents = amount, editedCategoryId = categoryId, editedCategoryIdSource = "user", editSource = EditSource.USER)
             } else {
-                Transaction(
-                    id = nextId++, householdId = parent.householdId, accountId = parent.accountId, accountName = parent.accountName,
-                    originalDate = parent.effectiveDate, originalMerchant = parent.effectiveMerchant, originalAmountCents = amount,
-                    originalCategoryId = categoryId, originalDescription = "Split from #${parent.id}: ${parent.notes ?: ""}".trim(),
-                    externalId = "${parent.externalId ?: parent.id}_split_$index", editSource = EditSource.USER, source = "split"
+                resolveLocalTransactionLogoIfNeeded(
+                    Transaction(
+                        id = nextId++, householdId = parent.householdId, accountId = parent.accountId, accountName = parent.accountName,
+                        originalDate = parent.effectiveDate, originalMerchant = parent.effectiveMerchant, originalAmountCents = amount,
+                        originalCategoryId = categoryId, originalDescription = "Split from #${parent.id}: ${parent.notes ?: ""}".trim(),
+                        externalId = "${parent.externalId ?: parent.id}_split_$index", editSource = EditSource.USER, source = "split"
+                    ),
+                    current
                 )
             }
         }
@@ -400,7 +399,11 @@ class OrbitRepository(
         val localId = if (exists) account.id else if (account.id == 0L) (current.maxOfOrNull { it.id } ?: 0L) + 1L else account.id
         val savedLocal = if (exists) account else account.copy(id = localId)
         val updatedList = if (exists) current.map { if (it.id == account.id) savedLocal else it } else current + savedLocal
-        commitSnapshot(BalanceHistoryEngine.applySavedAccount(_snapshot.value, savedLocal, updatedList, LocalDateUtils.todayIsoDate()))
+        val instChanged = exists && current.find { it.id == savedLocal.id }?.institution != savedLocal.institution
+        val baseAccountSnap = BalanceHistoryEngine.applySavedAccount(_snapshot.value, savedLocal, updatedList, LocalDateUtils.todayIsoDate())
+        commitSnapshot(
+            if (instChanged && _storageMode.value != StorageMode.SELF_HOSTED) reconcileSnapshotLogos(baseAccountSnap) else baseAccountSnap
+        )
         val pushed = activeEngine.pushAccount(if (exists) account else account.copy(id = 0L)).getOrNull()
         return if (pushed != null && ((pushed.id > 0L && pushed.id != localId) || pushed.institutionLogo != savedLocal.institutionLogo)) {
             val resolvedId = if (pushed.id > 0L) pushed.id else localId
@@ -523,7 +526,11 @@ class OrbitRepository(
         activeEngine.runRules()
     }
 
-    suspend fun pairTransfers() = commitSnapshot(_snapshot.value.copy(transactions = TransferMatcherEngine.matchTransfers(_transactions.value)))
+    suspend fun pairTransfers() = commitSnapshot(
+        _snapshot.value.copy(
+            transactions = reconcileLocalTransactionsIfNeeded(TransferMatcherEngine.matchTransfers(_transactions.value))
+        )
+    )
 
     // Upcoming Items
     suspend fun saveUpcoming(item: UpcomingItem) {

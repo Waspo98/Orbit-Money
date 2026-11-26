@@ -3,6 +3,7 @@ package app.overbay.orbit.data
 import app.overbay.orbit.data.model.Account
 import app.overbay.orbit.data.model.InstitutionLogoDefaults
 import app.overbay.orbit.data.model.MerchantLogo
+import app.overbay.orbit.data.model.MerchantLogoResolver
 import app.overbay.orbit.data.model.StorageMode
 import app.overbay.orbit.data.model.cleanMerchantNameForLogo
 import app.overbay.orbit.data.network.MerchantLogoCandidateDto
@@ -122,7 +123,16 @@ suspend fun OrbitRepository.overrideAccountInstitutionLogo(
             acct.copy(institutionLogo = updatedLogo)
         } else acct
     }
-    commitSnapshot(snapshot.value.copy(accounts = updatedAccounts, preferences = nextPrefs))
+    val updatedTransactions = if (storageMode.value == StorageMode.SELF_HOSTED) {
+        transactions.value
+    } else {
+        MerchantLogoResolver.reconcileLocalTransactions(
+            transactions.value,
+            updatedAccounts,
+            nextPrefs.merchantLogoOverrides
+        )
+    }
+    commitSnapshot(snapshot.value.copy(accounts = updatedAccounts, transactions = updatedTransactions, preferences = nextPrefs))
     updatePreferences(nextPrefs)
     updatedLogo
 }

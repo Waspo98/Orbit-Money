@@ -1,4 +1,5 @@
-const DOMAIN_RE = /\b(?:https?:\/\/)?(?:www\.)?([a-z0-9][a-z0-9-]*(?:\.[a-z0-9][a-z0-9-]*)+\.[a-z]{2,})\b/i;
+const PREFIXED_DOMAIN_RE = /\b(?:https?:\/\/(?:www\.)?|www\.)([a-z0-9][a-z0-9-]*(?:\.[a-z0-9][a-z0-9-]*)*\.[a-z]{2,})\b/i;
+const BARE_DOMAIN_RE = /\b([a-z0-9][a-z0-9-]*(?:\.[a-z0-9][a-z0-9-]*)*\.(?:com|org|net|io|co|us|edu|gov|bank|ai|app|dev|me|tv|biz|info|ca|uk|de|eu|cc|gg|so|fm|ly|to|shop|store|online|xyz|money|finance|financial|coop))\b/i;
 const PAYMENT_PREFIX_RE = /^(sq|tst|sp|paypal|pp|stripe|sumup|toast|clover)[\s*.-]+/i;
 const SAFE_SHORT_NAMES = new Set(['aldi', 'amex', 'apple', 'at&t', 'aws', 'cvs', 'etsy', 'hulu', 'ikea', 'lyft', 'uber', 'ups', 'usps']);
 
@@ -88,7 +89,7 @@ const GENERIC_MERCHANTS = new Set([
 const GENERIC_EVENT_PATTERNS = [
   /^(savings|checking|hysa|apy|monthly|quarterly|bank|account)\s+interest(\s+(payment|credit|earned|income|paid|charge))?$/i,
   /^(interest|dividend)\s+(payments?|credits?|earned|income|paid|reinvestment|charges?)$/i,
-  /^[a-z0-9\s-]*\b(annual|monthly|maintenance|service|overdraft|nsf|wire|atm|late|foreign\s+transaction|returned\s+item|account|membership)\s+fees?$/i,
+  /^(?:(?:bank|account|checking|savings|card|credit\s+card|monthly|quarterly|annual|minimum\s+balance)\s+)*(?:annual|monthly|maintenance|service|overdraft|nsf|wire|atm|late|foreign\s+transaction|returned\s+item|account|membership)\s+fees?$/i,
   /^(atm|cash|check|mobile|remote|branch|ach|wire|direct)\s+(deposits?|withdrawals?|transfers?|payments?)$/i
 ];
 
@@ -168,7 +169,8 @@ export function merchantLogoKey(value) {
 }
 
 export function extractDomain(value) {
-  const match = DOMAIN_RE.exec(String(value || '').toLowerCase());
+  const lower = String(value || '').toLowerCase();
+  const match = PREFIXED_DOMAIN_RE.exec(lower) || BARE_DOMAIN_RE.exec(lower);
   if (!match) return null;
   const domain = match[1].replace(/^www\./, '');
   if (domain.endsWith('.local') || domain.endsWith('.invalid')) return null;

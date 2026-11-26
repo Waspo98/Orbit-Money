@@ -20,6 +20,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -57,7 +58,7 @@ fun MerchantLogoFinderDialog(
     val initialQuery = remember(transaction.id) {
         transaction.effectiveMerchant.ifBlank { transaction.merchantLogo?.merchantName ?: "" }
     }
-    var selectedScope by remember(transaction.id) { mutableStateOf(scopeContext.defaultScope) }
+    var selectedScope by rememberSaveable(transaction.id) { mutableStateOf(scopeContext.defaultScope) }
 
     BrandLogoFinderDialog(
         targetKey = "txn:${transaction.id}",

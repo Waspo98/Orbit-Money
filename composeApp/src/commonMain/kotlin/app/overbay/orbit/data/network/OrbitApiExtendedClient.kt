@@ -240,15 +240,6 @@ suspend fun OrbitApiClient.reportMerchantLogoStatus(merchantKey: String, status:
     res.status.isSuccess()
 }
 
-suspend fun OrbitApiClient.ensureMerchantLogo(transactionId: Long): Result<MerchantLogoDto> = runCatching {
-    val res = client.post(url("/api/merchant-logos/ensure")) {
-        contentType(ContentType.Application.Json); auth(sessionCookie); setBody(MerchantLogoEnsureRequestDto(transactionId))
-    }
-    extractSessionCookie(res); ensureSuccess(res)
-    res.body<MerchantLogoMutationResponseDto>().merchantLogo
-        ?: throw IllegalStateException("This transaction does not have a merchant name to override.")
-}
-
 suspend fun OrbitApiClient.searchMerchantLogos(transactionId: Long, query: String): Result<MerchantLogoSearchResponseDto> = runCatching {
     val res = client.post(url("/api/merchant-logos/search")) {
         contentType(ContentType.Application.Json); auth(sessionCookie); setBody(MerchantLogoSearchRequestDto(transactionId = transactionId, query = query))
