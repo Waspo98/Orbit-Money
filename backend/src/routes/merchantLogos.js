@@ -41,10 +41,17 @@ router.post('/report', requireAuth, (req, res) => {
 router.post('/override', requireAuth, (req, res) => {
   const householdId = requireHouseholdId(req);
   const accountId = parseId(req.body?.account_id);
+  const transactionId = parseId(req.body?.transaction_id);
+  const rawScope = typeof req.body?.scope === 'string' ? req.body.scope.trim().toLowerCase() : '';
+  const scope = rawScope || null;
   let merchantKey = String(req.body?.merchant_key || '').trim();
   const merchantName = typeof req.body?.merchant_name === 'string' ? req.body.merchant_name.trim() : '';
   const useCategoryIcon = req.body?.use_category_icon === true;
   const rawLogoUrl = String(req.body?.logo_url || '').trim();
+
+  if (scope && !['global', 'institution', 'transaction'].includes(scope)) {
+    return sendBadRequest(res, 'scope must be global, institution, or transaction.');
+  }
 
   if (accountId !== null && accountId > 0) {
     const ensured = ensureInstitutionLogoEntryForAccount(db, accountId, householdId);
@@ -53,8 +60,8 @@ router.post('/override', requireAuth, (req, res) => {
     }
   }
 
-  if (!merchantKey) {
-    return sendBadRequest(res, 'merchant_key is required.');
+  if (!merchantKey && (transactionId === null || transactionId <= 0)) {
+    return sendBadRequest(res, 'merchant_key or transaction_id is required.');
   }
   if (!useCategoryIcon && !rawLogoUrl) {
     return sendBadRequest(res, 'logo_url is required unless using the category icon.');
@@ -75,10 +82,13 @@ router.post('/override', requireAuth, (req, res) => {
 
   try {
     const result = overrideMerchantLogo(db, {
-      merchantKey,
+      merchantKey: merchantKey || null,
+      transactionId: transactionId !== null && transactionId > 0 ? transactionId : null,
+      scope,
       merchantName: merchantName || null,
       logoUrl,
-      hide: useCategoryIcon
+      hide: useCategoryIcon,
+      householdId
     });
     if (!result.updated) {
       return sendNotFound(res, 'Merchant logo entry not found.');

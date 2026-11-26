@@ -1,13 +1,16 @@
 import { config } from '../config.js';
 import {
-  ensureCandidates,
   extractDomain,
+  merchantLogoKey
+} from './merchantLogoClassifier.js';
+import {
+  LOGO_PROVIDER,
+  ensureCandidates,
   logoDevUrl,
-  merchantLogoKey,
   publicLogoDevUrl
-} from './merchantLogos.js';
+} from './logoCachePrimitives.js';
 
-const PROVIDER = 'logo_dev';
+const PROVIDER = LOGO_PROVIDER;
 
 const INSTITUTION_DOMAIN_MAP = new Map([
   ['chase', 'chase.com'],
@@ -111,6 +114,42 @@ function normalizeInstitutionLookup(raw) {
     .trim();
 }
 
+const AMBIGUOUS_FREE_TEXT_INSTITUTIONS = new Set([
+  'ally',
+  'apple',
+  'm1',
+  'principal',
+  'wise',
+  'citizens'
+]);
+
+const FREE_TEXT_INSTITUTION_ENTRIES = [...INSTITUTION_DOMAIN_MAP.entries()]
+  .filter(([name]) => !AMBIGUOUS_FREE_TEXT_INSTITUTIONS.has(name))
+  .sort((a, b) => b[0].length - a[0].length)
+  .map(([name, domain]) => ({
+    name,
+    domain,
+    regex: new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i')
+  }));
+
+export function resolveCounterpartyInstitutionDomain(rawText, owningDomain = null) {
+  const explicit = extractDomain(rawText);
+  if (explicit && (!owningDomain || explicit !== owningDomain)) return explicit;
+  const norm = normalizeInstitutionLookup(rawText);
+  if (!norm) return explicit || null;
+
+  let firstMatch = null;
+  for (const entry of FREE_TEXT_INSTITUTION_ENTRIES) {
+    if (entry.regex.test(norm)) {
+      if (!firstMatch) firstMatch = entry.domain;
+      if (!owningDomain || entry.domain !== owningDomain) {
+        return entry.domain;
+      }
+    }
+  }
+  return explicit || firstMatch;
+}
+
 export function resolveInstitutionDomain(raw) {
   const explicit = extractDomain(raw);
   if (explicit) return explicit;
@@ -128,11 +167,11 @@ function cleanInstitutionDisplayName(raw) {
   return String(raw || '').replace(/\s+/g, ' ').trim();
 }
 
-function fallbackFaviconUrl(domain) {
+export function fallbackFaviconUrl(domain) {
   return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`;
 }
 
-function formatInstitutionCachedLogo(cached) {
+export function formatInstitutionCachedLogo(cached) {
   if (!cached) return null;
   const hasLogo = Boolean(cached.logo_url) && cached.status !== 'failed' && cached.status !== 'hidden';
   let url = null;
@@ -182,7 +221,7 @@ function candidateForAccount(row) {
   };
 }
 
-function identityForAccount(row) {
+export function identityForAccount(row) {
   const display = cleanInstitutionDisplayName(row?.institution);
   if (display && display.length >= 2) {
     const domain = resolveInstitutionDomain(display);

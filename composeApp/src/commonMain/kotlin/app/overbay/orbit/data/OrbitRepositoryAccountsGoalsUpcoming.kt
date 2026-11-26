@@ -1,7 +1,6 @@
 package app.overbay.orbit.data
 
 import app.overbay.orbit.data.model.*
-import app.overbay.orbit.data.network.MerchantLogoSearchResponseDto
 import app.overbay.orbit.data.network.*
 import app.overbay.orbit.domain.Cents
 import app.overbay.orbit.domain.CreditCardBenefitEngine
@@ -489,70 +488,4 @@ fun OrbitRepository.previewRuleLocal(rule: TransactionRule): RulePreviewResult {
         conflicts = conflicts,
         diffs = diffs
     )
-}
-
-// =============================================================================
-// Merchant Logos Extension Methods
-// =============================================================================
-
-internal suspend fun OrbitRepository.reportMerchantLogoStatusImpl(merchantKey: String, status: String) {
-    if (merchantKey.isBlank()) return
-    if (storageMode.value == StorageMode.SELF_HOSTED) {
-        runCatching { createApiClient().reportMerchantLogoStatus(merchantKey, status) }
-    }
-    if (status == "loaded") {
-        // "candidate" and "loaded" render identically in UI; avoid cloning all transactions
-        // and triggering full workspace snapshot emissions/disk flushes as each logo finishes loading.
-        return
-    }
-    val updatedList = transactions.value.map { txn ->
-        val currentLogo = txn.merchantLogo
-        if (currentLogo?.merchantKey == merchantKey && currentLogo.status == "candidate") {
-            txn.copy(merchantLogo = currentLogo.copy(status = status, url = if (status == "failed") null else currentLogo.url))
-        } else txn
-    }
-    if (updatedList != transactions.value) commitSnapshot(snapshot.value.copy(transactions = updatedList))
-}
-
-internal suspend fun OrbitRepository.searchMerchantLogosImpl(transactionId: Long, query: String): Result<MerchantLogoSearchResponseDto> = runCatching {
-    if (storageMode.value != StorageMode.SELF_HOSTED) {
-        MerchantLogoSearchResponseDto(configured = false, candidates = emptyList())
-    } else {
-        createApiClient().searchMerchantLogos(transactionId, query).getOrThrow()
-    }
-}
-
-internal suspend fun OrbitRepository.overrideMerchantLogoImpl(
-    transactionId: Long,
-    logoUrl: String? = null,
-    useCategoryIcon: Boolean = false
-): Result<MerchantLogo> = runCatching {
-    val target = transactions.value.find { it.id == transactionId }
-        ?: throw IllegalStateException("Transaction not found.")
-    val cleanedName = cleanMerchantNameForLogo(target.effectiveMerchant.ifBlank { target.originalMerchant })
-    val fallbackKey = target.resolvedMerchantKey
-    if (fallbackKey.isBlank()) throw IllegalStateException("This merchant does not have a logo entry to update yet.")
-    val updatedLogo = if (storageMode.value == StorageMode.SELF_HOSTED) {
-        val client = createApiClient()
-        val ensuredKey = target.merchantLogo?.merchantKey?.takeIf { it.isNotBlank() }
-            ?: client.ensureMerchantLogo(transactionId).getOrNull()?.merchantKey
-            ?: fallbackKey
-        client.overrideMerchantLogo(ensuredKey, logoUrl, useCategoryIcon).getOrThrow().toDomain()
-            ?: MerchantLogo(ensuredKey, cleanedName, url = if (useCategoryIcon) null else logoUrl, status = if (useCategoryIcon) "hidden" else "manual")
-    } else {
-        MerchantLogo(
-            merchantKey = fallbackKey,
-            merchantName = cleanedName,
-            providerQuery = cleanedName,
-            url = if (useCategoryIcon) null else logoUrl?.trim(),
-            status = if (useCategoryIcon) "hidden" else "manual"
-        )
-    }
-    val updatedList = transactions.value.map { txn ->
-        if (txn.id == transactionId || txn.resolvedMerchantKey == updatedLogo.merchantKey || merchantLogoKey(txn.effectiveMerchant) == updatedLogo.merchantKey) {
-            txn.copy(merchantLogo = updatedLogo)
-        } else txn
-    }
-    commitSnapshot(snapshot.value.copy(transactions = updatedList))
-    updatedLogo
 }

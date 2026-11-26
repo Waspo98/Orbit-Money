@@ -279,6 +279,8 @@ suspend fun OrbitApiClient.overrideMerchantLogo(
     logoUrl: String? = null,
     useCategoryIcon: Boolean = false,
     accountId: Long? = null,
+    transactionId: Long? = null,
+    scope: String? = null,
     merchantName: String? = null
 ): Result<MerchantLogoDto> = runCatching {
     val res = client.post(url("/api/merchant-logos/override")) {
@@ -289,6 +291,8 @@ suspend fun OrbitApiClient.overrideMerchantLogo(
                 logoUrl = logoUrl?.takeIf { it.isNotBlank() },
                 useCategoryIcon = useCategoryIcon,
                 accountId = accountId,
+                transactionId = transactionId,
+                scope = scope,
                 merchantName = merchantName
             )
         )

@@ -282,11 +282,18 @@ class TransactionsViewModel(
     suspend fun searchMerchantLogos(transactionId: Long, query: String): Result<MerchantLogoSearchResponseDto> =
         repository.searchMerchantLogos(transactionId, query)
 
-    suspend fun saveMerchantLogoOverride(transactionId: Long, logoUrl: String): Result<Unit> =
-        repository.overrideMerchantLogo(transactionId, logoUrl = logoUrl, useCategoryIcon = false).map {}
+    suspend fun saveMerchantLogoOverride(
+        transactionId: Long,
+        logoUrl: String,
+        scope: app.overbay.orbit.data.model.LogoOverrideScope? = null
+    ): Result<Unit> =
+        repository.overrideMerchantLogo(transactionId, logoUrl = logoUrl, useCategoryIcon = false, scope = scope).map {}
 
-    suspend fun useCategoryIconSuspend(transactionId: Long): Result<Unit> =
-        repository.overrideMerchantLogo(transactionId, useCategoryIcon = true).map {}
+    suspend fun useCategoryIconSuspend(
+        transactionId: Long,
+        scope: app.overbay.orbit.data.model.LogoOverrideScope? = null
+    ): Result<Unit> =
+        repository.overrideMerchantLogo(transactionId, useCategoryIcon = true, scope = scope).map {}
 
     fun syncSimpleFin() {
         if (_isSyncing.value) return

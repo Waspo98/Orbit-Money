@@ -122,6 +122,7 @@ data class OrbitPreferences(
     val mutedSimpleFinAccounts: List<String> = emptyList(),
     val dismissedClosurePrompts: Map<String, String> = emptyMap(),
     val accountInstitutionLogoOverrides: Map<String, MerchantLogo> = emptyMap(),
+    val merchantLogoOverrides: Map<String, MerchantLogo> = emptyMap(),
     val includeHsaInRetirementRate: Boolean = true,
     val retirementIncludedAccountIds: List<Long>? = null,
     val notificationPreferences: NotificationPreferencesConfig = NotificationPreferencesConfig(),

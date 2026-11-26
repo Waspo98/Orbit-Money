@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -34,6 +36,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.overbay.orbit.data.model.LogoOverrideScope
+import app.overbay.orbit.data.model.LogoScopeOption
 import app.overbay.orbit.data.network.MerchantLogoCandidateDto
 import app.overbay.orbit.theme.OrbitTheme
 import app.overbay.orbit.ui.components.OrbitHorizontalReveal
@@ -103,6 +107,59 @@ internal fun MerchantLogoCandidatesSection(
                 Spacer(modifier = Modifier.height(12.dp))
             }
             else -> Unit
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun LogoScopeSelectorSection(
+    options: List<LogoScopeOption>,
+    selectedScope: LogoOverrideScope,
+    saving: Boolean,
+    onSelectScope: (LogoOverrideScope) -> Unit
+) {
+    if (options.isEmpty()) return
+    val haptics = LocalOrbitHaptics.current
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = "Apply To",
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            options.forEach { option ->
+                val isSelected = option.scope == selectedScope
+                FilterChip(
+                    selected = isSelected,
+                    onClick = {
+                        if (!saving && !isSelected) {
+                            haptics.tick()
+                            onSelectScope(option.scope)
+                        }
+                    },
+                    enabled = !saving,
+                    label = {
+                        Text(
+                            text = option.label,
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    shape = CircleShape,
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                )
+            }
         }
     }
 }

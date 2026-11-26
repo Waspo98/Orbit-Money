@@ -62,6 +62,7 @@ data class Account(
 ) {
     val resolvedInstitutionLogoKey: String
         get() = institutionLogo?.merchantKey?.takeIf { it.isNotBlank() }
+            ?: InstitutionLogoDefaults.resolveDomain(institution)?.let { "inst:$it" }
             ?: institution?.let { merchantLogoKey(it) }?.takeIf { it.isNotBlank() }?.let { "inst:$it" }
             ?: "inst:acct-$id"
 
@@ -323,6 +324,20 @@ object InstitutionLogoDefaults {
         "chime" to "chime.com"
     )
 
+    private val AMBIGUOUS_FREE_TEXT_NAMES = setOf("ally", "apple", "m1", "principal", "wise", "citizens")
+
+    private val FREE_TEXT_ENTRIES: List<Pair<Regex, String>> by lazy {
+        DOMAIN_BY_NAME.entries
+            .filter { (key, _) -> key !in AMBIGUOUS_FREE_TEXT_NAMES }
+            .sortedByDescending { it.key.length }
+            .map { (key, domain) -> Regex("\\b${Regex.escape(key)}\\b", RegexOption.IGNORE_CASE) to domain }
+    }
+
+    private val EXPLICIT_DOMAIN_REGEX = Regex(
+        "\\b(?:https?://)?(?:www\\.)?([a-z0-9][a-z0-9-]*(?:\\.[a-z0-9][a-z0-9-]*)+\\.[a-z]{2,})\\b",
+        RegexOption.IGNORE_CASE
+    )
+
     fun resolveDomain(institution: String?): String? {
         val raw = institution?.trim()?.takeIf { it.isNotBlank() } ?: return null
         val norm = raw.lowercase()
@@ -333,6 +348,37 @@ object InstitutionLogoDefaults {
         DOMAIN_BY_NAME[norm]?.let { return it }
         val stripped = norm.replace(Regex("\\s+(bank|financial|investments|savings|mortgage)$"), "").trim()
         return DOMAIN_BY_NAME[stripped]
+    }
+
+    fun resolveCounterpartyDomainInText(rawText: String?, owningDomain: String? = null): String? {
+        val raw = rawText?.trim()?.takeIf { it.isNotBlank() } ?: return null
+        val explicit = EXPLICIT_DOMAIN_REGEX.find(raw.lowercase())
+            ?.groupValues?.getOrNull(1)
+            ?.removePrefix("www.")
+            ?.takeUnless { it.endsWith(".local") || it.endsWith(".invalid") }
+        if (explicit != null && (owningDomain == null || explicit != owningDomain)) return explicit
+
+        val norm = raw.lowercase()
+            .replace("&", " and ")
+            .replace(Regex("[^a-z0-9]+"), " ")
+            .trim()
+        if (norm.isBlank()) return explicit
+
+        var firstMatch: String? = null
+        for ((regex, domain) in FREE_TEXT_ENTRIES) {
+            if (regex.containsMatchIn(norm)) {
+                if (firstMatch == null) firstMatch = domain
+                if (owningDomain == null || domain != owningDomain) return domain
+            }
+        }
+        return explicit ?: firstMatch
+    }
+
+    fun displayNameForDomain(domain: String?): String? {
+        if (domain.isNullOrBlank()) return null
+        return DOMAIN_BY_NAME.entries.firstOrNull { it.value == domain }?.key
+            ?.split(" ")
+            ?.joinToString(" ") { part -> part.replaceFirstChar { it.uppercase() } }
     }
 
     fun fallbackUrlFor(institution: String?): String? {
